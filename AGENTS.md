@@ -16,6 +16,16 @@ UniTask belongs in asynchronous application/integration services; deterministic 
 
 Read [the module policy](Docs/Architecture.md) for dependency direction and lifetime rules. The selected stack is intentional: Ponytail's stdlib-first heuristic must not replace it with coroutines, service locators or handmade tween loops.
 
+## Coding conventions
+
+- Put exactly one class, struct, interface, enum, record, or delegate in each
+  production `.cs` file. The filename must match that type (generic parameters
+  are omitted from the filename); do not nest an additional declared type.
+- Organize related types with folders, namespaces and assemblies rather than
+  grouping declarations into a catch-all source file. This keeps Git history,
+  reviews and ownership precise.
+- Apply the same convention to test sources and helpers.
+
 ## Reuse before implementation
 
 Search existing code, tests and installed package APIs before adding a subsystem. For substantial missing capabilities, inspect maintained upstream solutions and official documentation; compare fit, license, Unity/IL2CPP/AOT compatibility, allocations, dependencies and maintenance. Prefer adapting an existing API to duplicating it. Record the chosen reuse source or a short reason custom code is needed; trivial fixes do not need a research report.

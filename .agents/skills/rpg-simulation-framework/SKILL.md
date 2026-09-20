@@ -13,12 +13,10 @@ not use it for an unrelated Unity feature that does not cross this boundary.
 
 - `Docs/Simulation-Architecture.md` for the public boundary and delivery
   rules.
-- `Assets/Scripts/Simulation/Contracts/Protocol/SimulationContracts.cs` for
-  protocol contracts.
-- `Assets/Scripts/Simulation/Runtime/Host/SimulationHost.cs` for thread and
-  tick ownership.
-- `Assets/Scripts/Core/Actors/RpgSimulation.cs` for the current RPG vertical
-  slice and snapshot projection.
+- `Assets/Scripts/Simulation/Contracts/Protocol/` for protocol contracts.
+- `Assets/Scripts/Simulation/Runtime/Host/` for thread and tick ownership.
+- `Assets/Scripts/Core/Actors/` for the current RPG vertical slice and
+  snapshot projection.
 
 ## Invariants
 
@@ -39,6 +37,9 @@ not use it for an unrelated Unity feature that does not cross this boundary.
 - Core events are typed `ISimulationEvent`s processed by the host phase. Keep
   MessagePipe, VContainer, UniTask, LitMotion, MonoBehaviour, and Unity types
   in the Unity adapter/composition layer.
+- Keep one declared type per `.cs` file, named after that type. Use the
+  Contracts, Runtime and Actors folders to express the relationship instead of
+  accumulating protocol or gameplay types in one source file.
 
 ## Extending gameplay
 
