@@ -8,6 +8,7 @@ namespace RPG.Core.Actors
         public ActorRegistry Actors { get; } = new();
         public Dictionary<PlayerId, EntityId> PlayerActors { get; } = new();
         public List<PresentationSignal> Signals { get; } = new();
+        public TurnState Turns { get; } = new();
 
         public void BeginTick() => Signals.Clear();
     }

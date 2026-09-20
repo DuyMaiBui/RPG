@@ -1,0 +1,20 @@
+{
+  "name": "RPG.Unity",
+  "rootNamespace": "RPG.Unity",
+  "references": [
+    "RPG.Core",
+    "RPG.Simulation.Contracts",
+    "RPG.Simulation.Runtime",
+    "LitMotion",
+    "LitMotion.Extensions"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -10,6 +10,9 @@ namespace RPG.Core.Actors
         private readonly Stack<int> _freeIndices = new();
 
         public EntityId Spawn(ActorKind kind, int maximumHealth, int attackPower)
+            => Spawn(kind, kind == ActorKind.Player ? FactionId.Red : FactionId.Blue, maximumHealth, attackPower);
+
+        public EntityId Spawn(ActorKind kind, FactionId faction, int maximumHealth, int attackPower)
         {
             var index = _freeIndices.Count > 0 ? _freeIndices.Pop() : _actors.Count;
             if (index == _actors.Count)
@@ -19,7 +22,7 @@ namespace RPG.Core.Actors
             }
 
             var id = new EntityId(index, _generations[index]);
-            _actors[index] = new Actor(id, kind, maximumHealth, attackPower);
+            _actors[index] = new Actor(id, kind, faction, maximumHealth, attackPower);
             return id;
         }
 
@@ -50,7 +53,7 @@ namespace RPG.Core.Actors
             foreach (var actor in _actors)
             {
                 if (actor == null) continue;
-                snapshots.Add(new ActorSnapshot(actor.Id, actor.Kind, actor.CurrentHealth, actor.MaximumHealth,
+                snapshots.Add(new ActorSnapshot(actor.Id, actor.Kind, actor.Faction, actor.CurrentHealth, actor.MaximumHealth,
                     actor.IsDead ? ActorVisualState.Dead : ActorVisualState.Idle));
             }
 

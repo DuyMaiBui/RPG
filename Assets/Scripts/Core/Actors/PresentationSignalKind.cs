@@ -2,7 +2,10 @@ namespace RPG.Core.Actors
 {
     public enum PresentationSignalKind : byte
     {
-        Damaged = 1,
-        Died = 2,
+        AttackStarted = 1,
+        Damaged = 2,
+        Died = 3,
+        TurnStarted = 4,
+        BattleEnded = 5,
     }
 }

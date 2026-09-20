@@ -82,6 +82,61 @@ public sealed class RpgSimulationTests
         Assert.Throws<InvalidOperationException>(() => host.TryReadLatest(out _));
     }
 
+    [Test]
+    public void TargetSelector_RetargetsToNextAliveEnemyWithoutRangeChecks()
+    {
+        var registry = new ActorRegistry();
+        var attackerId = registry.Spawn(ActorKind.Player, FactionId.Red, 10, 1);
+        var defeatedId = registry.Spawn(ActorKind.Monster, FactionId.Blue, 1, 0);
+        var replacementId = registry.Spawn(ActorKind.Monster, FactionId.Blue, 10, 0);
+        Assert.That(registry.TryGet(attackerId, out var attacker), Is.True);
+        Assert.That(registry.Destroy(defeatedId), Is.True);
+
+        var selector = new AnyAliveEnemyTargetSelector();
+
+        Assert.That(selector.TrySelect(attacker, registry, out var selected), Is.True);
+        Assert.That(selected, Is.EqualTo(replacementId));
+    }
+
+    [Test]
+    public void TurnState_RemovesDefeatedActorBeforeAdvancing()
+    {
+        var registry = new ActorRegistry();
+        var redId = registry.Spawn(ActorKind.Player, FactionId.Red, 10, 1);
+        var blueId = registry.Spawn(ActorKind.Monster, FactionId.Blue, 10, 1);
+        var order = new[] { redId, blueId };
+        var turns = new TurnState();
+        turns.Initialize(order);
+
+        Assert.That(registry.Destroy(blueId), Is.True);
+        Assert.That(turns.Advance(registry), Is.True);
+        Assert.That(turns.ActiveActorId, Is.EqualTo(redId));
+    }
+
+    [Test]
+    public void ZeroDamageAttack_StillAdvancesTurn()
+    {
+        var state = new RpgSimulationState();
+        var application = new RpgSimulationApplication();
+        using var host = new SimulationHost<RpgSimulationState>(state, application, new SimulationOptions(10));
+        var redId = state.Actors.Spawn(ActorKind.Player, FactionId.Red, 10, 0);
+        var blueId = state.Actors.Spawn(ActorKind.Monster, FactionId.Blue, 10, 1);
+        var red = new PlayerId("red");
+        state.PlayerActors.Add(red, redId);
+        state.Turns.Initialize(new[] { redId, blueId });
+        using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(host, new SessionContext(new SessionId(Guid.NewGuid()), red));
+
+        host.Start();
+        Assert.That(client.TrySend(new ClientCommandEnvelope(
+            ProtocolVersion.Current,
+            new ClientSequence(0),
+            new SimulationTick(0),
+            new AttackCommand(blueId))), Is.True);
+
+        WaitForUpdate(client, update => update.Payload is WorldFrameUpdate frame && frame.TurnNumber > 0);
+        Assert.That(state.Turns.ActiveActorId, Is.EqualTo(blueId));
+    }
+
     private static ServerUpdateEnvelope WaitForUpdate(
         ISimulationClient client,
         Func<ServerUpdateEnvelope, bool> predicate)
