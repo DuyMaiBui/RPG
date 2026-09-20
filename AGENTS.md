@@ -19,6 +19,13 @@ only instantiate a serialized prefab reference and bind simulation state to its
 existing components. Missing references are authoring/configuration errors and
 must be reported rather than silently repaired at runtime.
 
+Prefer a small reusable prefab composition: establish a base actor/view prefab,
+extract reusable component prefabs for shared UI/effects, and use prefab
+variants or nested prefab instances for faction/content differences. Do not
+duplicate nearly identical prefab hierarchies; before creating a new prefab,
+search for an existing base, component prefab or variant extension point.
+Keep overrides intentional and localized so prefab changes propagate safely.
+
 Reusable modules own cohesive rules and public contracts, with explicit acyclic assembly dependencies. Core contracts do not reference bridges or composition. Cross-feature access uses narrow contracts, not concrete peer services. Use Unity-free assembly definitions (`noEngineReferences`) when extracting truly engine-independent modules. Do not create empty layers or interfaces for every class. Preserve existing paths and metadata; extract reusable packages when an actual consumer exists.
 
 UniTask belongs in asynchronous application/integration services; deterministic core steps stay synchronous with explicit delta time where needed. Pass CancellationToken from the owning operation/scope; cancellation on pool return/disable is distinct from destruction. Await operations or deliberately observe errors at the event boundary. LitMotion owns visual transitions in presenters/adapters; cancel motion on replacement, scope end or pool return. Visual completion must not own authoritative damage, rewards or saved state.
@@ -59,6 +66,11 @@ serialized asset when the format and GUID/reference integrity are understood;
 otherwise use the configured Unity MCP/CLI. Inspect the resulting asset and
 references after either path. Do not call MCP merely for edits that can be
 safely and completely represented as text.
+
+When authoring a new view, first identify the reusable base prefab and nested
+component prefabs it should compose. Treat repeated serialized hierarchies as
+a review finding unless the differences cannot be represented by a variant,
+serialized configuration, or a separate nested component prefab.
 
 An editor-only C# static helper may be created for a narrowly scoped MCP
 authoring operation when text editing cannot preserve Unity serialization. It

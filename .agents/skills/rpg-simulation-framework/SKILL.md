@@ -46,6 +46,10 @@ not use it for an unrelated Unity feature that does not cross this boundary.
   instantiate serialized prefab references and bind existing components, but
   must not create GameObjects, add view components, or build UI/rendering
   hierarchies at runtime. Missing authoring is a configuration error.
+- Prefer a reusable base view prefab with nested component prefabs and prefab
+  variants for content/faction differences. Do not create duplicate actor/UI
+  hierarchies when an existing prefab composition or serialized configuration
+  can express the variation.
 
 ## Extending gameplay
 

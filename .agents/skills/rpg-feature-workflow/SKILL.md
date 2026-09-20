@@ -13,7 +13,11 @@ Read project `AGENTS.md` first.
 4. Implement a small end-to-end slice using existing paths. Preserve GUIDs and serialization compatibility. Avoid framework or dependency installation unless the task requires it.
 5. Author gameplay views in prefabs/scenes before runtime wiring. Runtime code may instantiate only serialized prefab references and bind existing components; it must not create view GameObjects, add view components, or construct UI/rendering hierarchies as a fallback.
 6. Prefer carefully scoped plain-text edits to serialized scene/prefab assets when GUIDs and YAML integrity are understood. Use Unity MCP/CLI when text is unsafe or insufficient, and inspect references after the edit.
-7. Validate the acceptance scenario using rpg-validation. Report changed behavior, evidence and any unresolved limitation.
+7. Compose views from a reusable base prefab plus nested component prefabs or
+   prefab variants. Search existing prefab extension points before creating a
+   new hierarchy, and avoid duplicated serialized structures that should share
+   future fixes.
+8. Validate the acceptance scenario using rpg-validation. Report changed behavior, evidence and any unresolved limitation.
 
 ## Authoring-tool boundary
 
