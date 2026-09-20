@@ -1,0 +1,23 @@
+# Project roles; inherit user model, permissions and the existing unity MCP.
+[agents.unity_architect]
+description = "Inspect Unity C# module boundaries and propose a scoped architecture for a feature."
+config_file = "agents/unity-architect.toml"
+
+[agents.unity_gameplay]
+description = "Implement a bounded Unity C# gameplay feature using the established project architecture."
+config_file = "agents/unity-gameplay.toml"
+
+[agents.unity_reviewer]
+description = "Review Unity C# diffs for concrete correctness, lifecycle and architecture issues."
+config_file = "agents/unity-reviewer.toml"
+
+[agents.unity_qa]
+description = "Verify a Unity change with focused tests and explicit runtime evidence."
+config_file = "agents/unity-qa.toml"
+
+# Installed in the shared cache; active only for this trusted project.
+[plugins."ponytail@ponytail"]
+enabled = true
+
+[features]
+hooks = true

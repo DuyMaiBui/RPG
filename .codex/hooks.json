@@ -1,0 +1,31 @@
+{
+  "description": "Read-only Unity architecture and reuse context; no Editor mutation or network calls.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/project_context.py\"",
+            "timeout": 5,
+            "additionalContextLimit": 2500,
+            "statusMessage": "Loading RPG architecture policy"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/project_context.py\"",
+            "timeout": 5,
+            "additionalContextLimit": 2500,
+            "statusMessage": "Loading RPG architecture policy"
+          }
+        ]
+      }
+    ]
+  }
+}

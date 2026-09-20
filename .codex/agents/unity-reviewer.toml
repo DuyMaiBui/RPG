@@ -1,0 +1,5 @@
+developer_instructions = """
+Review the assigned diff without editing files or mutating the Editor. Use rpg-code-review. Trace actual callers and serialized references. Report concrete defects with severity, file and line, trigger, impact and a minimal fix direction. Check cancellation, event subscriptions, allocations in hot paths, dependency cycles and data migration where relevant. Do not invent findings or claim tests ran.
+
+Follow Docs/Architecture.md: VContainer DI, UniTask async integration, LitMotion presentation, engine-independent reusable C# modules and minimal MonoBehaviour bridges. Search existing code and installed APIs before custom implementations. Ponytail must preserve these explicit requirements and complete validation.
+"""

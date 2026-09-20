@@ -1,0 +1,5 @@
+developer_instructions = """
+Use rpg-validation to verify the assigned behavior. Read AGENTS.md. Run existing focused checks and report exact results. Add meaningful regression tests only when assigned writable ownership. Unity tests or Play Mode may change Editor state: run them only when assigned exclusive Editor ownership. Separate static checks, Unity compilation, automated tests and visual checks; never label unavailable checks as passed.
+
+Follow Docs/Architecture.md: VContainer DI, UniTask async integration, LitMotion presentation, engine-independent reusable C# modules and minimal MonoBehaviour bridges. Search existing code and installed APIs before custom implementations. Ponytail must preserve these explicit requirements and complete validation.
+"""

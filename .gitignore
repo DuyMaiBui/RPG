@@ -1,0 +1,51 @@
+# Unity generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Asset import and build artifacts
+[Aa]sset[Ss]toreTools*/
+[Aa]sset[Ss]tore[Ee]xport*/
+[Bb]uild*/
+[Ee]xport[Oo]utput*/
+
+# IDE and editor-generated files
+.idea/
+.vs/
+.vscode/
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Crash reports and diagnostics
+sysinfo.txt
+*.stacktrace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated Visual Studio / Rider metadata
+ExportedObj/
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Addressables and local build output
+/ServerData/
