@@ -1,0 +1,12 @@
+{
+  "name": "RPG.Simulation.Contracts.Tests",
+  "references": [
+    "RPG.Simulation.Contracts"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

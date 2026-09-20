@@ -1,0 +1,8 @@
+{
+  "name": "RPG.Core",
+  "references": [
+    "RPG.Simulation.Contracts",
+    "RPG.Simulation.Runtime"
+  ],
+  "noEngineReferences": true
+}

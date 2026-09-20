@@ -1,0 +1,7 @@
+{
+  "name": "RPG.Simulation.Runtime",
+  "references": [
+    "RPG.Simulation.Contracts"
+  ],
+  "noEngineReferences": true
+}

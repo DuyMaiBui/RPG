@@ -1,0 +1,14 @@
+{
+  "name": "RPG.Core.Tests",
+  "references": [
+    "RPG.Core",
+    "RPG.Simulation.Contracts",
+    "RPG.Simulation.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
