@@ -42,6 +42,10 @@ not use it for an unrelated Unity feature that does not cross this boundary.
   accumulating protocol or gameplay types in one source file.
 - Implement interface members explicitly (`InterfaceName.Member`) so concrete
   APIs and contract APIs remain visually distinct at call sites.
+- Gameplay view objects are authored in prefabs/scenes. The Unity bridge may
+  instantiate serialized prefab references and bind existing components, but
+  must not create GameObjects, add view components, or build UI/rendering
+  hierarchies at runtime. Missing authoring is a configuration error.
 
 ## Extending gameplay
 
@@ -65,5 +69,10 @@ not use it for an unrelated Unity feature that does not cross this boundary.
 - For core changes, run focused Edit Mode tests. For Unity bridge/pooling/view
   changes, also run a Play Mode lifecycle check and confirm all subscriptions
   and motions are canceled on unbind/pool return.
+- Prefer plain-text serialized scene/prefab edits when their GUID/reference
+  integrity is understood; otherwise use the configured Unity MCP/CLI and
+  inspect the resulting asset. Any temporary editor/static C# helper must be
+  explicitly AI-agent/editor-only, isolated from runtime assemblies, reviewed
+  before execution, and retained until the user approves its removal.
 - Do not add networking, authentication, prediction, delta replication, or
   empty adapter abstractions until their concrete implementation is authorized.

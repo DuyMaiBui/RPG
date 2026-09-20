@@ -10,6 +10,15 @@ Use dependency injection, UniTask for Unity-facing asynchronous work, and LitMot
 
 Gameplay core is plain C#: no MonoBehaviour inheritance, scene lookup, Unity lifecycle, Transform, GameObject, LitMotion or container resolution. Constructor injection expresses dependencies; consumer-owned interfaces are appropriate at real module/engine boundaries even with one current implementation. Keep VContainer registrations, entry points and LifetimeScope in the composition/integration layer. MonoBehaviours are thin bridges for serialized references, input/physics callbacks and rendering/lifecycle handoff. Do not remove engine components needed by Unity or create a manager MonoBehaviour for each service.
 
+Gameplay views must be authored into prefabs and scenes. Serialized prefab and
+scene references are the source of truth for view hierarchy, components,
+materials, UI, anchors and required child objects. Runtime gameplay code must
+not create view GameObjects, add view components, build Canvas/UI hierarchies,
+or create sprites/materials/prefabs to repair missing authoring. Runtime may
+only instantiate a serialized prefab reference and bind simulation state to its
+existing components. Missing references are authoring/configuration errors and
+must be reported rather than silently repaired at runtime.
+
 Reusable modules own cohesive rules and public contracts, with explicit acyclic assembly dependencies. Core contracts do not reference bridges or composition. Cross-feature access uses narrow contracts, not concrete peer services. Use Unity-free assembly definitions (`noEngineReferences`) when extracting truly engine-independent modules. Do not create empty layers or interfaces for every class. Preserve existing paths and metadata; extract reusable packages when an actual consumer exists.
 
 UniTask belongs in asynchronous application/integration services; deterministic core steps stay synchronous with explicit delta time where needed. Pass CancellationToken from the owning operation/scope; cancellation on pool return/disable is distinct from destruction. Await operations or deliberately observe errors at the event boundary. LitMotion owns visual transitions in presenters/adapters; cancel motion on replacement, scope end or pool return. Visual completion must not own authoritative damage, rewards or saved state.
@@ -44,6 +53,20 @@ Use only the configured MCP server named `unity`, with Unity CLI as a fallback t
 Check `unity status --format json` before Editor automation. `com.unity.pipeline` provides the integration. No ready instance is a connection blocker, not evidence that code compiles or that a scene is correct. Inspect Pipeline status and compiler logs before diagnosing the cause.
 
 Use Editor APIs for serialized scene, prefab and asset changes. Preserve `.meta` files and GUIDs; let Unity generate metadata for new assets. Do not edit generated `Library`, `Temp`, `.csproj` or `.sln` files. Package changes must remain explicit and relevant to the task.
+
+For scene and prefab setup, prefer a minimal plain-text change to the
+serialized asset when the format and GUID/reference integrity are understood;
+otherwise use the configured Unity MCP/CLI. Inspect the resulting asset and
+references after either path. Do not call MCP merely for edits that can be
+safely and completely represented as text.
+
+An editor-only C# static helper may be created for a narrowly scoped MCP
+authoring operation when text editing cannot preserve Unity serialization. It
+must be clearly named and documented as an AI-agent/editor tool, have no
+runtime assembly dependency, and be removed when no longer needed. Removing a
+one-shot helper requires asking the user first; never delete it implicitly.
+Inspect what such a helper changes before running it and validate the produced
+asset afterward.
 
 ## Work and validation
 
