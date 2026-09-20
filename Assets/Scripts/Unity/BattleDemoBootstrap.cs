@@ -14,6 +14,11 @@ namespace RPG.Unity
         [SerializeField] private int maximumHealth = 30;
         [SerializeField] private int attackPower = 5;
         [SerializeField] private int tickRate = 10;
+        [SerializeField] private ActorView actorPrefab;
+        [SerializeField] private Transform actorRoot;
+        [SerializeField] private FloatingCombatTextPool floatingTextPool;
+        [SerializeField] private TurnBattleDemoDriver driver;
+        [SerializeField] private SimulationUnityBridge bridge;
 
         private SimulationHost<RpgSimulationState> _host;
         private ActorViewRegistry _registry;
@@ -22,16 +27,14 @@ namespace RPG.Unity
 
         private void Start()
         {
-            ConfigureCamera();
+            if (actorPrefab == null || actorRoot == null || floatingTextPool == null || driver == null || bridge == null)
+                throw new InvalidOperationException("BattleDemoBootstrap scene references are incomplete.");
+
             var state = new RpgSimulationState();
             var application = new RpgSimulationApplication();
             _host = new SimulationHost<RpgSimulationState>(state, application, new SimulationOptions(tickRate));
             _registry = new ActorViewRegistry();
-            var viewRoot = new GameObject("ActorViews");
-            var floatingTextRoot = new GameObject("FloatingCombatTextPool");
-            var floatingTextPool = floatingTextRoot.AddComponent<FloatingCombatTextPool>();
-            var driver = gameObject.AddComponent<TurnBattleDemoDriver>();
-            _bridge = gameObject.AddComponent<SimulationUnityBridge>();
+            _bridge = bridge;
 
             var orderedIds = new List<SimulationEntityId>(actorsPerFaction * 2);
             var clientsByActor = new Dictionary<SimulationEntityId, ISimulationClient>();
@@ -39,8 +42,8 @@ namespace RPG.Unity
             var blueIds = new List<SimulationEntityId>(actorsPerFaction);
             for (var index = 0; index < actorsPerFaction; index++)
             {
-                redIds.Add(SpawnActor(state, clientsByActor, viewRoot.transform, floatingTextPool, FactionId.Red, index));
-                blueIds.Add(SpawnActor(state, clientsByActor, viewRoot.transform, floatingTextPool, FactionId.Blue, index));
+                redIds.Add(SpawnActor(state, clientsByActor, actorRoot, floatingTextPool, FactionId.Red, index));
+                blueIds.Add(SpawnActor(state, clientsByActor, actorRoot, floatingTextPool, FactionId.Blue, index));
             }
 
             for (var index = 0; index < actorsPerFaction; index++)
@@ -53,24 +56,6 @@ namespace RPG.Unity
             driver.Initialize(clientsByActor);
             _bridge.Initialize(clientsByActor[orderedIds[0]], _registry, driver);
             _host.Start();
-        }
-
-        private static void ConfigureCamera()
-        {
-            var camera = Camera.main;
-            if (camera == null)
-            {
-                var cameraObject = new GameObject("BattleCamera");
-                camera = cameraObject.AddComponent<Camera>();
-                cameraObject.tag = "MainCamera";
-            }
-
-            camera.orthographic = true;
-            camera.orthographicSize = 5.25f;
-            camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.035f, 0.05f, 0.09f, 1f);
-            camera.transform.position = new Vector3(0f, 0f, -10f);
-            camera.transform.rotation = Quaternion.identity;
         }
 
         private void OnDestroy()
@@ -98,13 +83,12 @@ namespace RPG.Unity
             _clients.Add(client);
             clientsByActor.Add(id, client);
 
-            var viewObject = new GameObject($"{faction}_{index}");
-            viewObject.transform.SetParent(viewRoot, false);
-            viewObject.transform.position = new Vector3(
+            var view = Instantiate(actorPrefab, viewRoot);
+            view.name = $"{faction}_{index}";
+            view.transform.position = new Vector3(
                 faction == FactionId.Red ? -2f : 2f,
                 (index - (actorsPerFaction - 1) * 0.5f) * 1.5f,
                 0f);
-            var view = viewObject.AddComponent<ActorView>();
             view.Initialize(id, faction, floatingTextPool);
             _registry.Add(id, view);
             return id;

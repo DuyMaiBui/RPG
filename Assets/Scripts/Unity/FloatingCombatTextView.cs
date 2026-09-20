@@ -1,3 +1,4 @@
+using System;
 using LitMotion;
 using LitMotion.Extensions;
 using UnityEngine;
@@ -7,8 +8,8 @@ namespace RPG.Unity
 {
     public sealed class FloatingCombatTextView : MonoBehaviour
     {
-        private Text _label;
-        private CanvasGroup _canvasGroup;
+        [SerializeField] private Text _label;
+        [SerializeField] private CanvasGroup _canvasGroup;
         private MotionHandle _positionMotion;
         private MotionHandle _alphaMotion;
         private FloatingCombatTextPool _owner;
@@ -18,22 +19,8 @@ namespace RPG.Unity
         public void Initialize(FloatingCombatTextPool owner)
         {
             _owner = owner;
-            var canvas = gameObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            canvas.sortingOrder = 20;
-            gameObject.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 10f;
-            _canvasGroup = gameObject.AddComponent<CanvasGroup>();
-            var labelObject = new GameObject("Label");
-            labelObject.transform.SetParent(transform, false);
-            _label = labelObject.AddComponent<Text>();
-            _label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _label.fontSize = 32;
-            _label.alignment = TextAnchor.MiddleCenter;
-            _label.fontStyle = FontStyle.Bold;
-            _label.color = Color.white;
-            var rect = _label.rectTransform;
-            rect.sizeDelta = new Vector2(160f, 60f);
-            rect.localScale = Vector3.one * 0.01f;
+            if (_label == null || _canvasGroup == null)
+                throw new InvalidOperationException("FloatingCombatTextView prefab references are incomplete.");
             gameObject.SetActive(false);
         }
 

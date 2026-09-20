@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,6 +7,7 @@ namespace RPG.Unity
     public sealed class FloatingCombatTextPool : MonoBehaviour
     {
         [SerializeField] private int initialSize = 12;
+        [SerializeField] private FloatingCombatTextView itemPrefab;
         private readonly List<FloatingCombatTextView> _items = new();
 
         private void Awake()
@@ -32,9 +34,9 @@ namespace RPG.Unity
 
         private FloatingCombatTextView CreateItem()
         {
-            var itemObject = new GameObject("FloatingCombatText");
-            itemObject.transform.SetParent(transform, false);
-            var item = itemObject.AddComponent<FloatingCombatTextView>();
+            if (itemPrefab == null)
+                throw new InvalidOperationException("FloatingCombatTextPool requires an item prefab.");
+            var item = Instantiate(itemPrefab, transform);
             item.Initialize(this);
             _items.Add(item);
             return item;

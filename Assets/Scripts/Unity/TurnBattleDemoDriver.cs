@@ -10,7 +10,7 @@ namespace RPG.Unity
     {
         private IReadOnlyDictionary<SimulationEntityId, ISimulationClient> _clients;
         private long _lastCommandTurn = -1;
-        private readonly Dictionary<SimulationEntityId, long> _sequences = new();
+        private long _nextSequence;
 
         public void Initialize(IReadOnlyDictionary<SimulationEntityId, ISimulationClient> clients)
         {
@@ -37,14 +37,11 @@ namespace RPG.Unity
             var target = FindTarget(frame, active.Value.Faction);
             if (target.IsNone) return;
 
-            if (!_sequences.TryGetValue(frame.ActiveActorId, out var sequence))
-                sequence = 0;
             var command = new ClientCommandEnvelope(
                 ProtocolVersion.Current,
-                new ClientSequence(sequence++),
+                new ClientSequence(_nextSequence++),
                 new SimulationTick(frame.TurnNumber),
                 new AttackCommand(target));
-            _sequences[frame.ActiveActorId] = sequence;
             if (client.TrySend(command))
                 _lastCommandTurn = frame.TurnNumber;
         }

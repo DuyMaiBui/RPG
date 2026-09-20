@@ -1,3 +1,4 @@
+using System;
 using LitMotion;
 using LitMotion.Extensions;
 using RPG.Core.Actors;
@@ -9,8 +10,8 @@ namespace RPG.Unity
 {
     public sealed class ActorView : MonoBehaviour
     {
-        private SpriteRenderer _renderer;
-        private HealthBarView _healthBar;
+        [SerializeField] private SpriteRenderer _renderer;
+        [SerializeField] private HealthBarView _healthBar;
         private HealthBarPresenter _healthPresenter;
         private FloatingCombatTextPool _floatingTextPool;
         private MotionHandle _attackMotion;
@@ -26,15 +27,10 @@ namespace RPG.Unity
             EntityId = entityId;
             Faction = faction;
             _floatingTextPool = floatingTextPool;
-            _renderer = gameObject.AddComponent<SpriteRenderer>();
-            _renderer.sprite = Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, 1f, 1f), Vector2.one * 0.5f, 1f);
+            if (_renderer == null || _healthBar == null)
+                throw new InvalidOperationException("ActorView prefab references are incomplete.");
             _renderer.color = faction == FactionId.Red ? new Color(0.85f, 0.18f, 0.2f) : new Color(0.18f, 0.35f, 0.9f);
-            _baseScale = Vector3.one * 0.85f;
-            transform.localScale = _baseScale;
-            var barObject = new GameObject("HealthBar");
-            barObject.transform.SetParent(transform, false);
-            barObject.transform.localPosition = Vector3.up * 0.72f;
-            _healthBar = barObject.AddComponent<HealthBarView>();
+            _baseScale = transform.localScale;
             _healthBar.Initialize(_renderer.color);
             _healthPresenter = new HealthBarPresenter(_healthBar);
         }
