@@ -110,6 +110,7 @@ public sealed class SimulationHost<TState> : IDisposable
     private long _tick;
     private int _running;
     private int _disposed;
+    private Exception _fault;
 
     public SimulationHost(
         TState state,
@@ -126,6 +127,7 @@ public sealed class SimulationHost<TState> : IDisposable
     }
 
     public bool IsRunning => Volatile.Read(ref _running) == 1;
+    public Exception Fault => Volatile.Read(ref _fault);
 
     public void Start()
     {
@@ -139,6 +141,7 @@ public sealed class SimulationHost<TState> : IDisposable
     public bool TryEnqueue(SessionContext session, in ClientCommandEnvelope command)
     {
         ThrowIfDisposed();
+        ThrowIfFaulted();
         if (!IsRunning || !TryReserveInboundSlot())
             return false;
 
@@ -149,6 +152,7 @@ public sealed class SimulationHost<TState> : IDisposable
 
     public bool TryReadLatest(out ServerUpdateEnvelope update)
     {
+        ThrowIfFaulted();
         lock (_updateGate)
         {
             if (!_hasLatestUpdate)
@@ -178,30 +182,42 @@ public sealed class SimulationHost<TState> : IDisposable
 
     private void Run()
     {
-        var tickDuration = Stopwatch.Frequency / (double)_options.TickRate;
-        double nextTickAt = Stopwatch.GetTimestamp();
-
-        while (IsRunning)
+        try
         {
-            var now = Stopwatch.GetTimestamp();
-            if (now < nextTickAt)
-            {
-                var waitMilliseconds = (int)Math.Max(1, (nextTickAt - now) * 1000d / Stopwatch.Frequency);
-                _wakeSignal.WaitOne(waitMilliseconds);
-                continue;
-            }
+            var tickDuration = Stopwatch.Frequency / (double)_options.TickRate;
+            double nextTickAt = Stopwatch.GetTimestamp();
 
-            var ticksRun = 0;
-            while (IsRunning && now >= nextTickAt && ticksRun < _options.MaximumCatchUpTicks)
+            while (IsRunning)
             {
-                RunSingleTick();
-                nextTickAt += tickDuration;
-                ticksRun++;
-                now = Stopwatch.GetTimestamp();
-            }
+                var now = Stopwatch.GetTimestamp();
+                if (now < nextTickAt)
+                {
+                    var waitMilliseconds = (int)Math.Max(1, (nextTickAt - now) * 1000d / Stopwatch.Frequency);
+                    _wakeSignal.WaitOne(waitMilliseconds);
+                    continue;
+                }
 
-            if (now >= nextTickAt)
-                nextTickAt = now + tickDuration;
+                var ticksRun = 0;
+                while (IsRunning && now >= nextTickAt && ticksRun < _options.MaximumCatchUpTicks)
+                {
+                    RunSingleTick();
+                    nextTickAt += tickDuration;
+                    ticksRun++;
+                    now = Stopwatch.GetTimestamp();
+                }
+
+                if (now >= nextTickAt)
+                    nextTickAt = now + tickDuration;
+            }
+        }
+        catch (Exception exception)
+        {
+            Volatile.Write(ref _fault, exception);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _running, 0);
+            _wakeSignal.Set();
         }
     }
 
@@ -245,6 +261,13 @@ public sealed class SimulationHost<TState> : IDisposable
     {
         if (Volatile.Read(ref _disposed) != 0)
             throw new ObjectDisposedException(nameof(SimulationHost<TState>));
+    }
+
+    private void ThrowIfFaulted()
+    {
+        var fault = Fault;
+        if (fault != null)
+            throw new InvalidOperationException("Simulation host faulted.", fault);
     }
 
     private bool TryReserveInboundSlot()

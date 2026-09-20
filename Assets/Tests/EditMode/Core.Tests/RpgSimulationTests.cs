@@ -64,6 +64,24 @@ public sealed class RpgSimulationTests
         Assert.That(state.Actors.TryGet(target, out _), Is.False);
     }
 
+    [Test]
+    public void FaultedSimulationHost_StopsAndReportsItsOriginalException()
+    {
+        using var host = new SimulationHost<object>(
+            new object(),
+            new ThrowingApplication(),
+            new SimulationOptions(tickRate: 120));
+
+        host.Start();
+        var timeout = Stopwatch.StartNew();
+        while (host.IsRunning && timeout.ElapsedMilliseconds < 1000)
+            Thread.Sleep(5);
+
+        Assert.That(host.IsRunning, Is.False);
+        Assert.That(host.Fault, Is.TypeOf<InvalidOperationException>());
+        Assert.Throws<InvalidOperationException>(() => host.TryReadLatest(out _));
+    }
+
     private static ServerUpdateEnvelope WaitForUpdate(
         ISimulationClient client,
         Func<ServerUpdateEnvelope, bool> predicate)
@@ -79,6 +97,18 @@ public sealed class RpgSimulationTests
 
         Assert.Fail("Timed out waiting for simulation update.");
         return default;
+    }
+
+    private sealed class ThrowingApplication : ISimulationApplication<object>
+    {
+        public void BeginTick(SimulationContext<object> context, SimulationTick tick)
+            => throw new InvalidOperationException("Expected test fault.");
+
+        public void HandleCommand(SimulationContext<object> context, SessionContext session, in ClientCommandEnvelope command) { }
+        public void Tick(SimulationContext<object> context, SimulationTick tick) { }
+        public void HandleEvents(SimulationContext<object> context, System.Collections.Generic.IReadOnlyList<ISimulationEvent> events) { }
+        public ISimulationUpdate CreateUpdate(SimulationContext<object> context, SimulationTick tick)
+            => throw new NotSupportedException();
     }
 }
 }

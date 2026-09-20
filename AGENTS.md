@@ -1,0 +1,68 @@
+# RPG agent instructions
+
+## Project facts and architecture
+
+This is a Unity project. Read `ProjectSettings/ProjectVersion.txt` and `Packages/manifest.json` for current versions and dependencies. Project code currently starts under `Assets/Scripts/Core` and `Assets/Scripts/Combat`, with assemblies `RPG.Core` and `RPG.Combat`. Inspect their actual references before changing dependencies; do not assume Combat already references Core.
+
+## Required coding direction
+
+Use dependency injection, UniTask for Unity-facing asynchronous work, and LitMotion for presentation tweens. VContainer is the preferred DI container for this project. These are chosen conventions, not proof of installed packages: verify the manifest and package source before writing calls; add a missing package only as part of an authorized implementation that needs it. Custom ECS and ZLinq are not automatically required by this decision. Project instructions take precedence over the older global `unity-ecs-stack` convention.
+
+Gameplay core is plain C#: no MonoBehaviour inheritance, scene lookup, Unity lifecycle, Transform, GameObject, LitMotion or container resolution. Constructor injection expresses dependencies; consumer-owned interfaces are appropriate at real module/engine boundaries even with one current implementation. Keep VContainer registrations, entry points and LifetimeScope in the composition/integration layer. MonoBehaviours are thin bridges for serialized references, input/physics callbacks and rendering/lifecycle handoff. Do not remove engine components needed by Unity or create a manager MonoBehaviour for each service.
+
+Reusable modules own cohesive rules and public contracts, with explicit acyclic assembly dependencies. Core contracts do not reference bridges or composition. Cross-feature access uses narrow contracts, not concrete peer services. Use Unity-free assembly definitions (`noEngineReferences`) when extracting truly engine-independent modules. Do not create empty layers or interfaces for every class. Preserve existing paths and metadata; extract reusable packages when an actual consumer exists.
+
+UniTask belongs in asynchronous application/integration services; deterministic core steps stay synchronous with explicit delta time where needed. Pass CancellationToken from the owning operation/scope; cancellation on pool return/disable is distinct from destruction. Await operations or deliberately observe errors at the event boundary. LitMotion owns visual transitions in presenters/adapters; cancel motion on replacement, scope end or pool return. Visual completion must not own authoritative damage, rewards or saved state.
+
+Read [the module policy](Docs/Architecture.md) for dependency direction and lifetime rules. The selected stack is intentional: Ponytail's stdlib-first heuristic must not replace it with coroutines, service locators or handmade tween loops.
+
+## Reuse before implementation
+
+Search existing code, tests and installed package APIs before adding a subsystem. For substantial missing capabilities, inspect maintained upstream solutions and official documentation; compare fit, license, Unity/IL2CPP/AOT compatibility, allocations, dependencies and maintenance. Prefer adapting an existing API to duplicating it. Record the chosen reuse source or a short reason custom code is needed; trivial fixes do not need a research report.
+
+Ponytail is a coding discipline inside Codex, not a replacement execution engine. Minimize unnecessary code while fully satisfying the task. Required DI boundaries, module separation, cancellation, error handling and meaningful tests are not optional abstractions. Never omit requirements or validation merely to shorten a diff. Keep project-specific conventions authoritative over imported generic examples.
+
+## Editor and assets
+
+Use only the configured MCP server named `unity`, with Unity CLI as a fallback to the same Pipeline integration. Do not introduce another Unity MCP or bridge. Target this project explicitly when driving an Editor. Read the installed Unity CLI skill for command syntax and caller labels.
+
+Check `unity status --format json` before Editor automation. `com.unity.pipeline` provides the integration. No ready instance is a connection blocker, not evidence that code compiles or that a scene is correct. Inspect Pipeline status and compiler logs before diagnosing the cause.
+
+Use Editor APIs for serialized scene, prefab and asset changes. Preserve `.meta` files and GUIDs; let Unity generate metadata for new assets. Do not edit generated `Library`, `Temp`, `.csproj` or `.sln` files. Package changes must remain explicit and relevant to the task.
+
+## Work and validation
+
+Inspect git status and preserve existing user changes. Follow the object's scene/prefab references to the actual runtime owner before fixing visible behavior. Write a short design for cross-module or persistent-data changes; routine fixes can proceed directly. Use the project skills selectively, not all at once.
+
+### Required delivery loop
+
+For every implementation task, complete this loop in order:
+
+```text
+Brainstorm -> plan -> implement -> test -> review -> handoff
+```
+
+- Brainstorm and plan enough to identify ownership, acceptance criteria,
+  dependencies, failure modes and the smallest complete slice. Ask the user a
+  concise clarification question before implementation when a missing decision
+  or requirement would materially change the result.
+- Implement the planned behavior in the correct code boundary. Do not use a
+  tip, workaround, fake result, test-only bypass, swallowed error, or
+  presentation-only patch to make output appear correct while the underlying
+  implementation remains wrong.
+- Test proportionately, then review the actual diff and runtime/compiler
+  evidence against the acceptance criteria.
+- A failing compile, test, review finding, lifecycle check, or unmet acceptance
+  criterion restarts the loop at diagnosis and implementation. Fix the root
+  cause in code, re-run the relevant validation, and repeat review until the
+  requested outcome is genuinely complete.
+- Report passed checks and any explicitly unverified scope. Never represent
+  static analysis, a partial check, or a workaround as successful completion.
+
+For logic changes, run focused Edit Mode tests when useful; use Play Mode for lifecycle/scene behavior and manual visual checks for visible output. Report exactly which checks ran and what remains unverified. Static validation is not a Unity compile or runtime test. Avoid test files that merely repeat implementation details.
+
+## Agent roles
+
+Project role definitions are in `.codex/config.toml`: `unity_architect`, `unity_gameplay`, `unity_reviewer`, and `unity_qa`. Roles inherit the session model. For simple tasks work locally. Delegate only when the user asks for parallel/agent work and useful independent tasks exist. Assign explicit file ownership before concurrent editing. Only one agent should mutate the live Unity Editor at a time; reviewers and architects inspect without changing it. Main agent integrates and validates results.
+
+Use the user's language for explanations. Continue authorized work without repetitive confirmation; ask only for missing decisions that materially affect the result.
