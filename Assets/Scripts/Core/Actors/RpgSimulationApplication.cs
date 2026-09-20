@@ -6,9 +6,9 @@ namespace RPG.Core.Actors
 {
     public sealed class RpgSimulationApplication : ISimulationApplication<RpgSimulationState>
     {
-        public void BeginTick(SimulationContext<RpgSimulationState> context, SimulationTick tick) => context.State.BeginTick();
+        void ISimulationApplication<RpgSimulationState>.BeginTick(SimulationContext<RpgSimulationState> context, SimulationTick tick) => context.State.BeginTick();
 
-        public void HandleCommand(SimulationContext<RpgSimulationState> context, SessionContext session, in ClientCommandEnvelope command)
+        void ISimulationApplication<RpgSimulationState>.HandleCommand(SimulationContext<RpgSimulationState> context, SessionContext session, in ClientCommandEnvelope command)
         {
             if (command.Payload is not AttackCommand attack ||
                 !context.State.PlayerActors.TryGetValue(session.Player, out var attackerId) ||
@@ -27,9 +27,9 @@ namespace RPG.Core.Actors
             context.Defer(state => state.Actors.Destroy(target.Id));
         }
 
-        public void Tick(SimulationContext<RpgSimulationState> context, SimulationTick tick) { }
+        void ISimulationApplication<RpgSimulationState>.Tick(SimulationContext<RpgSimulationState> context, SimulationTick tick) { }
 
-        public void HandleEvents(SimulationContext<RpgSimulationState> context, IReadOnlyList<ISimulationEvent> events)
+        void ISimulationApplication<RpgSimulationState>.HandleEvents(SimulationContext<RpgSimulationState> context, IReadOnlyList<ISimulationEvent> events)
         {
             foreach (var simulationEvent in events)
             {
@@ -45,7 +45,7 @@ namespace RPG.Core.Actors
             }
         }
 
-        public ISimulationUpdate CreateUpdate(SimulationContext<RpgSimulationState> context, SimulationTick tick)
+        ISimulationUpdate ISimulationApplication<RpgSimulationState>.CreateUpdate(SimulationContext<RpgSimulationState> context, SimulationTick tick)
             => new WorldFrameUpdate(context.State.Actors.CreateSnapshot(), context.State.Signals.ToArray());
     }
 }

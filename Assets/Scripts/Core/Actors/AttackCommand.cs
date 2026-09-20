@@ -6,6 +6,6 @@ namespace RPG.Core.Actors
     {
         public AttackCommand(EntityId target) => Target = target;
         public EntityId Target { get; }
-        public ushort TypeId => 1;
+        ushort ISimulationCommand.TypeId => 1;
     }
 }

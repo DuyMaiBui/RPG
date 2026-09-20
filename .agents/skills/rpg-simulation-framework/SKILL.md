@@ -40,6 +40,8 @@ not use it for an unrelated Unity feature that does not cross this boundary.
 - Keep one declared type per `.cs` file, named after that type. Use the
   Contracts, Runtime and Actors folders to express the relationship instead of
   accumulating protocol or gameplay types in one source file.
+- Implement interface members explicitly (`InterfaceName.Member`) so concrete
+  APIs and contract APIs remain visually distinct at call sites.
 
 ## Extending gameplay
 

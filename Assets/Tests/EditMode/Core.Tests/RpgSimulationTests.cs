@@ -40,7 +40,7 @@ public sealed class RpgSimulationTests
             state,
             new RpgSimulationApplication(),
             new SimulationOptions(tickRate: 120));
-        using var client = new LocalSimulationClient<RpgSimulationState>(
+        using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(
             host,
             new SessionContext(new SessionId(Guid.NewGuid()), player));
 

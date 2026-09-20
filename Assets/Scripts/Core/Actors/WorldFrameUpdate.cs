@@ -15,7 +15,7 @@ namespace RPG.Core.Actors
             Signals = ((PresentationSignal[])signals.Clone()).AsMemory();
         }
 
-        public ushort TypeId => MessageTypeId;
+        ushort ISimulationUpdate.TypeId => MessageTypeId;
         public ReadOnlyMemory<ActorSnapshot> Actors { get; }
         public ReadOnlyMemory<PresentationSignal> Signals { get; }
     }

@@ -15,10 +15,10 @@ namespace RPG.Simulation.Contracts
         public int Index { get; }
         public int Generation { get; }
         public bool IsNone => Index < 0;
-        public bool Equals(EntityId other) => Index == other.Index && Generation == other.Generation;
+        bool IEquatable<EntityId>.Equals(EntityId other) => Index == other.Index && Generation == other.Generation;
         public override bool Equals(object obj) => obj is EntityId other && Equals(other);
         public override int GetHashCode() => (Index * 397) ^ Generation;
-        public static bool operator ==(EntityId left, EntityId right) => left.Equals(right);
-        public static bool operator !=(EntityId left, EntityId right) => !left.Equals(right);
+        public static bool operator ==(EntityId left, EntityId right) => left.Index == right.Index && left.Generation == right.Generation;
+        public static bool operator !=(EntityId left, EntityId right) => left.Index != right.Index || left.Generation != right.Generation;
     }
 }

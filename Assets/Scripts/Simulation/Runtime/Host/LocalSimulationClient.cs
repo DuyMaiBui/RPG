@@ -14,8 +14,8 @@ namespace RPG.Simulation.Runtime
             _session = session;
         }
 
-        public bool TrySend(in ClientCommandEnvelope command) => _host.TryEnqueue(_session, command);
-        public bool TryRead(out ServerUpdateEnvelope update) => _host.TryReadLatest(out update);
-        public void Dispose() { }
+        bool ISimulationClient.TrySend(in ClientCommandEnvelope command) => _host.TryEnqueue(_session, command);
+        bool ISimulationClient.TryRead(out ServerUpdateEnvelope update) => _host.TryReadLatest(out update);
+        void IDisposable.Dispose() { }
     }
 }

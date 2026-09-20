@@ -25,6 +25,11 @@ Read [the module policy](Docs/Architecture.md) for dependency direction and life
   grouping declarations into a catch-all source file. This keeps Git history,
   reviews and ownership precise.
 - Apply the same convention to test sources and helpers.
+- When a class or struct implements an interface, implement every interface
+  member explicitly (`InterfaceName.Member`). Keep the concrete type's public
+  surface limited to behavior that belongs to the concrete abstraction; use
+  explicit casts at interface boundaries so call sites reveal which contract
+  they consume. Marker interfaces have no members to implement.
 
 ## Reuse before implementation
 
