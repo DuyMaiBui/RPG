@@ -80,5 +80,16 @@ namespace RPG.Core.Tests
             Assert.That(replacement, Is.SameAs(first));
             Assert.That(replacement.Damage, Is.EqualTo(2));
         }
+
+        [Test]
+        public void BehaviorTree_SequenceAndSelectorKeepExpectedStatus()
+        {
+            var tree = new BehaviorTree<int>(new BehaviorSelector<int>(
+                new BehaviorSequence<int>(
+                    new BehaviorAction<int>(_ => BehaviorStatus.Failed)),
+                new BehaviorAction<int>(_ => BehaviorStatus.Succeeded)));
+
+            Assert.That(tree.Tick(0), Is.EqualTo(BehaviorStatus.Succeeded));
+        }
     }
 }

@@ -37,6 +37,15 @@ namespace RPG.Unity
                 component.ApplySnapshot(snapshot);
         }
 
+        public void ApplyPredictedPosition(RPG.Simulation.Contracts.SimulationVector2 position)
+        {
+            foreach (var component in _components)
+            {
+                if (component is ActorMovementView movement)
+                    movement.ApplyPredictedPosition(position);
+            }
+        }
+
         public void PlaySignal(PresentationSignal signal)
         {
             foreach (var component in _components)

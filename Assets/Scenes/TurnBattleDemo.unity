@@ -338,11 +338,14 @@ MonoBehaviour:
   maximumHealth: 30
   attackPower: 5
   tickRate: 10
+  moveSpeed: 0.8
   actorPrefab: {fileID: 1795847064336846514, guid: 014f3ddf73da24f7a9f1d63bd22d851d, type: 3}
   actorRoot: {fileID: 1345598794}
   floatingTextPool: {fileID: 399920601}
   driver: {fileID: 1361859389}
   bridge: {fileID: 1361859388}
+  projectilePrefab: {fileID: 5637623362077680192, guid: 1d71a1c3564df43f6a3dc4deb218cb13, type: 3}
+  projectileRoot: {fileID: 1345598794}
 --- !u!114 &1361859388
 MonoBehaviour:
   m_ObjectHideFlags: 0

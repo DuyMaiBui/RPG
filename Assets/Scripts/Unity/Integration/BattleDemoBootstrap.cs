@@ -14,11 +14,14 @@ namespace RPG.Unity
         [SerializeField] private int maximumHealth = 30;
         [SerializeField] private int attackPower = 5;
         [SerializeField] private int tickRate = 10;
+        [SerializeField] private float moveSpeed = 0.8f;
         [SerializeField] private ActorView actorPrefab;
         [SerializeField] private Transform actorRoot;
         [SerializeField] private FloatingCombatTextPool floatingTextPool;
         [SerializeField] private TurnBattleDemoDriver driver;
         [SerializeField] private SimulationUnityBridge bridge;
+        [SerializeField] private ProjectileView projectilePrefab;
+        [SerializeField] private Transform projectileRoot;
 
         private SimulationHost<RpgSimulationState> _host;
         private ActorViewRegistry _registry;
@@ -27,7 +30,8 @@ namespace RPG.Unity
 
         private void Start()
         {
-            if (actorPrefab == null || actorRoot == null || floatingTextPool == null || driver == null || bridge == null)
+            if (actorPrefab == null || actorRoot == null || floatingTextPool == null || driver == null || bridge == null ||
+                projectilePrefab == null || projectileRoot == null)
                 throw new InvalidOperationException("BattleDemoBootstrap scene references are incomplete.");
 
             var state = new RpgSimulationState();
@@ -53,7 +57,15 @@ namespace RPG.Unity
             }
 
             driver.Initialize(clientsByActor);
-            _bridge.Initialize(clientsByActor[orderedIds[0]], _registry, driver);
+            _bridge.Initialize(
+                clientsByActor[orderedIds[0]],
+                _registry,
+                driver,
+                projectilePrefab,
+                projectileRoot,
+                orderedIds[0],
+                moveSpeed,
+                1f / tickRate);
             _host.Start();
         }
 
@@ -82,7 +94,7 @@ namespace RPG.Unity
                 attackPower,
                 position,
                 0.35f,
-                0.8f,
+                moveSpeed,
                 6f,
                 0.1f,
                 0.8f));
