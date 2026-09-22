@@ -52,7 +52,6 @@ namespace RPG.Unity
                 orderedIds.Add(blueIds[index]);
             }
 
-            state.Turns.Initialize(orderedIds);
             driver.Initialize(clientsByActor);
             _bridge.Initialize(clientsByActor[orderedIds[0]], _registry, driver);
             _host.Start();
@@ -75,7 +74,18 @@ namespace RPG.Unity
             int index)
         {
             var kind = faction == FactionId.Red ? ActorKind.Player : ActorKind.Monster;
-            var id = state.Actors.Spawn(kind, faction, maximumHealth, attackPower);
+            var position = new SimulationVector2(
+                faction == FactionId.Red ? -2f : 2f,
+                (index - (actorsPerFaction - 1) * 0.5f) * 1.5f);
+            var id = state.Actors.Spawn(kind, faction, new ActorSpawnData(
+                maximumHealth,
+                attackPower,
+                position,
+                0.35f,
+                0.8f,
+                6f,
+                0.1f,
+                0.8f));
             var player = new PlayerId($"{faction}-{index}");
             state.PlayerActors.Add(player, id);
             var session = new SessionContext(new SessionId(Guid.NewGuid()), player);
@@ -85,10 +95,7 @@ namespace RPG.Unity
 
             var view = Instantiate(actorPrefab, viewRoot);
             view.name = $"{faction}_{index}";
-            view.transform.position = new Vector3(
-                faction == FactionId.Red ? -2f : 2f,
-                (index - (actorsPerFaction - 1) * 0.5f) * 1.5f,
-                0f);
+            view.transform.position = new Vector3(position.X, position.Y, 0f);
             view.Initialize(id, faction, floatingTextPool);
             _registry.Add(id, view);
             return id;

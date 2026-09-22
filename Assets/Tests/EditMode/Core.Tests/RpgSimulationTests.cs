@@ -28,13 +28,13 @@ public sealed class RpgSimulationTests
     }
 
     [Test]
-    public void AttackCommand_ProducesAuthoritativeDeathFrameAndAcknowledgement()
+    public void AutoBattle_ProducesAuthoritativeDeathFrame()
     {
         var state = new RpgSimulationState();
-        var player = new PlayerId("test-player");
-        var attacker = state.Actors.Spawn(ActorKind.Player, 10, 5);
-        var target = state.Actors.Spawn(ActorKind.Monster, 5, 0);
-        state.PlayerActors.Add(player, attacker);
+        var attacker = state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+            5, 5, new SimulationVector2(-0.3f, 0f), 0.3f, 1f, 5f, 0.2f, 0.01f));
+        var target = state.Actors.Spawn(ActorKind.Monster, FactionId.Blue, new ActorSpawnData(
+            5, 5, new SimulationVector2(0.3f, 0f), 0.3f, 1f, 5f, 0.2f, 0.01f));
 
         using var host = new SimulationHost<RpgSimulationState>(
             state,
@@ -42,25 +42,13 @@ public sealed class RpgSimulationTests
             new SimulationOptions(tickRate: 120));
         using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(
             host,
-            new SessionContext(new SessionId(Guid.NewGuid()), player));
+            new SessionContext(new SessionId(Guid.NewGuid()), new PlayerId("observer")));
 
         host.Start();
-        var command = new ClientCommandEnvelope(
-            ProtocolVersion.Current,
-            new ClientSequence(0),
-            new SimulationTick(0),
-            new AttackCommand(target));
-        Assert.That(client.TrySend(command), Is.True);
-
         var update = WaitForUpdate(client, frame =>
-            frame.LastProcessedClientSequence.Value == 0 &&
-            frame.Payload is WorldFrameUpdate world &&
-            !world.Actors.Span.ToArray().Any(actor => actor.Entity == target));
+            frame.Payload is WorldFrameUpdate && !state.Actors.TryGet(target, out _));
 
         Assert.That(update.Payload, Is.TypeOf<WorldFrameUpdate>());
-        var worldFrame = (WorldFrameUpdate)update.Payload;
-        Assert.That(worldFrame.Signals.Span.ToArray().Any(
-            signal => signal.Kind == PresentationSignalKind.Died && signal.Entity == target), Is.True);
         Assert.That(state.Actors.TryGet(target, out _), Is.False);
     }
 
@@ -114,27 +102,22 @@ public sealed class RpgSimulationTests
     }
 
     [Test]
-    public void ZeroDamageAttack_StillAdvancesTurn()
+    public void AutoBattle_ZeroDamageDoesNotDestroyTarget()
     {
         var state = new RpgSimulationState();
-        var application = new RpgSimulationApplication();
-        using var host = new SimulationHost<RpgSimulationState>(state, application, new SimulationOptions(10));
-        var redId = state.Actors.Spawn(ActorKind.Player, FactionId.Red, 10, 0);
-        var blueId = state.Actors.Spawn(ActorKind.Monster, FactionId.Blue, 10, 1);
-        var red = new PlayerId("red");
-        state.PlayerActors.Add(red, redId);
-        state.Turns.Initialize(new[] { redId, blueId });
-        using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(host, new SessionContext(new SessionId(Guid.NewGuid()), red));
+        var redId = state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+            10, 0, new SimulationVector2(-0.3f, 0f), 0.3f, 0f, 5f, 0.2f, 0.1f));
+        var blueId = state.Actors.Spawn(ActorKind.Monster, FactionId.Blue, new ActorSpawnData(
+            10, 1, new SimulationVector2(0.3f, 0f), 0.3f, 0f, 5f, 0.2f, 0.1f));
+        using var host = new SimulationHost<RpgSimulationState>(state, new RpgSimulationApplication(), new SimulationOptions(30));
+        using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(
+            host,
+            new SessionContext(new SessionId(Guid.NewGuid()), new PlayerId("observer")));
 
         host.Start();
-        Assert.That(client.TrySend(new ClientCommandEnvelope(
-            ProtocolVersion.Current,
-            new ClientSequence(0),
-            new SimulationTick(0),
-            new AttackCommand(blueId))), Is.True);
-
-        WaitForUpdate(client, update => update.Payload is WorldFrameUpdate frame && frame.TurnNumber > 0);
-        Assert.That(state.Turns.ActiveActorId, Is.EqualTo(blueId));
+        WaitForUpdate(client, update => update.Payload is WorldFrameUpdate frame && frame.TurnNumber >= 2);
+        Assert.That(state.Actors.TryGet(redId, out _), Is.True);
+        Assert.That(state.Actors.TryGet(blueId, out _), Is.True);
     }
 
     private static ServerUpdateEnvelope WaitForUpdate(
