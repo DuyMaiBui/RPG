@@ -11,6 +11,9 @@ GameObject:
   - component: {fileID: 9154552589734710665}
   - component: {fileID: 7634259637558852624}
   - component: {fileID: 1795847064336846514}
+  - component: {fileID: 2840000000000000001}
+  - component: {fileID: 2840000000000000002}
+  - component: {fileID: 2840000000000000003}
   m_Layer: 0
   m_Name: ActorView
   m_TagString: Untagged
@@ -104,10 +107,51 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ff98df1f0c1e1430ba14a3a1957ee741, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: RPG.Unity::RPG.Unity.ActorView
+  _components:
+  - {fileID: 2840000000000000001}
+  - {fileID: 2840000000000000002}
+  - {fileID: 2840000000000000003}
+--- !u!114 &2840000000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3535769273843624852}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e1d45221653c405c85ebd45d43214de, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: RPG.Unity::RPG.Unity.ActorFactionView
   _renderer: {fileID: 7634259637558852624}
+--- !u!114 &2840000000000000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3535769273843624852}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 69f9c52127bd3462aa2f0981d8324f53, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: RPG.Unity::RPG.Unity.ActorHealthView
   _healthBar: {fileID: 6472076744634270563}
+--- !u!114 &2840000000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3535769273843624852}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5bf4f4d4296bd408db17a0ab091c518d, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: RPG.Unity::RPG.Unity.ActorCombatFeedbackView
+  _renderer: {fileID: 7634259637558852624}
 --- !u!1001 &1052739530651435554
 PrefabInstance:
   m_ObjectHideFlags: 0

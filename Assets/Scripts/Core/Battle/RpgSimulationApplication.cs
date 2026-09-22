@@ -15,13 +15,14 @@ namespace RPG.Core.Actors
             if (command.Payload is not AttackCommand attack ||
                 !context.State.PlayerActors.TryGetValue(session.Player, out var attackerId) ||
                 !context.State.Actors.TryGet(attackerId, out var attacker) ||
-                attacker.IsDead ||
+                attacker.Components.Get<HealthComponent>().IsDead ||
                 (context.State.Turns.IsInitialized && context.State.Turns.ActiveActorId != attacker.Id) ||
                 !TryResolveTarget(context.State, attacker, attack.Target, out var target))
                 return;
 
             context.Publish(new ActorAttackStarted(attacker.Id, target.Id));
-            var damage = target.ReceiveDamage(attacker.AttackPower);
+            var damage = target.Components.Get<HealthComponent>().ReceiveDamage(
+                attacker.Components.Get<AttackComponent>().AttackPower);
             if (damage == 0)
             {
                 if (context.State.Turns.IsInitialized)
@@ -30,7 +31,7 @@ namespace RPG.Core.Actors
             }
 
             context.Publish(new ActorDamaged(attacker.Id, target.Id, damage));
-            if (!target.IsDead)
+            if (!target.Components.Get<HealthComponent>().IsDead)
             {
                 if (context.State.Turns.IsInitialized)
                     context.Defer(state => state.Turns.Advance(state.Actors));
@@ -79,8 +80,8 @@ namespace RPG.Core.Actors
         private bool TryResolveTarget(RpgSimulationState state, Actor attacker, EntityId requestedTarget, out Actor target)
         {
             if (state.Actors.TryGet(requestedTarget, out target) &&
-                !target.IsDead &&
-                target.Faction != attacker.Faction &&
+                !target.Components.Get<HealthComponent>().IsDead &&
+                target.Components.Get<FactionComponent>().Faction != attacker.Components.Get<FactionComponent>().Faction &&
                 target.Id != attacker.Id)
                 return true;
 

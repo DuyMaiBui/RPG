@@ -9,7 +9,7 @@ namespace RPG.Core.Actors
             targetId = EntityId.None;
             foreach (var snapshot in actors.CreateSnapshot())
             {
-                if (snapshot.Faction == attacker.Faction || snapshot.VisualState == ActorVisualState.Dead)
+                if (snapshot.Faction == attacker.Components.Get<FactionComponent>().Faction || snapshot.VisualState == ActorVisualState.Dead)
                     continue;
 
                 targetId = snapshot.Entity;

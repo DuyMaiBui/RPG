@@ -22,7 +22,12 @@ namespace RPG.Core.Actors
             }
 
             var id = new EntityId(index, _generations[index]);
-            _actors[index] = new Actor(id, kind, faction, maximumHealth, attackPower);
+            var components = new ActorComponentSet();
+            components.Add(new ActorKindComponent(kind));
+            components.Add(new FactionComponent(faction));
+            components.Add(new HealthComponent(maximumHealth));
+            components.Add(new AttackComponent(attackPower));
+            _actors[index] = new Actor(id, components);
             return id;
         }
 
@@ -53,8 +58,11 @@ namespace RPG.Core.Actors
             foreach (var actor in _actors)
             {
                 if (actor == null) continue;
-                snapshots.Add(new ActorSnapshot(actor.Id, actor.Kind, actor.Faction, actor.CurrentHealth, actor.MaximumHealth,
-                    actor.IsDead ? ActorVisualState.Dead : ActorVisualState.Idle));
+                var kind = actor.Components.Get<ActorKindComponent>().Kind;
+                var faction = actor.Components.Get<FactionComponent>().Faction;
+                var health = actor.Components.Get<HealthComponent>();
+                snapshots.Add(new ActorSnapshot(actor.Id, kind, faction, health.CurrentHealth, health.MaximumHealth,
+                    health.IsDead ? ActorVisualState.Dead : ActorVisualState.Idle));
             }
 
             return snapshots.ToArray();
