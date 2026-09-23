@@ -53,6 +53,30 @@ public sealed class RpgSimulationTests
     }
 
     [Test]
+    public void AutoBattle_ProjectileProducesAuthoritativeDeathFrame()
+    {
+        var state = new RpgSimulationState();
+        var attacker = state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+            5, 5, new SimulationVector2(-0.8f, 0f), 0.3f, 0f, 5f, 5f, 0.01f,
+            attackType: AttackType.Projectile, projectileSpeed: 8f, projectileRadius: 0.05f));
+        var target = state.Actors.Spawn(ActorKind.Monster, FactionId.Blue, new ActorSpawnData(
+            5, 1, new SimulationVector2(0.8f, 0f), 0.3f, 0f, 5f, 0.2f, 0.01f));
+
+        using var host = new SimulationHost<RpgSimulationState>(
+            state, new RpgSimulationApplication(), new SimulationOptions(tickRate: 60));
+        using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(
+            host,
+            new SessionContext(new SessionId(Guid.NewGuid()), new PlayerId("projectile-observer")));
+
+        host.Start();
+        var update = WaitForUpdate(client, frame =>
+            frame.Payload is WorldFrameUpdate && !state.Actors.TryGet(target, out _));
+
+        Assert.That(update.Payload, Is.TypeOf<WorldFrameUpdate>());
+        Assert.That(state.Actors.TryGet(attacker, out _), Is.True);
+    }
+
+    [Test]
     public void FaultedSimulationHost_StopsAndReportsItsOriginalException()
     {
         using var host = new SimulationHost<object>(
