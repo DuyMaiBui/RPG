@@ -168,6 +168,29 @@ public sealed class RpgSimulationTests
         Assert.That(actor.Components.Get<PositionComponent>().Position.X, Is.GreaterThan(0f));
     }
 
+    [Test]
+    public void AutoBattle_MovesStraightOnClearPathBeforeCollision()
+    {
+        var state = new RpgSimulationState();
+        var redId = state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+            100, 1, new SimulationVector2(-3f, 0f), 0.3f, 1f, 6f, 0.1f, 100f));
+        var blueId = state.Actors.Spawn(ActorKind.Monster, FactionId.Blue, new ActorSpawnData(
+            100, 1, new SimulationVector2(3f, 0f), 0.3f, 1f, 6f, 0.1f, 100f));
+        using var host = new SimulationHost<RpgSimulationState>(state, new RpgSimulationApplication(), new SimulationOptions(60));
+        using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(
+            host, new SessionContext(new SessionId(Guid.NewGuid()), new PlayerId("straight-path")));
+
+        host.Start();
+        WaitForUpdate(client, update => update.Payload is WorldFrameUpdate frame && frame.TurnNumber >= 10);
+
+        Assert.That(state.Actors.TryGet(redId, out var red), Is.True);
+        Assert.That(state.Actors.TryGet(blueId, out var blue), Is.True);
+        Assert.That(red.Components.Get<PositionComponent>().Position.Y, Is.EqualTo(0f).Within(0.001f));
+        Assert.That(blue.Components.Get<PositionComponent>().Position.Y, Is.EqualTo(0f).Within(0.001f));
+        Assert.That(red.Components.Get<PositionComponent>().Position.X, Is.GreaterThan(-3f));
+        Assert.That(blue.Components.Get<PositionComponent>().Position.X, Is.LessThan(3f));
+    }
+
     private static ServerUpdateEnvelope WaitForUpdate(
         ISimulationClient client,
         Func<ServerUpdateEnvelope, bool> predicate)
