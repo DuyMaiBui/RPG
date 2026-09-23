@@ -11,6 +11,8 @@ namespace RPG.Core.Formations
         }
 
         public int FormationId { get; }
-        public SimulationVector2 LocalOffset { get; }
+        public SimulationVector2 LocalOffset { get; private set; }
+
+        public void AssignOffset(SimulationVector2 localOffset) => LocalOffset = localOffset;
     }
 }

@@ -72,6 +72,30 @@ namespace RPG.Core.Tests
         }
 
         [Test]
+        public void FormationCoordinator_ReassignsSlotsByNearestPosition()
+        {
+            var actors = new ActorRegistry();
+            var leftId = actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+                10, 1, new SimulationVector2(-0.8f, 0f), 0.3f, 0f, 3f, 1f, 1f, formationId: 4));
+            var rightId = actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+                10, 1, new SimulationVector2(0.8f, 0f), 0.3f, 0f, 3f, 1f, 1f, formationId: 4));
+            var coordinator = new FormationCoordinator();
+            coordinator.RegisterLayout(4, SimulationVector2.Zero, new[]
+            {
+                new SimulationVector2(-1f, 0f), new SimulationVector2(1f, 0f),
+            });
+
+            coordinator.ReassignSlots(actors, 4);
+
+            Assert.That(actors.TryGet(leftId, out var left), Is.True);
+            Assert.That(actors.TryGet(rightId, out var right), Is.True);
+            Assert.That(left.Components.Get<FormationSlotComponent>().LocalOffset,
+                Is.EqualTo(new SimulationVector2(-1f, 0f)));
+            Assert.That(right.Components.Get<FormationSlotComponent>().LocalOffset,
+                Is.EqualTo(new SimulationVector2(1f, 0f)));
+        }
+
+        [Test]
         public void PredictionBuffer_ReplaysInputsAfterAcknowledgement()
         {
             var buffer = new PredictionBuffer(4);
