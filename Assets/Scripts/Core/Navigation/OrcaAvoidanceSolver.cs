@@ -39,9 +39,9 @@ namespace RPG.Core.Navigation
             var maxSpeed = movement.Speed;
             if (maxSpeed <= 0f) return SimulationVector2.Zero;
 
-            spatialHash.Collect(position, maxSpeed * _timeHorizon + radius + 1f, _nearby);
-            var lineCount = BuildLines(actor, position, radius, actors, deltaTime);
             var preferredVelocity = preferredDirection.Normalized() * maxSpeed;
+            spatialHash.Collect(position, maxSpeed * _timeHorizon + radius + 1f, _nearby);
+            var lineCount = BuildLines(actor, position, radius, actors, deltaTime, preferredVelocity);
             if (lineCount == 0) return preferredDirection.Normalized();
 
             var result = SimulationVector2.Zero;
@@ -59,10 +59,10 @@ namespace RPG.Core.Navigation
             SimulationVector2 position,
             float radius,
             ActorRegistry actors,
-            float deltaTime)
+            float deltaTime,
+            SimulationVector2 preferredVelocity)
         {
-            var movement = actor.Components.Get<MovementComponent>();
-            var velocity = movement.DesiredDirection * movement.Speed;
+            var velocity = preferredVelocity;
             var lineCount = 0;
             var inverseTimeStep = 1f / MathF.Max(deltaTime, Epsilon);
 

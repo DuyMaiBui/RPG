@@ -13,6 +13,8 @@ namespace RPG.Core.Actors
         private readonly SpatialHash _spatialHash = new(1f);
         private readonly OrcaAvoidanceSolver _avoidance = new();
         private readonly CombatBehaviorTree _behaviorTree = new();
+        private SimulationVector2[] _resolvedDirections = new SimulationVector2[0];
+        private SimulationVector2[] _candidatePositions = new SimulationVector2[0];
 
         public void Tick(SimulationContext<RpgSimulationState> context)
         {
@@ -60,21 +62,23 @@ namespace RPG.Core.Actors
         private void MoveActors(SimulationContext<RpgSimulationState> context)
         {
             var actors = context.State.Actors;
+            EnsureMovementBuffers(actors.SlotCount);
             for (var index = 0; index < actors.SlotCount; index++)
             {
+                _resolvedDirections[index] = SimulationVector2.Zero;
                 if (!actors.TryGetAt(index, out var actor) || actor.Components.Get<HealthComponent>().IsDead)
                     continue;
 
                 var position = actor.Components.Get<PositionComponent>();
                 var movement = actor.Components.Get<MovementComponent>();
+                _candidatePositions[index] = position.Position;
                 if (actor.Components.TryGet<ManualMovementComponent>(out var manualMovement) && manualMovement.IsActive)
                 {
-                    movement.DesiredDirection = _avoidance.Solve(
+                    var resolvedDirection = _avoidance.Solve(
                         actor, manualMovement.Direction, actors, _spatialHash, context.FixedDeltaTime);
                     var manualTravel = movement.Speed * context.FixedDeltaTime;
-                    var manualCandidate = position.Position + movement.DesiredDirection * manualTravel;
-                    position.Position = context.State.Navigation.ClampInside(
-                        ResolveOverlap(actors, actor, manualCandidate), MovingBodyRadius(actor));
+                    _resolvedDirections[index] = resolvedDirection;
+                    _candidatePositions[index] = position.Position + resolvedDirection * manualTravel;
                     continue;
                 }
 
@@ -85,7 +89,6 @@ namespace RPG.Core.Actors
                                    context.State.Formations.TryGetPosition(formationSlot, out formationPosition);
                 if (!hasTarget && !hasFormation)
                 {
-                    movement.DesiredDirection = SimulationVector2.Zero;
                     continue;
                 }
 
@@ -94,7 +97,6 @@ namespace RPG.Core.Actors
                 var stopDistance = hasTarget ? AttackDistance(actor, target) : 0.05f;
                 if (distance <= stopDistance || movement.Speed <= 0f)
                 {
-                    movement.DesiredDirection = SimulationVector2.Zero;
                     continue;
                 }
 
@@ -128,13 +130,33 @@ namespace RPG.Core.Actors
                             pathFollower.Clear();
                     }
                 }
-                movement.DesiredDirection = _avoidance.Solve(
+                var resolvedMovementDirection = _avoidance.Solve(
                     actor, direction, actors, _spatialHash, context.FixedDeltaTime);
                 var travel = System.MathF.Min(movement.Speed * context.FixedDeltaTime, distance - stopDistance);
-                var candidate = position.Position + movement.DesiredDirection * travel;
-                position.Position = context.State.Navigation.ClampInside(
-                    ResolveOverlap(actors, actor, candidate), MovingBodyRadius(actor));
+                _resolvedDirections[index] = resolvedMovementDirection;
+                _candidatePositions[index] = position.Position + resolvedMovementDirection * travel;
             }
+
+            for (var index = 0; index < actors.SlotCount; index++)
+            {
+                if (!actors.TryGetAt(index, out var actor) || actor.Components.Get<HealthComponent>().IsDead)
+                    continue;
+
+                var position = actor.Components.Get<PositionComponent>();
+                var movement = actor.Components.Get<MovementComponent>();
+                movement.DesiredDirection = _resolvedDirections[index];
+                position.Position = context.State.Navigation.ClampInside(
+                    ResolveOverlap(actors, actor, _candidatePositions[index]), MovingBodyRadius(actor));
+            }
+        }
+
+        private void EnsureMovementBuffers(int count)
+        {
+            if (_resolvedDirections.Length >= count)
+                return;
+
+            _resolvedDirections = new SimulationVector2[count];
+            _candidatePositions = new SimulationVector2[count];
         }
 
         private static void AttackActors(SimulationContext<RpgSimulationState> context)
