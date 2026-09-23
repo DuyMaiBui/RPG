@@ -13,7 +13,7 @@ namespace RPG.Unity
         [SerializeField] private int actorsPerFaction = 3;
         [SerializeField] private int maximumHealth = 30;
         [SerializeField] private int attackPower = 5;
-        [SerializeField] private int tickRate = 10;
+        [SerializeField] private int tickRate = 30;
         [SerializeField] private float moveSpeed = 0.8f;
         [SerializeField] private ActorView actorPrefab;
         [SerializeField] private Transform actorRoot;

@@ -338,7 +338,7 @@ MonoBehaviour:
   actorsPerFaction: 3
   maximumHealth: 30
   attackPower: 5
-  tickRate: 10
+  tickRate: 30
   moveSpeed: 0.8
   actorPrefab: {fileID: 1795847064336846514, guid: 014f3ddf73da24f7a9f1d63bd22d851d, type: 3}
   actorRoot: {fileID: 1345598794}

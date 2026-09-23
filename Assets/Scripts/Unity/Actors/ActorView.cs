@@ -46,6 +46,15 @@ namespace RPG.Unity
             }
         }
 
+        public void TickRemotePresentation(float deltaTime, float snapshotInterval)
+        {
+            foreach (var component in _components)
+            {
+                if (component is ActorMovementView movement)
+                    movement.TickRemoteInterpolation(deltaTime, snapshotInterval);
+            }
+        }
+
         public void ApplyTargetPosition(Vector3 targetPosition, bool visible)
         {
             foreach (var component in _components)

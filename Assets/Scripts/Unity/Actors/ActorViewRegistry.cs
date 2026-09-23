@@ -14,6 +14,8 @@ namespace RPG.Unity
 
         public IEnumerable<KeyValuePair<EntityId, ActorView>> Entries => _views;
 
+        public Dictionary<SimulationEntityId, ActorView>.Enumerator GetEnumerator() => _views.GetEnumerator();
+
         public void Remove(SimulationEntityId id)
         {
             if (!_views.Remove(id, out var view)) return;

@@ -21,7 +21,9 @@ namespace RPG.Unity
         private SimulationTick _lastServerTick;
         private SimulationVector2 _localDirection;
         private SimulationVector2 _predictedPosition;
+        private SimulationVector2 _correctionRemaining;
         private bool _hasPredictedPosition;
+        private const float PredictionCorrectionDuration = 0.1f;
         private readonly Dictionary<SimulationEntityId, float> _pendingRemoval = new();
         private readonly Dictionary<SimulationEntityId, ActorSnapshot> _snapshots = new();
         private readonly HashSet<SimulationEntityId> _liveIds = new();
@@ -51,6 +53,7 @@ namespace RPG.Unity
             _predictionDelta = fixedDeltaTime;
             _nextSequence = 0;
             _localDirection = SimulationVector2.Zero;
+            _correctionRemaining = SimulationVector2.Zero;
             _hasPredictedPosition = false;
         }
 
@@ -76,13 +79,24 @@ namespace RPG.Unity
                         view.ApplySnapshot(snapshot);
                     if (snapshot.Entity == _localActorId && _registry.TryGet(snapshot.Entity, out var localView))
                     {
-                        _predictedPosition = _prediction.Reconcile(
+                        var reconciledPosition = _prediction.Reconcile(
                             snapshot.Position,
                             update.LastProcessedClientSequence,
                             _predictionSpeed,
                             _predictionDelta);
+                        if (!_hasPredictedPosition)
+                        {
+                            _predictedPosition = reconciledPosition;
+                            _correctionRemaining = SimulationVector2.Zero;
+                        }
+                        else
+                        {
+                            _correctionRemaining = reconciledPosition - _predictedPosition;
+                        }
+
                         _hasPredictedPosition = true;
-                        localView.ApplyPredictedPosition(_predictedPosition);
+                        if (_correctionRemaining.LengthSquared <= 0.000001f)
+                            localView.ApplyPredictedPosition(_predictedPosition);
                     }
                     _pendingRemoval.Remove(snapshot.Entity);
                 }
@@ -105,7 +119,7 @@ namespace RPG.Unity
                         _pendingRemoval[signal.Entity] = 0.9f;
                 }
 
-                foreach (var entry in _registry.Entries)
+                foreach (var entry in _registry)
                 {
                     if (!_liveIds.Contains(entry.Key) && !_pendingRemoval.ContainsKey(entry.Key))
                         _pendingRemoval[entry.Key] = 0.9f;
@@ -114,6 +128,7 @@ namespace RPG.Unity
                 _driver.OnFrame(frame);
             }
 
+            AdvanceRemotePresentation(Time.deltaTime);
             AdvanceLocalPrediction(Time.deltaTime);
             ProcessPendingRemoval();
         }
@@ -127,6 +142,7 @@ namespace RPG.Unity
             _prediction?.Clear();
             _prediction = null;
             _localDirection = SimulationVector2.Zero;
+            _correctionRemaining = SimulationVector2.Zero;
             _hasPredictedPosition = false;
             _client = null;
         }
@@ -152,12 +168,36 @@ namespace RPG.Unity
 
         private void AdvanceLocalPrediction(float deltaTime)
         {
-            if (!_hasPredictedPosition || _localDirection.LengthSquared <= 0.0001f)
+            if (!_hasPredictedPosition)
                 return;
 
             _predictedPosition += _localDirection * (_predictionSpeed * deltaTime);
+
+            if (_correctionRemaining.LengthSquared > 0.000001f)
+            {
+                var correctionStep = Mathf.Min(1f, deltaTime / PredictionCorrectionDuration);
+                var appliedCorrection = _correctionRemaining * correctionStep;
+                _predictedPosition += appliedCorrection;
+                _correctionRemaining -= appliedCorrection;
+            }
+
             if (_registry.TryGet(_localActorId, out var localView))
                 localView.ApplyPredictedPosition(_predictedPosition);
+        }
+
+        private void AdvanceRemotePresentation(float deltaTime)
+        {
+            if (_registry == null)
+                return;
+
+            var snapshotInterval = Mathf.Max(_predictionDelta, 1f / 30f);
+            foreach (var entry in _registry)
+            {
+                if (entry.Key == _localActorId)
+                    continue;
+
+                entry.Value.TickRemotePresentation(deltaTime, snapshotInterval);
+            }
         }
 
         private void ProcessPendingRemoval()
