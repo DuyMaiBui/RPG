@@ -121,7 +121,7 @@ namespace RPG.Unity
 
         public bool TrySendMoveIntent(Vector2 direction)
         {
-            if (_client == null || _prediction == null || direction.sqrMagnitude <= 0.0001f)
+            if (_client == null || _prediction == null)
                 return false;
 
             var sequence = new ClientSequence(_nextSequence++);

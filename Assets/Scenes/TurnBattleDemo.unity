@@ -146,7 +146,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cfb87ecdce2094e7c90660684f0c6bdc, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: RPG.Unity::RPG.Unity.FloatingCombatTextPool
   initialSize: 12
   itemPrefab: {fileID: 2449637644194022962, guid: 8f2a1a3ed20274294aae540f7f5281e0, type: 3}
@@ -300,6 +300,7 @@ GameObject:
   - component: {fileID: 1361859387}
   - component: {fileID: 1361859389}
   - component: {fileID: 1361859388}
+  - component: {fileID: 1361859390}
   m_Layer: 0
   m_Name: BattleDemoBootstrap
   m_TagString: Untagged
@@ -370,6 +371,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 23b5371a1c1ce4c6fb73c1816578d860, type: 3}
   m_Name: 
   m_EditorClassIdentifier: RPG.Unity::RPG.Unity.TurnBattleDemoDriver
+--- !u!114 &1361859390
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1361859385}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4eecede1bf3744bed987f5d2553159dc, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: RPG.Unity::RPG.Unity.SimulationMoveInput
+  _bridge: {fileID: 1361859388}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

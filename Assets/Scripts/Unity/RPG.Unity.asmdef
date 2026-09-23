@@ -5,6 +5,7 @@
     "RPG.Core",
     "RPG.Simulation.Contracts",
     "RPG.Simulation.Runtime",
+    "Unity.InputSystem",
     "LitMotion",
     "LitMotion.Extensions"
   ],
