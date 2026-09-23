@@ -129,7 +129,9 @@ namespace RPG.Core.Navigation
                 if (index == startIndex) break;
             }
 
-            for (var left = 0, right = count - 1; left < right; left++, right--)
+            var left = 0;
+            var right = count - 1;
+            for (; left < right; left++, right--)
             {
                 var value = output[left];
                 output[left] = output[right];
