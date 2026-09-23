@@ -189,5 +189,26 @@ namespace RPG.Core.Tests
             Assert.That(direction.X, Is.LessThan(0.99f));
             Assert.That(direction.LengthSquared, Is.GreaterThan(0.9f));
         }
+
+        [Test]
+        public void Avoidance_PreservesPreferredDirectionForNearbyNonCollidingActor()
+        {
+            var registry = new ActorRegistry();
+            var actorId = registry.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+                10, 1, SimulationVector2.Zero, 0.3f, 1f, 3f, 1f, 1f));
+            var nearbyId = registry.Spawn(ActorKind.Monster, FactionId.Blue, new ActorSpawnData(
+                10, 1, new SimulationVector2(0f, 1.2f), 0.3f, 0f, 3f, 1f, 1f));
+            Assert.That(registry.TryGet(actorId, out var actor), Is.True);
+            Assert.That(registry.TryGet(nearbyId, out _), Is.True);
+
+            var hash = new SpatialHash(1f);
+            hash.Rebuild(registry);
+
+            var direction = new OrcaAvoidanceSolver().Solve(
+                actor, new SimulationVector2(1f, 0f), registry, hash);
+
+            Assert.That(direction.X, Is.EqualTo(1f).Within(0.0001f));
+            Assert.That(direction.Y, Is.EqualTo(0f).Within(0.0001f));
+        }
     }
 }

@@ -78,6 +78,9 @@ namespace RPG.Core.Navigation
                 var relativeVelocity = velocity - otherMovement.DesiredDirection * otherMovement.Speed;
                 var combinedRadius = radius + other.Components.Get<BodyComponent>().Radius;
                 var distanceSquared = relativePosition.LengthSquared;
+                if (!HasProjectedCollision(relativePosition, relativeVelocity, combinedRadius))
+                    continue;
+
                 SimulationVector2 direction;
                 SimulationVector2 u;
 
@@ -123,6 +126,27 @@ namespace RPG.Core.Navigation
             }
 
             return lineCount;
+        }
+
+        private bool HasProjectedCollision(
+            SimulationVector2 relativePosition,
+            SimulationVector2 relativeVelocity,
+            float combinedRadius)
+        {
+            var distanceSquared = relativePosition.LengthSquared;
+            if (distanceSquared <= combinedRadius * combinedRadius)
+                return true;
+
+            var relativeSpeedSquared = relativeVelocity.LengthSquared;
+            if (relativeSpeedSquared <= Epsilon)
+                return false;
+
+            var timeToClosest = Dot(relativePosition, relativeVelocity) / relativeSpeedSquared;
+            if (timeToClosest < 0f || timeToClosest > _timeHorizon)
+                return false;
+
+            var closestPosition = relativePosition - relativeVelocity * timeToClosest;
+            return closestPosition.LengthSquared < combinedRadius * combinedRadius;
         }
 
         private void LinearProgram3(
