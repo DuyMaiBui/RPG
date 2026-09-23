@@ -46,6 +46,15 @@ namespace RPG.Unity
             }
         }
 
+        public void ApplyTargetPosition(Vector3 targetPosition, bool visible)
+        {
+            foreach (var component in _components)
+            {
+                if (component is ActorTargetView targetView)
+                    targetView.ApplyTargetPosition(targetPosition, visible);
+            }
+        }
+
         public void PlaySignal(PresentationSignal signal)
         {
             foreach (var component in _components)

@@ -91,5 +91,28 @@ namespace RPG.Core.Tests
 
             Assert.That(tree.Tick(0), Is.EqualTo(BehaviorStatus.Succeeded));
         }
+
+        [Test]
+        public void Avoidance_SteersHeadOnActorsAwayFromCollision()
+        {
+            var registry = new ActorRegistry();
+            var leftId = registry.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+                10, 1, new SimulationVector2(-0.4f, 0f), 0.3f, 1f, 3f, 1f, 1f));
+            var rightId = registry.Spawn(ActorKind.Monster, FactionId.Blue, new ActorSpawnData(
+                10, 1, new SimulationVector2(0.4f, 0f), 0.3f, 1f, 3f, 1f, 1f));
+            Assert.That(registry.TryGet(leftId, out var left), Is.True);
+            Assert.That(registry.TryGet(rightId, out var right), Is.True);
+
+            left.Components.Get<MovementComponent>().DesiredDirection = new SimulationVector2(1f, 0f);
+            right.Components.Get<MovementComponent>().DesiredDirection = new SimulationVector2(-1f, 0f);
+            var hash = new SpatialHash(1f);
+            hash.Rebuild(registry);
+
+            var direction = new OrcaAvoidanceSolver().Solve(
+                left, new SimulationVector2(1f, 0f), registry, hash);
+
+            Assert.That(direction.X, Is.LessThan(0.99f));
+            Assert.That(direction.LengthSquared, Is.GreaterThan(0.9f));
+        }
     }
 }

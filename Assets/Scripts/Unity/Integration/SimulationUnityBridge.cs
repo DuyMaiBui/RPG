@@ -20,6 +20,7 @@ namespace RPG.Unity
         private long _nextSequence;
         private SimulationTick _lastServerTick;
         private readonly Dictionary<SimulationEntityId, float> _pendingRemoval = new();
+        private readonly Dictionary<SimulationEntityId, ActorSnapshot> _snapshots = new();
 
         public void Initialize(
             ISimulationClient client,
@@ -57,9 +58,11 @@ namespace RPG.Unity
             _lastServerTick = update.ServerTick;
             _projectiles.Apply(frame.Projectiles);
             var liveIds = new HashSet<SimulationEntityId>();
+            _snapshots.Clear();
             foreach (var snapshot in frame.Actors.Span)
             {
                 liveIds.Add(snapshot.Entity);
+                _snapshots[snapshot.Entity] = snapshot;
                 if (_registry.TryGet(snapshot.Entity, out var view))
                     view.ApplySnapshot(snapshot);
                 if (snapshot.Entity == _localActorId && _registry.TryGet(snapshot.Entity, out var localView))
@@ -72,6 +75,15 @@ namespace RPG.Unity
                     localView.ApplyPredictedPosition(predicted);
                 }
                 _pendingRemoval.Remove(snapshot.Entity);
+            }
+
+            foreach (var snapshot in frame.Actors.Span)
+            {
+                if (!_registry.TryGet(snapshot.Entity, out var view)) continue;
+                var hasTarget = _snapshots.TryGetValue(snapshot.Target, out var targetSnapshot);
+                view.ApplyTargetPosition(
+                    hasTarget ? new Vector3(targetSnapshot.Position.X, targetSnapshot.Position.Y, 0f) : Vector3.zero,
+                    hasTarget);
             }
 
             foreach (var signal in frame.Signals.Span)
