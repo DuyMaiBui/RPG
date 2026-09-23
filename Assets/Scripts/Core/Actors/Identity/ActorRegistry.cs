@@ -114,11 +114,14 @@ namespace RPG.Core.Actors
                 var position = actor.Components.Get<PositionComponent>();
                 var body = actor.Components.Get<BodyComponent>();
                 var attackRange = actor.Components.Get<AttackRangeComponent>();
+                var attackType = actor.Components.TryGet<ProjectileWeaponComponent>(out _)
+                    ? AttackType.Projectile
+                    : AttackType.Melee;
                 var vision = actor.Components.Get<VisionComponent>();
                 var target = actor.Components.Get<TargetComponent>();
                 var behavior = actor.Components.Get<AutoCombatStateComponent>();
                 snapshots.Add(new ActorSnapshot(actor.Id, kind, faction, health.CurrentHealth, health.MaximumHealth,
-                    position.Position, body.Radius, attackRange.Reach, vision.Range, target.CurrentTarget,
+                    position.Position, body.Radius, attackRange.Reach, attackType, vision.Range, target.CurrentTarget,
                     health.IsDead ? ActorVisualState.Dead : ActorVisualState.Idle, behavior.State));
             }
 

@@ -33,9 +33,13 @@ namespace RPG.Unity
 
             _range.SetPositions(_points);
             _range.enabled = snapshot.BehaviorState != AutoCombatState.Dead;
-            _range.startColor = snapshot.BehaviorState == AutoCombatState.AttackTarget
-                ? new Color(1f, 0.25f, 0.1f, 0.8f)
+            var activeColor = snapshot.AttackType == AttackType.Projectile
+                ? new Color(0.2f, 0.75f, 1f, 0.85f)
+                : new Color(1f, 0.25f, 0.1f, 0.85f);
+            var idleColor = snapshot.AttackType == AttackType.Projectile
+                ? new Color(0.2f, 0.75f, 1f, 0.35f)
                 : new Color(1f, 0.8f, 0.15f, 0.35f);
+            _range.startColor = snapshot.BehaviorState == AutoCombatState.AttackTarget ? activeColor : idleColor;
             _range.endColor = _range.startColor;
         }
 

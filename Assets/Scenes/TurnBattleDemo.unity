@@ -146,7 +146,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cfb87ecdce2094e7c90660684f0c6bdc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: RPG.Unity::RPG.Unity.FloatingCombatTextPool
   initialSize: 12
   itemPrefab: {fileID: 2449637644194022962, guid: 8f2a1a3ed20274294aae540f7f5281e0, type: 3}
@@ -340,6 +340,17 @@ MonoBehaviour:
   attackPower: 5
   tickRate: 30
   moveSpeed: 0.8
+  actorLoadouts:
+  - _attackType: 0
+    _attackRange: 0.1
+    _projectileSpeed: 0
+    _projectileRadius: 0.05
+    _projectileLifetime: 0
+  - _attackType: 1
+    _attackRange: 3.5
+    _projectileSpeed: 5
+    _projectileRadius: 0.05
+    _projectileLifetime: 5
   actorPrefab: {fileID: 1795847064336846514, guid: 014f3ddf73da24f7a9f1d63bd22d851d, type: 3}
   actorRoot: {fileID: 1345598794}
   floatingTextPool: {fileID: 399920601}
@@ -347,6 +358,7 @@ MonoBehaviour:
   bridge: {fileID: 1361859388}
   projectilePrefab: {fileID: 5637623362077680192, guid: 1d71a1c3564df43f6a3dc4deb218cb13, type: 3}
   projectileRoot: {fileID: 1345598794}
+  navigationObstacles: []
 --- !u!114 &1361859388
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -381,7 +393,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4eecede1bf3744bed987f5d2553159dc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: RPG.Unity::RPG.Unity.SimulationMoveInput
   _bridge: {fileID: 1361859388}
 --- !u!1660057539 &9223372036854775807

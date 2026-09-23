@@ -13,6 +13,7 @@ namespace RPG.Core.Actors
             SimulationVector2 position,
             float radius,
             float attackRange,
+            AttackType attackType,
             float visionRange,
             EntityId target,
             ActorVisualState visualState,
@@ -26,6 +27,7 @@ namespace RPG.Core.Actors
             Position = position;
             Radius = radius;
             AttackRange = attackRange;
+            AttackType = attackType;
             VisionRange = visionRange;
             Target = target;
             VisualState = visualState;
@@ -40,6 +42,7 @@ namespace RPG.Core.Actors
         public SimulationVector2 Position { get; }
         public float Radius { get; }
         public float AttackRange { get; }
+        public AttackType AttackType { get; }
         public float VisionRange { get; }
         public EntityId Target { get; }
         public ActorVisualState VisualState { get; }

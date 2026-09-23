@@ -15,6 +15,11 @@ namespace RPG.Unity
         [SerializeField] private int attackPower = 5;
         [SerializeField] private int tickRate = 30;
         [SerializeField] private float moveSpeed = 0.8f;
+        [SerializeField] private ActorLoadoutAuthoring[] actorLoadouts =
+        {
+            new ActorLoadoutAuthoring(AttackType.Melee, 0.1f, 0f, 0.05f, 0f),
+            new ActorLoadoutAuthoring(AttackType.Projectile, 3.5f, 5f, 0.05f, 5f),
+        };
         [SerializeField] private ActorView actorPrefab;
         [SerializeField] private Transform actorRoot;
         [SerializeField] private FloatingCombatTextPool floatingTextPool;
@@ -34,6 +39,8 @@ namespace RPG.Unity
             if (actorPrefab == null || actorRoot == null || floatingTextPool == null || driver == null || bridge == null ||
                 projectilePrefab == null || projectileRoot == null)
                 throw new InvalidOperationException("BattleDemoBootstrap scene references are incomplete.");
+            if (actorLoadouts == null || actorLoadouts.Length == 0)
+                throw new InvalidOperationException("BattleDemoBootstrap requires at least one actor loadout.");
 
             var state = new RpgSimulationState();
             for (var index = 0; index < navigationObstacles.Length; index++)
@@ -97,15 +104,11 @@ namespace RPG.Unity
             var position = new SimulationVector2(
                 faction == FactionId.Red ? -2f : 2f,
                 (index - (actorsPerFaction - 1) * 0.5f) * 1.5f);
-            var id = state.Actors.Spawn(kind, faction, new ActorSpawnData(
-                maximumHealth,
-                attackPower,
-                position,
-                0.35f,
-                moveSpeed,
-                6f,
-                0.1f,
-                0.8f));
+            var loadout = actorLoadouts[index % actorLoadouts.Length];
+            if (loadout == null)
+                throw new InvalidOperationException($"BattleDemoBootstrap actor loadout at index {index % actorLoadouts.Length} is missing.");
+            var id = state.Actors.Spawn(kind, faction, loadout.CreateSpawnData(
+                maximumHealth, attackPower, position, 0.35f, moveSpeed, 6f, 0.8f));
             var player = new PlayerId($"{faction}-{index}");
             state.PlayerActors.Add(player, id);
             var session = new SessionContext(new SessionId(Guid.NewGuid()), player);

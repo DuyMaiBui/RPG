@@ -85,6 +85,24 @@ namespace RPG.Core.Tests
         }
 
         [Test]
+        public void ActorSnapshot_PreservesMeleeAndProjectileAttackTypes()
+        {
+            var registry = new ActorRegistry();
+            registry.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+                10, 1, SimulationVector2.Zero, 0.35f, 0.8f, 6f, 0.1f, 0.8f));
+            registry.Spawn(ActorKind.Monster, FactionId.Blue, new ActorSpawnData(
+                10, 1, new SimulationVector2(2f, 0f), 0.35f, 0.8f, 6f, 3.5f, 0.8f,
+                attackType: AttackType.Projectile, projectileSpeed: 5f, projectileRadius: 0.05f, projectileLifetime: 5f));
+
+            var snapshots = registry.CreateSnapshot();
+
+            Assert.That(snapshots[0].AttackType, Is.EqualTo(AttackType.Melee));
+            Assert.That(snapshots[0].AttackRange, Is.EqualTo(0.1f));
+            Assert.That(snapshots[1].AttackType, Is.EqualTo(AttackType.Projectile));
+            Assert.That(snapshots[1].AttackRange, Is.EqualTo(3.5f));
+        }
+
+        [Test]
         public void FormationCoordinator_ResolvesAuthoringOffset()
         {
             var coordinator = new FormationCoordinator();
