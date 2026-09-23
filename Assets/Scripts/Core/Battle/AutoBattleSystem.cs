@@ -99,26 +99,34 @@ namespace RPG.Core.Actors
                 }
 
                 var pathFollower = actor.Components.Get<PathFollowerComponent>();
-                var pathDestinationDelta = destination - pathFollower.Destination;
-                if (!pathFollower.HasPath || pathDestinationDelta.LengthSquared > 0.25f)
-                {
-                    if (context.State.Pathfinder.TryFindPath(position.Position, destination, MovingBodyRadius(actor), out var path))
-                        pathFollower.SetPath(destination, path);
-                    else
-                        pathFollower.Clear();
-                }
-
-                pathFollower.AdvanceIfClose(position.Position, 0.1f);
                 var directDirection = (destination - position.Position).Normalized();
                 var direction = directDirection;
-                if (pathFollower.HasPath)
+                if (context.State.Navigation.IsDirectPathWalkable(
+                        position.Position, destination, MovingBodyRadius(actor)))
                 {
-                    var pathDirection = (pathFollower.CurrentNode - position.Position).Normalized();
-                    var alignment = pathDirection.X * directDirection.X + pathDirection.Y * directDirection.Y;
-                    if (alignment > 0f)
-                        direction = pathDirection;
-                    else
-                        pathFollower.Clear();
+                    pathFollower.Clear();
+                }
+                else
+                {
+                    var pathDestinationDelta = destination - pathFollower.Destination;
+                    if (!pathFollower.HasPath || pathDestinationDelta.LengthSquared > 0.25f)
+                    {
+                        if (context.State.Pathfinder.TryFindPath(position.Position, destination, MovingBodyRadius(actor), out var path))
+                            pathFollower.SetPath(destination, path);
+                        else
+                            pathFollower.Clear();
+                    }
+
+                    pathFollower.AdvanceIfClose(position.Position, 0.1f);
+                    if (pathFollower.HasPath)
+                    {
+                        var pathDirection = (pathFollower.CurrentNode - position.Position).Normalized();
+                        var alignment = pathDirection.X * directDirection.X + pathDirection.Y * directDirection.Y;
+                        if (alignment > 0f)
+                            direction = pathDirection;
+                        else
+                            pathFollower.Clear();
+                    }
                 }
                 movement.DesiredDirection = _avoidance.Solve(
                     actor, direction, actors, _spatialHash, context.FixedDeltaTime);

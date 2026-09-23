@@ -47,6 +47,21 @@ namespace RPG.Core.Navigation
         public SimulationVector2 GetCenter(GridCoordinate coordinate) =>
             new(Origin.X + (coordinate.X + 0.5f) * CellSize, Origin.Y + (coordinate.Y + 0.5f) * CellSize);
 
+        public bool IsDirectPathWalkable(SimulationVector2 start, SimulationVector2 destination, float radius)
+        {
+            var delta = destination - start;
+            var distance = MathF.Sqrt(delta.LengthSquared);
+            var steps = Math.Max(1, (int)MathF.Ceiling(distance / MathF.Max(CellSize * 0.5f, 0.01f)));
+            for (var step = 0; step <= steps; step++)
+            {
+                var position = start + delta * (step / (float)steps);
+                if (!TryGetCoordinate(position, out var coordinate) || !IsWalkableForRadius(coordinate, radius))
+                    return false;
+            }
+
+            return true;
+        }
+
         public void ResetObstacles()
         {
             Array.Copy(_baseBlocked, _blocked, _blocked.Length);

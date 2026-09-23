@@ -44,6 +44,30 @@ namespace RPG.Core.Tests
         }
 
         [Test]
+        public void NavigationGrid_UsesDirectPathWhenNoObstacleBlocksIt()
+        {
+            var grid = new NavigationGrid(8, 8, 1f, new SimulationVector2(-4f, -4f));
+
+            Assert.That(grid.IsDirectPathWalkable(
+                new SimulationVector2(-2f, 0f),
+                new SimulationVector2(2f, 0f),
+                0.25f), Is.True);
+        }
+
+        [Test]
+        public void NavigationGrid_RejectsDirectPathThroughBlockedCell()
+        {
+            var grid = new NavigationGrid(8, 8, 1f, new SimulationVector2(-4f, -4f));
+            grid.ApplyObstacle(new NavigationObstacle(
+                1, new SimulationVector2(0f, 0f), new SimulationVector2(0.4f, 0.4f)));
+
+            Assert.That(grid.IsDirectPathWalkable(
+                new SimulationVector2(-2f, 0f),
+                new SimulationVector2(2f, 0f),
+                0.25f), Is.False);
+        }
+
+        [Test]
         public void TargetSelector_UsesVisionAndConfiguredPriority()
         {
             var registry = new ActorRegistry();
