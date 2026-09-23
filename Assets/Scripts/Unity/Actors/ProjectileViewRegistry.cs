@@ -14,6 +14,7 @@ namespace RPG.Unity
         private readonly Dictionary<SimulationEntityId, ProjectileView> _active = new();
         private readonly Stack<ProjectileView> _pool = new();
         private readonly List<SimulationEntityId> _expired = new();
+        private readonly HashSet<SimulationEntityId> _seen = new();
 
         public ProjectileViewRegistry(ProjectileView prefab, Transform root)
         {
@@ -24,9 +25,11 @@ namespace RPG.Unity
         public void Apply(ReadOnlyMemory<ProjectileSnapshot> snapshots)
         {
             var span = snapshots.Span;
+            _seen.Clear();
             for (var index = 0; index < span.Length; index++)
             {
                 var snapshot = span[index];
+                _seen.Add(snapshot.Entity);
                 if (!_active.TryGetValue(snapshot.Entity, out var view))
                 {
                     view = Rent();
@@ -39,15 +42,7 @@ namespace RPG.Unity
             _expired.Clear();
             foreach (var pair in _active)
             {
-                var found = false;
-                for (var index = 0; index < span.Length; index++)
-                {
-                    if (span[index].Entity != pair.Key) continue;
-                    found = true;
-                    break;
-                }
-
-                if (!found) _expired.Add(pair.Key);
+                if (!_seen.Contains(pair.Key)) _expired.Add(pair.Key);
             }
 
             for (var index = 0; index < _expired.Count; index++)
