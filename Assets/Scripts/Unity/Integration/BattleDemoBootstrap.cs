@@ -22,6 +22,7 @@ namespace RPG.Unity
         [SerializeField] private SimulationUnityBridge bridge;
         [SerializeField] private ProjectileView projectilePrefab;
         [SerializeField] private Transform projectileRoot;
+        [SerializeField] private NavigationObstacleAuthoring[] navigationObstacles = new NavigationObstacleAuthoring[0];
 
         private SimulationHost<RpgSimulationState> _host;
         private ActorViewRegistry _registry;
@@ -35,6 +36,13 @@ namespace RPG.Unity
                 throw new InvalidOperationException("BattleDemoBootstrap scene references are incomplete.");
 
             var state = new RpgSimulationState();
+            for (var index = 0; index < navigationObstacles.Length; index++)
+            {
+                var obstacle = navigationObstacles[index];
+                if (obstacle != null && obstacle.IsEnabled)
+                    state.Navigation.ApplyObstacle(obstacle.ToSimulationObstacle());
+            }
+
             var application = new RpgSimulationApplication();
             _host = new SimulationHost<RpgSimulationState>(state, application, new SimulationOptions(tickRate));
             _registry = new ActorViewRegistry();
