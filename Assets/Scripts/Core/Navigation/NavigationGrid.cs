@@ -27,6 +27,7 @@ namespace RPG.Core.Navigation
 
         public int Width { get; }
         public int Height { get; }
+        public int CellCount => Width * Height;
         public float CellSize { get; }
         public SimulationVector2 Origin { get; }
         public int Revision { get; private set; }

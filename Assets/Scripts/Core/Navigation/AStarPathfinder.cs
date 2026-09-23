@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using RPG.Simulation.Contracts;
 
 namespace RPG.Core.Navigation
@@ -12,43 +11,72 @@ namespace RPG.Core.Navigation
         };
 
         private readonly NavigationGrid _grid;
+        private readonly float[] _costs;
+        private readonly int[] _parents;
+        private readonly int[] _open;
+        private readonly bool[] _openFlags;
+        private readonly SimulationVector2[] _pathScratch;
+        private int _openCount;
 
         public AStarPathfinder(NavigationGrid grid)
         {
             _grid = grid ?? throw new ArgumentNullException(nameof(grid));
+            _costs = new float[grid.CellCount];
+            _parents = new int[grid.CellCount];
+            _open = new int[grid.CellCount];
+            _openFlags = new bool[grid.CellCount];
+            _pathScratch = new SimulationVector2[grid.CellCount];
         }
 
-        public bool TryFindPath(SimulationVector2 start, SimulationVector2 destination, float radius, out SimulationVector2[] path)
+        public bool TryFindPath(
+            SimulationVector2 start,
+            SimulationVector2 destination,
+            float radius,
+            out SimulationVector2[] path)
         {
             path = null;
+            if (!TryFindPath(start, destination, radius, _pathScratch, out var length))
+                return false;
+
+            path = new SimulationVector2[length];
+            Array.Copy(_pathScratch, path, length);
+            return true;
+        }
+
+        private bool TryFindPath(
+            SimulationVector2 start,
+            SimulationVector2 destination,
+            float radius,
+            SimulationVector2[] output,
+            out int pathLength)
+        {
+            pathLength = 0;
             if (!_grid.TryGetCoordinate(start, out var startCell) ||
                 !_grid.TryGetCoordinate(destination, out var goalCell) ||
                 !_grid.IsWalkableForRadius(startCell, radius) ||
                 !_grid.IsWalkableForRadius(goalCell, radius))
                 return false;
 
-            var count = _grid.Width * _grid.Height;
-            var costs = new float[count];
-            var parents = new int[count];
-            var open = new List<int>(count);
-            for (var index = 0; index < count; index++)
+            for (var index = 0; index < _costs.Length; index++)
             {
-                costs[index] = float.MaxValue;
-                parents[index] = -1;
+                _costs[index] = float.MaxValue;
+                _parents[index] = -1;
+                _openFlags[index] = false;
             }
 
+            _openCount = 0;
             var startIndex = ToIndex(startCell);
             var goalIndex = ToIndex(goalCell);
-            costs[startIndex] = 0f;
-            open.Add(startIndex);
+            _costs[startIndex] = 0f;
+            AddOpen(startIndex);
 
-            while (open.Count > 0)
+            while (_openCount > 0)
             {
-                var currentIndex = TakeBest(open, costs, goalCell);
+                var currentIndex = TakeBest(goalCell);
                 if (currentIndex == goalIndex)
                 {
-                    path = BuildPath(parents, startIndex, goalIndex);
-                    return true;
+                    pathLength = BuildPath(_parents, startIndex, goalIndex, output);
+                    return pathLength > 0;
                 }
 
                 var current = FromIndex(currentIndex);
@@ -60,47 +88,61 @@ namespace RPG.Core.Navigation
                     if (!_grid.IsWalkableForRadius(neighbor, radius)) continue;
 
                     var index = ToIndex(neighbor);
-                    var cost = costs[currentIndex] + 1f;
-                    if (cost >= costs[index]) continue;
-                    costs[index] = cost;
-                    parents[index] = currentIndex;
-                    if (!open.Contains(index)) open.Add(index);
+                    var cost = _costs[currentIndex] + 1f;
+                    if (cost >= _costs[index]) continue;
+                    _costs[index] = cost;
+                    _parents[index] = currentIndex;
+                    if (!_openFlags[index]) AddOpen(index);
                 }
             }
 
             return false;
         }
 
-        private int TakeBest(List<int> open, float[] costs, GridCoordinate goal)
+        private int TakeBest(GridCoordinate goal)
         {
-            var bestListIndex = 0;
-            var bestIndex = open[0];
-            var bestScore = costs[bestIndex] + Heuristic(FromIndex(bestIndex), goal);
-            for (var index = 1; index < open.Count; index++)
+            var bestOpenIndex = 0;
+            var bestIndex = _open[0];
+            var bestScore = _costs[bestIndex] + Heuristic(FromIndex(bestIndex), goal);
+            for (var index = 1; index < _openCount; index++)
             {
-                var candidate = open[index];
-                var score = costs[candidate] + Heuristic(FromIndex(candidate), goal);
+                var candidate = _open[index];
+                var score = _costs[candidate] + Heuristic(FromIndex(candidate), goal);
                 if (score >= bestScore && (score != bestScore || candidate >= bestIndex)) continue;
-                bestListIndex = index;
+                bestOpenIndex = index;
                 bestIndex = candidate;
                 bestScore = score;
             }
 
-            open.RemoveAt(bestListIndex);
+            _openCount--;
+            _open[bestOpenIndex] = _open[_openCount];
+            _openFlags[bestIndex] = false;
             return bestIndex;
         }
 
-        private SimulationVector2[] BuildPath(int[] parents, int startIndex, int goalIndex)
+        private int BuildPath(int[] parents, int startIndex, int goalIndex, SimulationVector2[] output)
         {
-            var reversed = new List<SimulationVector2>();
-            for (var index = goalIndex; index >= 0; index = parents[index])
+            var count = 0;
+            for (var index = goalIndex; index >= 0 && count < output.Length; index = parents[index])
             {
-                reversed.Add(_grid.GetCenter(FromIndex(index)));
+                output[count++] = _grid.GetCenter(FromIndex(index));
                 if (index == startIndex) break;
             }
 
-            reversed.Reverse();
-            return reversed.ToArray();
+            for (var left = 0, right = count - 1; left < right; left++, right--)
+            {
+                var value = output[left];
+                output[left] = output[right];
+                output[right] = value;
+            }
+
+            return count;
+        }
+
+        private void AddOpen(int index)
+        {
+            _open[_openCount++] = index;
+            _openFlags[index] = true;
         }
 
         private int ToIndex(GridCoordinate coordinate) => coordinate.Y * _grid.Width + coordinate.X;
