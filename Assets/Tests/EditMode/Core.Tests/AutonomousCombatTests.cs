@@ -28,6 +28,22 @@ namespace RPG.Core.Tests
         }
 
         [Test]
+        public void NavigationObstacle_BlocksItsCoveredCellsAndCanBeReset()
+        {
+            var grid = new NavigationGrid(4, 4, 1f, SimulationVector2.Zero);
+            grid.ApplyObstacle(new NavigationObstacle(
+                3, new SimulationVector2(1.5f, 1.5f), new SimulationVector2(0.4f, 0.4f)));
+
+            Assert.That(grid.IsWalkable(new GridCoordinate(1, 1)), Is.False);
+            Assert.That(grid.Revision, Is.EqualTo(1));
+
+            grid.ResetObstacles();
+
+            Assert.That(grid.IsWalkable(new GridCoordinate(1, 1)), Is.True);
+            Assert.That(grid.Revision, Is.EqualTo(2));
+        }
+
+        [Test]
         public void TargetSelector_UsesVisionAndConfiguredPriority()
         {
             var registry = new ActorRegistry();
