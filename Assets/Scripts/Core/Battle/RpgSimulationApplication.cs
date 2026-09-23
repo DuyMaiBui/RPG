@@ -17,10 +17,11 @@ namespace RPG.Core.Actors
         {
             if (command.Payload is not MoveIntentCommand move ||
                 !context.State.PlayerActors.TryGetValue(session.Player, out var actorId) ||
-                !context.State.Actors.TryGet(actorId, out var actor))
+                !context.State.Actors.TryGet(actorId, out var actor) ||
+                !actor.Components.TryGet<ManualMovementComponent>(out var manualMovement))
                 return;
 
-            actor.Components.Get<MovementComponent>().DesiredDirection = move.Direction.Normalized();
+            manualMovement.Direction = move.Direction.Normalized();
         }
 
         void ISimulationApplication<RpgSimulationState>.Tick(SimulationContext<RpgSimulationState> context, SimulationTick tick) =>

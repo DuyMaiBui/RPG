@@ -50,6 +50,8 @@ namespace RPG.Core.Actors
             components.Add(new PositionComponent(data.Position));
             components.Add(new BodyComponent(data.Radius));
             components.Add(new MovementComponent(data.MoveSpeed));
+            if (kind == ActorKind.Player)
+                components.Add(new ManualMovementComponent());
             components.Add(new VisionComponent(data.VisionRange));
             components.Add(new TargetComponent());
             components.Add(new AttackRangeComponent(data.AttackRange));

@@ -67,6 +67,17 @@ namespace RPG.Core.Actors
 
                 var position = actor.Components.Get<PositionComponent>();
                 var movement = actor.Components.Get<MovementComponent>();
+                if (actor.Components.TryGet<ManualMovementComponent>(out var manualMovement) && manualMovement.IsActive)
+                {
+                    movement.DesiredDirection = _avoidance.Solve(
+                        actor, manualMovement.Direction, actors, _spatialHash, context.FixedDeltaTime);
+                    var manualTravel = movement.Speed * context.FixedDeltaTime;
+                    var manualCandidate = position.Position + movement.DesiredDirection * manualTravel;
+                    position.Position = context.State.Navigation.ClampInside(
+                        ResolveOverlap(actors, actor, manualCandidate), MovingBodyRadius(actor));
+                    continue;
+                }
+
                 var targetComponent = actor.Components.Get<TargetComponent>();
                 var hasTarget = IsLiveEnemy(actors, actor, targetComponent.CurrentTarget, out var target);
                 var formationPosition = SimulationVector2.Zero;
