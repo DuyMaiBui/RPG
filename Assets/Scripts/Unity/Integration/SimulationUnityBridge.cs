@@ -21,6 +21,9 @@ namespace RPG.Unity
         private SimulationTick _lastServerTick;
         private readonly Dictionary<SimulationEntityId, float> _pendingRemoval = new();
         private readonly Dictionary<SimulationEntityId, ActorSnapshot> _snapshots = new();
+        private readonly HashSet<SimulationEntityId> _liveIds = new();
+        private readonly List<SimulationEntityId> _expiredRemoval = new();
+        private readonly List<SimulationEntityId> _pendingKeys = new();
 
         public void Initialize(
             ISimulationClient client,
@@ -57,11 +60,11 @@ namespace RPG.Unity
             if (!(update.Payload is WorldFrameUpdate frame)) return;
             _lastServerTick = update.ServerTick;
             _projectiles.Apply(frame.Projectiles);
-            var liveIds = new HashSet<SimulationEntityId>();
+            _liveIds.Clear();
             _snapshots.Clear();
             foreach (var snapshot in frame.Actors.Span)
             {
-                liveIds.Add(snapshot.Entity);
+                _liveIds.Add(snapshot.Entity);
                 _snapshots[snapshot.Entity] = snapshot;
                 if (_registry.TryGet(snapshot.Entity, out var view))
                     view.ApplySnapshot(snapshot);
@@ -97,7 +100,7 @@ namespace RPG.Unity
 
             foreach (var entry in _registry.Entries)
             {
-                if (!liveIds.Contains(entry.Key) && !_pendingRemoval.ContainsKey(entry.Key))
+                if (!_liveIds.Contains(entry.Key) && !_pendingRemoval.ContainsKey(entry.Key))
                     _pendingRemoval[entry.Key] = 0.9f;
             }
 
@@ -137,16 +140,19 @@ namespace RPG.Unity
         private void ProcessPendingRemoval()
         {
             if (_registry == null) return;
-            var expired = new List<SimulationEntityId>();
-            var keys = new List<SimulationEntityId>(_pendingRemoval.Keys);
-            foreach (var id in keys)
+            _expiredRemoval.Clear();
+            _pendingKeys.Clear();
+            foreach (var id in _pendingRemoval.Keys)
+                _pendingKeys.Add(id);
+
+            foreach (var id in _pendingKeys)
             {
                 _pendingRemoval[id] -= Time.deltaTime;
                 if (_pendingRemoval[id] <= 0f)
-                    expired.Add(id);
+                    _expiredRemoval.Add(id);
             }
 
-            foreach (var id in expired)
+            foreach (var id in _expiredRemoval)
             {
                 _pendingRemoval.Remove(id);
                 _registry.Remove(id);
