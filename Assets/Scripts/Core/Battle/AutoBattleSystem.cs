@@ -109,7 +109,8 @@ namespace RPG.Core.Actors
                     else
                         pathFollower.Clear();
                 }
-                movement.DesiredDirection = _avoidance.Solve(actor, direction, actors, _spatialHash);
+                movement.DesiredDirection = _avoidance.Solve(
+                    actor, direction, actors, _spatialHash, context.FixedDeltaTime);
                 var travel = System.MathF.Min(movement.Speed * context.FixedDeltaTime, distance - stopDistance);
                 var candidate = position.Position + movement.DesiredDirection * travel;
                 position.Position = context.State.Navigation.ClampInside(
