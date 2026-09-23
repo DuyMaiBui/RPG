@@ -9,7 +9,7 @@ namespace RPG.Unity
     public sealed class ActorLoadoutAuthoring
     {
         [SerializeField] private AttackType _attackType;
-        [SerializeField, Min(0f)] private float _attackRange = 0.1f;
+        [SerializeField, Min(0f)] private float _attackRange = 0.25f;
         [SerializeField, Min(0f)] private float _projectileSpeed = 5f;
         [SerializeField, Min(0f)] private float _projectileRadius = 0.05f;
         [SerializeField, Min(0f)] private float _projectileLifetime = 5f;

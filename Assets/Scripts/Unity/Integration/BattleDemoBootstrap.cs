@@ -17,7 +17,7 @@ namespace RPG.Unity
         [SerializeField] private float moveSpeed = 0.8f;
         [SerializeField] private ActorLoadoutAuthoring[] actorLoadouts =
         {
-            new ActorLoadoutAuthoring(AttackType.Melee, 0.1f, 0f, 0.05f, 0f),
+            new ActorLoadoutAuthoring(AttackType.Melee, 0.25f, 0f, 0.05f, 0f),
             new ActorLoadoutAuthoring(AttackType.Projectile, 3.5f, 5f, 0.05f, 5f),
         };
         [SerializeField] private ActorView actorPrefab;

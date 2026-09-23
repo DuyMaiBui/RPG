@@ -342,7 +342,7 @@ MonoBehaviour:
   moveSpeed: 0.8
   actorLoadouts:
   - _attackType: 0
-    _attackRange: 0.1
+    _attackRange: 0.25
     _projectileSpeed: 0
     _projectileRadius: 0.05
     _projectileLifetime: 0
