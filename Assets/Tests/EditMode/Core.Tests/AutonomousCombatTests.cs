@@ -133,6 +133,17 @@ namespace RPG.Core.Tests
         }
 
         [Test]
+        public void BehaviorTree_ConditionInverterAndParallelComposeWithoutStateLeak()
+        {
+            var tree = new BehaviorTree<int>(new BehaviorParallel<int>(
+                new BehaviorCondition<int>(value => value > 0),
+                new BehaviorInverter<int>(new BehaviorCondition<int>(value => value < 0))));
+
+            Assert.That(tree.Tick(1), Is.EqualTo(BehaviorStatus.Succeeded));
+            Assert.That(tree.Tick(-1), Is.EqualTo(BehaviorStatus.Failed));
+        }
+
+        [Test]
         public void Avoidance_SteersHeadOnActorsAwayFromCollision()
         {
             var registry = new ActorRegistry();
