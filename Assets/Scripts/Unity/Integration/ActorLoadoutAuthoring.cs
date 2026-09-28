@@ -1,5 +1,6 @@
 using System;
 using RPG.Core.Actors;
+using RPG.Core.Physics;
 using RPG.Simulation.Contracts;
 using UnityEngine;
 
@@ -35,7 +36,8 @@ namespace RPG.Unity
             float bodyRadius,
             float moveSpeed,
             float visionRange,
-            float attackCooldown)
+            float attackCooldown,
+            ColliderShapeData[] colliderShapes = null)
         {
             if (_attackRange < 0f)
                 throw new InvalidOperationException("Actor loadout attack range cannot be negative.");
@@ -54,7 +56,8 @@ namespace RPG.Unity
                 attackType: _attackType,
                 projectileSpeed: _projectileSpeed,
                 projectileRadius: _projectileRadius,
-                projectileLifetime: _projectileLifetime);
+                projectileLifetime: _projectileLifetime,
+                colliderShapes: colliderShapes);
         }
     }
 }

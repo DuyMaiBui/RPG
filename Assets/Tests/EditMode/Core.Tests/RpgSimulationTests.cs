@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using NUnit.Framework;
 using RPG.Core.Actors;
+using RPG.Core.Navigation;
+using RPG.Core.Physics;
 using RPG.Simulation.Contracts;
 using RPG.Simulation.Runtime;
 
@@ -191,12 +193,156 @@ public sealed class RpgSimulationTests
         Assert.That(blue.Components.Get<PositionComponent>().Position.X, Is.LessThan(3f));
     }
 
+    [Test]
+    public void AutoBattle_MovesTowardEnemyOutsideVisionUntilItCanAcquireTarget()
+    {
+        var state = new RpgSimulationState();
+        var redId = state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+            100, 1, new SimulationVector2(-3f, 0f), 0.3f, 1f, 0.5f, 0.1f, 100f));
+        state.Actors.Spawn(ActorKind.Monster, FactionId.Blue, new ActorSpawnData(
+            100, 1, new SimulationVector2(3f, 0f), 0.3f, 1f, 0.5f, 0.1f, 100f));
+        using var host = new SimulationHost<RpgSimulationState>(state, new RpgSimulationApplication(), new SimulationOptions(60));
+        using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(
+            host, new SessionContext(new SessionId(Guid.NewGuid()), new PlayerId("long-route")));
+
+        host.Start();
+        WaitForUpdate(client, update => update.Payload is WorldFrameUpdate frame && frame.TurnNumber >= 10);
+
+        Assert.That(state.Actors.TryGet(redId, out var red), Is.True);
+        Assert.That(red.Components.Get<PositionComponent>().Position.X, Is.GreaterThan(-3f));
+    }
+
+    [Test]
+    public void AutoBattle_RoutesAroundStationaryCrowdBlocker()
+    {
+        var state = new RpgSimulationState();
+        var redId = state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+            100, 1, new SimulationVector2(-3f, 0f), 0.3f, 1f, 8f, 0.1f, 100f));
+        state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+            100, 1, new SimulationVector2(-2.1f, -0.45f), 0.3f, 0f, 8f, 0.1f, 100f));
+        state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+            100, 1, new SimulationVector2(-2.1f, 0f), 0.3f, 0f, 8f, 0.1f, 100f));
+        state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+            100, 1, new SimulationVector2(-2.1f, 0.45f), 0.3f, 0f, 8f, 0.1f, 100f));
+        state.Actors.Spawn(ActorKind.Monster, FactionId.Blue, new ActorSpawnData(
+            100, 1, new SimulationVector2(3f, 0f), 0.3f, 0f, 8f, 0.1f, 100f));
+
+        using var host = new SimulationHost<RpgSimulationState>(
+            state,
+            new RpgSimulationApplication(),
+            new SimulationOptions(60));
+        using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(
+            host,
+            new SessionContext(new SessionId(Guid.NewGuid()), new PlayerId("crowd-detour")));
+
+        host.Start();
+        WaitForUpdate(client, update => update.Payload is WorldFrameUpdate frame && frame.TurnNumber >= 60);
+
+        Assert.That(state.Actors.TryGet(redId, out var red), Is.True);
+        var position = red.Components.Get<PositionComponent>().Position;
+        Assert.That(position.X, Is.GreaterThan(-3f));
+        Assert.That(System.MathF.Abs(position.Y), Is.GreaterThan(0.1f));
+    }
+
+    [Test]
+    public void AutoBattle_CommitsToOneStaticObstacleSideWithoutRouteOscillation()
+    {
+        var state = new RpgSimulationState(12, 8, 1f);
+        state.Navigation.ApplyObstacle(new NavigationObstacle(
+            1,
+            new SimulationVector2(0f, 0f),
+            CollisionShape.Box(new SimulationVector2(0.4f, 1.2f))));
+        var redId = state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
+            1000, 0, new SimulationVector2(-4f, 0f), 0.3f, 3f, 10f, 0.1f, 100f));
+        state.Actors.Spawn(ActorKind.Monster, FactionId.Blue, new ActorSpawnData(
+            1000, 0, new SimulationVector2(4f, 0f), 0.3f, 0f, 10f, 0.1f, 100f));
+        using var host = new SimulationHost<RpgSimulationState>(
+            state,
+            new RpgSimulationApplication(),
+            new SimulationOptions(60));
+        using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(
+            host,
+            new SessionContext(new SessionId(Guid.NewGuid()), new PlayerId("static-obstacle")));
+
+        host.Start();
+        var side = 0;
+        var previousX = -4f;
+        for (var tick = 0; tick < 180; tick++)
+        {
+            WaitForUpdate(client, update => update.Payload is WorldFrameUpdate frame && frame.TurnNumber >= tick + 1);
+            Assert.That(state.Actors.TryGet(redId, out var red), Is.True);
+            var position = red.Components.Get<PositionComponent>().Position;
+            Assert.That(position.X, Is.GreaterThanOrEqualTo(previousX - 0.001f));
+            previousX = position.X;
+            if (System.MathF.Abs(position.Y) > 0.1f)
+            {
+                var currentSide = position.Y > 0f ? 1 : -1;
+                if (side == 0) side = currentSide;
+                Assert.That(currentSide, Is.EqualTo(side));
+            }
+        }
+
+        Assert.That(previousX, Is.GreaterThan(-1f));
+        Assert.That(side, Is.Not.EqualTo(0));
+    }
+
+    [Test]
+    public void WaveSpawner_SpawnsThreeMeleeThenThreeRangedPerFaction()
+    {
+        var state = new RpgSimulationState(60, 40, 1f);
+        var melee = new ActorSpawnData(
+            10, 1, SimulationVector2.Zero, 0.35f, 0f, 6f, 0.25f, 1f);
+        var ranged = new ActorSpawnData(
+            10, 1, SimulationVector2.Zero, 0.35f, 0f, 6f, 3.5f, 1f,
+            attackType: AttackType.Projectile, projectileSpeed: 5f, projectileLifetime: 5f);
+        state.Waves.Configure(
+            3, 3, 0.5f, 10f, 0f,
+            melee, ranged, melee, ranged,
+            new SimulationVector2(-24f, 0f), new SimulationVector2(24f, 0f));
+
+        for (var tick = 0; tick < 6; tick++)
+            state.Waves.Tick(state, 0.5f);
+
+        state.Waves.Tick(state, 6.5f);
+        Assert.That(state.Actors.SlotCount, Is.EqualTo(12));
+        state.Waves.Tick(state, 0.5f);
+        Assert.That(state.Actors.SlotCount, Is.EqualTo(14));
+
+        var redCount = 0;
+        var blueCount = 0;
+        var redMelee = 0;
+        var redRanged = 0;
+        var blueMelee = 0;
+        var blueRanged = 0;
+        for (var index = 0; index < state.Actors.SlotCount; index++)
+        {
+            if (!state.Actors.TryGetAt(index, out var actor)) continue;
+            var faction = actor.Components.Get<FactionComponent>().Faction;
+            if (faction == FactionId.Red) redCount++;
+            if (faction == FactionId.Blue) blueCount++;
+            if (faction == FactionId.Red && actor.Components.TryGet<ProjectileWeaponComponent>(out _)) redRanged++;
+            if (faction == FactionId.Red && !actor.Components.TryGet<ProjectileWeaponComponent>(out _)) redMelee++;
+            if (faction == FactionId.Blue && actor.Components.TryGet<ProjectileWeaponComponent>(out _)) blueRanged++;
+            if (faction == FactionId.Blue && !actor.Components.TryGet<ProjectileWeaponComponent>(out _)) blueMelee++;
+            Assert.That(state.Navigation.IsPositionWalkable(
+                actor.Components.Get<PositionComponent>().Position,
+                actor.Components.Get<ColliderComponent>().Compound.BoundingRadius), Is.True);
+        }
+
+        Assert.That(redCount, Is.EqualTo(7));
+        Assert.That(blueCount, Is.EqualTo(7));
+        Assert.That(redMelee, Is.EqualTo(4));
+        Assert.That(redRanged, Is.EqualTo(3));
+        Assert.That(blueMelee, Is.EqualTo(4));
+        Assert.That(blueRanged, Is.EqualTo(3));
+    }
+
     private static ServerUpdateEnvelope WaitForUpdate(
         ISimulationClient client,
         Func<ServerUpdateEnvelope, bool> predicate)
     {
         var timeout = Stopwatch.StartNew();
-        while (timeout.ElapsedMilliseconds < 1000)
+        while (timeout.ElapsedMilliseconds < 2000)
         {
             if (client.TryRead(out var update) && predicate(update))
                 return update;

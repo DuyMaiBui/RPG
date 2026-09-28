@@ -8,7 +8,8 @@ namespace RPG.Core.Navigation
     public sealed class OrcaAvoidanceSolver
     {
         private const float Epsilon = 0.00001f;
-        private const int MaxLines = 128;
+        // Bound local constraints so dense crowds do not turn one tick into an O(n^2) solve.
+        private const int MaxLines = 32;
         private readonly List<EntityId> _nearby = new();
         private readonly OrcaLine[] _lines = new OrcaLine[MaxLines];
         private readonly OrcaLine[] _projectionLines = new OrcaLine[MaxLines];
@@ -35,7 +36,7 @@ namespace RPG.Core.Navigation
         {
             var position = actor.Components.Get<PositionComponent>().Position;
             var movement = actor.Components.Get<MovementComponent>();
-            var radius = actor.Components.Get<BodyComponent>().Radius;
+            var radius = actor.Components.Get<ColliderComponent>().Compound.BoundingRadius;
             var maxSpeed = movement.Speed;
             if (maxSpeed <= 0f) return SimulationVector2.Zero;
 
@@ -76,7 +77,7 @@ namespace RPG.Core.Navigation
                 var otherMovement = other.Components.Get<MovementComponent>();
                 var relativePosition = otherPosition - position;
                 var relativeVelocity = velocity - otherMovement.DesiredDirection * otherMovement.Speed;
-                var combinedRadius = radius + other.Components.Get<BodyComponent>().Radius;
+                var combinedRadius = radius + other.Components.Get<ColliderComponent>().Compound.BoundingRadius;
                 var distanceSquared = relativePosition.LengthSquared;
                 if (!HasProjectedCollision(relativePosition, relativeVelocity, combinedRadius))
                     continue;

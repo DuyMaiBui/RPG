@@ -37,6 +37,16 @@ namespace RPG.Unity
                 component.ApplySnapshot(snapshot);
         }
 
+        public void ApplySnapshot(ActorSnapshot snapshot, bool applyMovement)
+        {
+            foreach (var component in _components)
+            {
+                if (!applyMovement && component is ActorMovementView)
+                    continue;
+                component.ApplySnapshot(snapshot);
+            }
+        }
+
         public void ApplyPredictedPosition(RPG.Simulation.Contracts.SimulationVector2 position)
         {
             foreach (var component in _components)
@@ -52,15 +62,6 @@ namespace RPG.Unity
             {
                 if (component is ActorMovementView movement)
                     movement.TickRemoteInterpolation(deltaTime, snapshotInterval);
-            }
-        }
-
-        public void ApplyTargetPosition(Vector3 targetPosition, bool visible)
-        {
-            foreach (var component in _components)
-            {
-                if (component is ActorTargetView targetView)
-                    targetView.ApplyTargetPosition(targetPosition, visible);
             }
         }
 

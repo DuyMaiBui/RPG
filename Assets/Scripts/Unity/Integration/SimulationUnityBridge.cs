@@ -23,9 +23,9 @@ namespace RPG.Unity
         private SimulationVector2 _predictedPosition;
         private SimulationVector2 _correctionRemaining;
         private bool _hasPredictedPosition;
+        private float _lastProjectileSnapshotTime = -1f;
         private const float PredictionCorrectionDuration = 0.1f;
         private readonly Dictionary<SimulationEntityId, float> _pendingRemoval = new();
-        private readonly Dictionary<SimulationEntityId, ActorSnapshot> _snapshots = new();
         private readonly HashSet<SimulationEntityId> _liveIds = new();
         private readonly List<SimulationEntityId> _expiredRemoval = new();
         private readonly List<SimulationEntityId> _pendingKeys = new();
@@ -55,10 +55,12 @@ namespace RPG.Unity
             _localDirection = SimulationVector2.Zero;
             _correctionRemaining = SimulationVector2.Zero;
             _hasPredictedPosition = false;
+            _lastProjectileSnapshotTime = -1f;
         }
 
         private void Update()
         {
+            var presentationDelta = Mathf.Min(Time.deltaTime, 1f / 30f);
             if (_client == null)
             {
                 ProcessPendingRemoval();
@@ -68,15 +70,18 @@ namespace RPG.Unity
             if (_client.TryRead(out var update) && update.Payload is WorldFrameUpdate frame)
             {
                 _lastServerTick = update.ServerTick;
-                _projectiles.Apply(frame.Projectiles);
+                var projectileSnapshotInterval = _lastProjectileSnapshotTime < 0f
+                    ? Mathf.Max(_predictionDelta, 1f / 30f)
+                    : Mathf.Clamp(Time.unscaledTime - _lastProjectileSnapshotTime, 1f / 120f, 0.25f);
+                _lastProjectileSnapshotTime = Time.unscaledTime;
+                _projectiles.Apply(frame.Projectiles, projectileSnapshotInterval);
                 _liveIds.Clear();
-                _snapshots.Clear();
                 foreach (var snapshot in frame.Actors.Span)
                 {
                     _liveIds.Add(snapshot.Entity);
-                    _snapshots[snapshot.Entity] = snapshot;
+                    _registry.Ensure(snapshot.Entity, snapshot.Faction);
                     if (_registry.TryGet(snapshot.Entity, out var view))
-                        view.ApplySnapshot(snapshot);
+                        view.ApplySnapshot(snapshot, snapshot.Entity != _localActorId);
                     if (snapshot.Entity == _localActorId && _registry.TryGet(snapshot.Entity, out var localView))
                     {
                         var reconciledPosition = _prediction.Reconcile(
@@ -101,15 +106,6 @@ namespace RPG.Unity
                     _pendingRemoval.Remove(snapshot.Entity);
                 }
 
-                foreach (var snapshot in frame.Actors.Span)
-                {
-                    if (!_registry.TryGet(snapshot.Entity, out var view)) continue;
-                    var hasTarget = _snapshots.TryGetValue(snapshot.Target, out var targetSnapshot);
-                    view.ApplyTargetPosition(
-                        hasTarget ? new Vector3(targetSnapshot.Position.X, targetSnapshot.Position.Y, 0f) : Vector3.zero,
-                        hasTarget);
-                }
-
                 foreach (var signal in frame.Signals.Span)
                 {
                     if (_registry.TryGet(signal.Entity, out var view))
@@ -128,8 +124,9 @@ namespace RPG.Unity
                 _driver.OnFrame(frame);
             }
 
-            AdvanceRemotePresentation(Time.deltaTime);
-            AdvanceLocalPrediction(Time.deltaTime);
+            AdvanceRemotePresentation(presentationDelta);
+            _projectiles?.TickPrediction(presentationDelta);
+            AdvanceLocalPrediction(presentationDelta);
             ProcessPendingRemoval();
         }
 
@@ -144,6 +141,7 @@ namespace RPG.Unity
             _localDirection = SimulationVector2.Zero;
             _correctionRemaining = SimulationVector2.Zero;
             _hasPredictedPosition = false;
+            _lastProjectileSnapshotTime = -1f;
             _client = null;
         }
 

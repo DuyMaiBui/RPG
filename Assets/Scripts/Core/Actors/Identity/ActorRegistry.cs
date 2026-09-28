@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using RPG.Core.Formations;
+using RPG.Core.Physics;
 using RPG.Simulation.Contracts;
 
 namespace RPG.Core.Actors
@@ -49,6 +50,17 @@ namespace RPG.Core.Actors
             components.Add(new AttackComponent(data.AttackPower));
             components.Add(new PositionComponent(data.Position));
             components.Add(new BodyComponent(data.Radius));
+            components.Add(new ColliderComponent(data.ColliderShapes == null
+                ? new ColliderCompound(new[]
+                {
+                    new ColliderShapeData(
+                        CollisionShape.Circle(data.Radius),
+                        SimulationVector2.Zero,
+                        0f,
+                        ColliderMode.Solid,
+                        new ColliderFilter(0, -1)),
+                })
+                : new ColliderCompound(data.ColliderShapes)));
             components.Add(new MovementComponent(data.MoveSpeed));
             if (kind == ActorKind.Player)
                 components.Add(new ManualMovementComponent());
@@ -58,7 +70,7 @@ namespace RPG.Core.Actors
             components.Add(new AttackCooldownComponent(data.AttackCooldown));
             components.Add(new AutoCombatStateComponent());
             components.Add(new TargetPriorityComponent(data.TargetPriority));
-            components.Add(new PathFollowerComponent());
+            components.Add(new MovementCohortComponent());
             if (data.AttackType == AttackType.Projectile)
                 components.Add(new ProjectileWeaponComponent(data.ProjectileSpeed, data.ProjectileRadius, data.ProjectileLifetime));
             if (data.FormationId >= 0)

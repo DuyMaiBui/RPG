@@ -22,7 +22,7 @@ namespace RPG.Unity
             _root = root;
         }
 
-        public void Apply(ReadOnlyMemory<ProjectileSnapshot> snapshots)
+        public void Apply(ReadOnlyMemory<ProjectileSnapshot> snapshots, float snapshotInterval)
         {
             var span = snapshots.Span;
             _seen.Clear();
@@ -36,7 +36,7 @@ namespace RPG.Unity
                     _active.Add(snapshot.Entity, view);
                 }
 
-                view.ApplySnapshot(snapshot);
+                view.ApplySnapshot(snapshot, snapshotInterval);
             }
 
             _expired.Clear();
@@ -53,6 +53,12 @@ namespace RPG.Unity
                 view.Release();
                 _pool.Push(view);
             }
+        }
+
+        public void TickPrediction(float deltaTime)
+        {
+            foreach (var view in _active.Values)
+                view.TickPrediction(deltaTime);
         }
 
         public void ReleaseAll()

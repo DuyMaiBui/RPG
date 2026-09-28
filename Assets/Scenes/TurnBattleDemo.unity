@@ -269,7 +269,8 @@ GameObject:
   - component: {fileID: 1226630236}
   - component: {fileID: 1226630235}
   - component: {fileID: 1226630234}
-  - component: {fileID: 1226630237}
+  - component: {fileID: 1226630239}
+  - component: {fileID: 1226630240}
   m_Layer: 0
   m_Name: CenterObstacle
   m_TagString: Untagged
@@ -285,7 +286,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1226630232}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0.1305262, w: 0.9914449}
   m_LocalPosition: {x: 0, y: 0, z: 0.25}
   m_LocalScale: {x: 1.2, y: 2, z: 0.2}
   m_ConstrainProportionsScale: 0
@@ -370,7 +371,7 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1226630232}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!114 &1226630237
+--- !u!114 &1226630239
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -379,12 +380,29 @@ MonoBehaviour:
   m_GameObject: {fileID: 1226630232}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: de86d545e60d2474da0bb8702fe8edc0, type: 3}
+  m_Script: {fileID: 11500000, guid: 0c20b605a06814833a08e6842b70601c, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: RPG.Unity::RPG.Unity.NavigationObstacleAuthoring
-  _id: 1
+  m_EditorClassIdentifier: RPG.Unity::RPG.Unity.ColliderCompoundAuthoring
+  _colliders:
+  - {fileID: 1226630240}
+--- !u!114 &1226630240
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1226630232}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 907fbe42b15814cde841505e5a671f42, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RPG.Unity::RPG.Unity.BoxColliderAuthoring
+  _localOffset: {x: 0, y: 0}
+  _localRotationDegrees: 0
+  _mode: 0
+  _layer: 0
+  _mask: -1
   _halfExtents: {x: 0.6, y: 1}
-  _isEnabled: 1
 --- !u!1 &1345598793
 GameObject:
   m_ObjectHideFlags: 0
@@ -486,8 +504,8 @@ MonoBehaviour:
   bridge: {fileID: 1361859388}
   projectilePrefab: {fileID: 5637623362077680192, guid: 1d71a1c3564df43f6a3dc4deb218cb13, type: 3}
   projectileRoot: {fileID: 1345598794}
-  navigationObstacles:
-  - {fileID: 1226630237}
+  navigationColliders:
+  - {fileID: 1226630239}
 --- !u!114 &1361859388
 MonoBehaviour:
   m_ObjectHideFlags: 0

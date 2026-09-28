@@ -1,4 +1,5 @@
 using RPG.Simulation.Contracts;
+using RPG.Core.Physics;
 
 namespace RPG.Core.Actors
 {
@@ -19,7 +20,8 @@ namespace RPG.Core.Actors
             float projectileRadius = 0.05f,
             float projectileLifetime = 5f,
             int formationId = -1,
-            SimulationVector2 formationOffset = default)
+            SimulationVector2 formationOffset = default,
+            ColliderShapeData[] colliderShapes = null)
         {
             MaximumHealth = maximumHealth;
             AttackPower = attackPower;
@@ -36,6 +38,7 @@ namespace RPG.Core.Actors
             ProjectileLifetime = projectileLifetime;
             FormationId = formationId;
             FormationOffset = formationOffset;
+            ColliderShapes = colliderShapes;
         }
 
         public int MaximumHealth { get; }
@@ -53,5 +56,24 @@ namespace RPG.Core.Actors
         public float ProjectileLifetime { get; }
         public int FormationId { get; }
         public SimulationVector2 FormationOffset { get; }
+        public ColliderShapeData[] ColliderShapes { get; }
+
+        public ActorSpawnData WithPosition(SimulationVector2 position) => new(
+            MaximumHealth,
+            AttackPower,
+            position,
+            Radius,
+            MoveSpeed,
+            VisionRange,
+            AttackRange,
+            AttackCooldown,
+            TargetPriority,
+            AttackType,
+            ProjectileSpeed,
+            ProjectileRadius,
+            ProjectileLifetime,
+            FormationId,
+            FormationOffset,
+            ColliderShapes);
     }
 }

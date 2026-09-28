@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using RPG.Core.Physics;
 using RPG.Simulation.Contracts;
 
 namespace RPG.Core.Navigation
@@ -7,6 +9,7 @@ namespace RPG.Core.Navigation
     {
         private readonly bool[] _blocked;
         private readonly bool[] _baseBlocked;
+        private readonly List<NavigationObstacle> _obstacles = new();
 
         public NavigationGrid(int width, int height, float cellSize, SimulationVector2 origin, bool[] blocked = null)
         {
@@ -65,25 +68,80 @@ namespace RPG.Core.Navigation
         public void ResetObstacles()
         {
             Array.Copy(_baseBlocked, _blocked, _blocked.Length);
+            _obstacles.Clear();
             Revision++;
         }
 
         public void ApplyObstacle(NavigationObstacle obstacle)
         {
-            var minX = (int)MathF.Floor((obstacle.Center.X - obstacle.HalfExtents.X - Origin.X) / CellSize);
-            var maxX = (int)MathF.Floor((obstacle.Center.X + obstacle.HalfExtents.X - Origin.X) / CellSize);
-            var minY = (int)MathF.Floor((obstacle.Center.Y - obstacle.HalfExtents.Y - Origin.Y) / CellSize);
-            var maxY = (int)MathF.Floor((obstacle.Center.Y + obstacle.HalfExtents.Y - Origin.Y) / CellSize);
+            _obstacles.Add(obstacle);
+            var bounds = obstacle.Shape.GetBoundsHalfExtents();
+            var minX = (int)MathF.Floor((obstacle.Center.X - bounds.X - Origin.X) / CellSize);
+            var maxX = (int)MathF.Floor((obstacle.Center.X + bounds.X - Origin.X) / CellSize);
+            var minY = (int)MathF.Floor((obstacle.Center.Y - bounds.Y - Origin.Y) / CellSize);
+            var maxY = (int)MathF.Floor((obstacle.Center.Y + bounds.Y - Origin.Y) / CellSize);
             for (var y = minY; y <= maxY; y++)
             {
                 for (var x = minX; x <= maxX; x++)
                 {
-                    if (x >= 0 && x < Width && y >= 0 && y < Height)
+                    if (x >= 0 && x < Width && y >= 0 && y < Height &&
+                        obstacle.Shape.IntersectsAabb(
+                            obstacle.Center,
+                            GetCenter(new GridCoordinate(x, y)),
+                            new SimulationVector2(CellSize * 0.5f, CellSize * 0.5f)))
                         _blocked[y * Width + x] = true;
                 }
             }
 
             Revision++;
+        }
+
+        public bool IsPositionWalkable(SimulationVector2 position, float radius)
+        {
+            if (!TryGetCoordinate(position, out var coordinate) || !IsWalkableForRadius(coordinate, radius))
+                return false;
+
+            var body = CollisionShape.Circle(MathF.Max(0f, radius));
+            for (var index = 0; index < _obstacles.Count; index++)
+            {
+                var obstacle = _obstacles[index];
+                if (CollisionShapeQueries.Overlaps(body, position, obstacle.Shape, obstacle.Center))
+                    return false;
+            }
+
+            return true;
+        }
+
+        public SimulationVector2 ResolveMovement(
+            SimulationVector2 start,
+            SimulationVector2 destination,
+            float radius)
+        {
+            if (!IsPositionWalkable(start, radius)) return start;
+            IsDirectMovementWalkable(start, destination, radius, out var lastSafe);
+            return lastSafe;
+        }
+
+        private bool IsDirectMovementWalkable(
+            SimulationVector2 start,
+            SimulationVector2 destination,
+            float radius,
+            out SimulationVector2 lastSafe)
+        {
+            var delta = destination - start;
+            var distance = MathF.Sqrt(delta.LengthSquared);
+            var steps = Math.Max(1, (int)MathF.Ceiling(distance / MathF.Max(MathF.Max(radius, 0.05f) * 0.5f, 0.05f)));
+            lastSafe = start;
+            for (var step = 1; step <= steps; step++)
+            {
+                var position = start + delta * (step / (float)steps);
+                if (!IsPositionWalkable(position, radius))
+                    return false;
+
+                lastSafe = position;
+            }
+
+            return true;
         }
 
         public SimulationVector2 ClampInside(SimulationVector2 position, float radius)

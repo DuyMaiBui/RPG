@@ -1,8 +1,9 @@
+using System.Collections.Generic;
 using RPG.Simulation.Contracts;
 using RPG.Simulation.Runtime;
-using RPG.Core.Projectiles;
-using RPG.Core.Formations;
 using RPG.Core.Navigation;
+using RPG.Core.Physics;
+using RPG.Core.Projectiles;
 
 namespace RPG.Core.Actors
 {
@@ -13,21 +14,31 @@ namespace RPG.Core.Actors
         private readonly SpatialHash _spatialHash = new(1f);
         private readonly OrcaAvoidanceSolver _avoidance = new();
         private readonly CombatBehaviorTree _behaviorTree = new();
+        private readonly List<EntityId> _overlapNearby = new();
         private SimulationVector2[] _resolvedDirections = new SimulationVector2[0];
         private SimulationVector2[] _candidatePositions = new SimulationVector2[0];
 
         public void Tick(SimulationContext<RpgSimulationState> context)
         {
+            context.State.Waves.Tick(context.State, context.FixedDeltaTime);
             _projectiles.Tick(context);
             var actors = context.State.Actors;
             _spatialHash.Rebuild(actors);
+            context.State.Occupancy.Rebuild(actors);
+            UpdateCombatTargets(context);
+            MoveActors(context);
+            AttackActors(context);
+        }
+
+        private void UpdateCombatTargets(SimulationContext<RpgSimulationState> context)
+        {
+            var actors = context.State.Actors;
             for (var index = 0; index < actors.SlotCount; index++)
             {
                 if (!actors.TryGetAt(index, out var actor)) continue;
                 var health = actor.Components.Get<HealthComponent>();
                 var behavior = actor.Components.Get<AutoCombatStateComponent>();
-                var cooldown = actor.Components.Get<AttackCooldownComponent>();
-                cooldown.Tick(context.FixedDeltaTime);
+                actor.Components.Get<AttackCooldownComponent>().Tick(context.FixedDeltaTime);
 
                 if (health.IsDead)
                 {
@@ -36,13 +47,13 @@ namespace RPG.Core.Actors
                 }
 
                 var target = actor.Components.Get<TargetComponent>();
-                if (!IsLiveEnemy(actors, actor, target.CurrentTarget, out var targetActor))
+                if (!IsLiveEnemy(actors, actor, target.CurrentTarget, out var targetActor) ||
+                    !IsTargetVisible(actor, targetActor))
                 {
                     target.CurrentTarget = EntityId.None;
                     if (!_targetSelector.TrySelect(actor, actors, _spatialHash, out var targetId))
                     {
-                        behavior.State = AutoCombatState.AcquireTarget;
-                        actor.Components.Get<MovementComponent>().DesiredDirection = SimulationVector2.Zero;
+                        behavior.State = AutoCombatState.ChaseTarget;
                         continue;
                     }
 
@@ -50,19 +61,27 @@ namespace RPG.Core.Actors
                     actors.TryGet(targetId, out targetActor);
                 }
 
-                var distance = Distance(actor, targetActor);
                 behavior.State = _behaviorTree.Evaluate(
-                    true, distance <= AttackDistance(actor, targetActor));
+                    true,
+                    IsAttackTriggerOverlapping(actor, targetActor));
             }
-
-            MoveActors(context);
-            AttackActors(context);
         }
 
         private void MoveActors(SimulationContext<RpgSimulationState> context)
         {
             var actors = context.State.Actors;
+            context.State.MovementCohorts.Update(
+                actors,
+                _spatialHash,
+                context.State.Navigation,
+                context.State.Pathfinder,
+                context.State.FlowFields,
+                context.State.Occupancy,
+                context.State.RedBasePosition,
+                context.State.BlueBasePosition,
+                context.FixedDeltaTime);
             EnsureMovementBuffers(actors.SlotCount);
+
             for (var index = 0; index < actors.SlotCount; index++)
             {
                 _resolvedDirections[index] = SimulationVector2.Zero;
@@ -74,67 +93,43 @@ namespace RPG.Core.Actors
                 _candidatePositions[index] = position.Position;
                 if (actor.Components.TryGet<ManualMovementComponent>(out var manualMovement) && manualMovement.IsActive)
                 {
-                    var resolvedDirection = _avoidance.Solve(
-                        actor, manualMovement.Direction, actors, _spatialHash, context.FixedDeltaTime);
-                    var manualTravel = movement.Speed * context.FixedDeltaTime;
-                    _resolvedDirections[index] = resolvedDirection;
-                    _candidatePositions[index] = position.Position + resolvedDirection * manualTravel;
+                    var manualDirection = _avoidance.Solve(
+                        actor,
+                        manualMovement.Direction,
+                        actors,
+                        _spatialHash,
+                        context.FixedDeltaTime);
+                    _resolvedDirections[index] = manualDirection;
+                    _candidatePositions[index] = position.Position +
+                                                 manualDirection * (movement.Speed * context.FixedDeltaTime);
                     continue;
                 }
 
                 var targetComponent = actor.Components.Get<TargetComponent>();
-                var hasTarget = IsLiveEnemy(actors, actor, targetComponent.CurrentTarget, out var target);
-                var formationPosition = SimulationVector2.Zero;
-                var hasFormation = actor.Components.TryGet<FormationSlotComponent>(out var formationSlot) &&
-                                   context.State.Formations.TryGetPosition(formationSlot, out formationPosition);
-                if (!hasTarget && !hasFormation)
-                {
-                    continue;
-                }
-
-                var destination = hasTarget ? target.Components.Get<PositionComponent>().Position : formationPosition;
+                var hasTarget = IsLiveEnemy(actors, actor, targetComponent.CurrentTarget, out var target) &&
+                                IsTargetVisible(actor, target);
+                var destination = hasTarget
+                    ? target.Components.Get<PositionComponent>().Position
+                    : context.State.GetEnemyBasePosition(actor.Components.Get<FactionComponent>().Faction);
                 var distance = hasTarget ? Distance(actor, target) : Distance(position.Position, destination);
-                var stopDistance = hasTarget ? AttackDistance(actor, target) : 0.05f;
-                if (distance <= stopDistance || movement.Speed <= 0f)
-                {
+                var stopDistance = hasTarget ? AttackDistance(actor, target) : context.State.BaseReach;
+                if (movement.Speed <= 0f || distance <= stopDistance)
                     continue;
-                }
 
-                var pathFollower = actor.Components.Get<PathFollowerComponent>();
-                var directDirection = (destination - position.Position).Normalized();
-                var direction = directDirection;
-                if (context.State.Navigation.IsDirectPathWalkable(
-                        position.Position, destination, MovingBodyRadius(actor)))
-                {
-                    pathFollower.Clear();
-                }
-                else
-                {
-                    var pathDestinationDelta = destination - pathFollower.Destination;
-                    if (!pathFollower.HasPath || pathDestinationDelta.LengthSquared > 0.25f)
-                    {
-                        if (context.State.Pathfinder.TryFindPath(position.Position, destination, MovingBodyRadius(actor), out var path))
-                            pathFollower.SetPath(destination, path);
-                        else
-                            pathFollower.Clear();
-                    }
+                if (!context.State.MovementCohorts.TryGetDirection(actor, out var preferredDirection))
+                    continue;
 
-                    pathFollower.AdvanceIfClose(position.Position, 0.1f);
-                    if (pathFollower.HasPath)
-                    {
-                        var pathDirection = (pathFollower.CurrentNode - position.Position).Normalized();
-                        var alignment = pathDirection.X * directDirection.X + pathDirection.Y * directDirection.Y;
-                        if (alignment > 0f)
-                            direction = pathDirection;
-                        else
-                            pathFollower.Clear();
-                    }
-                }
-                var resolvedMovementDirection = _avoidance.Solve(
-                    actor, direction, actors, _spatialHash, context.FixedDeltaTime);
-                var travel = System.MathF.Min(movement.Speed * context.FixedDeltaTime, distance - stopDistance);
-                _resolvedDirections[index] = resolvedMovementDirection;
-                _candidatePositions[index] = position.Position + resolvedMovementDirection * travel;
+                var resolvedDirection = _avoidance.Solve(
+                    actor,
+                    preferredDirection,
+                    actors,
+                    _spatialHash,
+                    context.FixedDeltaTime);
+                var travel = System.MathF.Min(
+                    movement.Speed * context.FixedDeltaTime,
+                    System.MathF.Max(0f, distance - stopDistance));
+                _resolvedDirections[index] = resolvedDirection;
+                _candidatePositions[index] = position.Position + resolvedDirection * travel;
             }
 
             for (var index = 0; index < actors.SlotCount; index++)
@@ -145,8 +140,15 @@ namespace RPG.Core.Actors
                 var position = actor.Components.Get<PositionComponent>();
                 var movement = actor.Components.Get<MovementComponent>();
                 movement.DesiredDirection = _resolvedDirections[index];
+                var radius = MovingBodyRadius(actor);
+                var resolvedCandidate = ResolveOverlap(
+                    actors,
+                    actor,
+                    _candidatePositions[index],
+                    _spatialHash,
+                    _overlapNearby);
                 position.Position = context.State.Navigation.ClampInside(
-                    ResolveOverlap(actors, actor, _candidatePositions[index]), MovingBodyRadius(actor));
+                    context.State.Navigation.ResolveMovement(position.Position, resolvedCandidate, radius), radius);
             }
         }
 
@@ -169,7 +171,7 @@ namespace RPG.Core.Actors
 
                 var targetId = attacker.Components.Get<TargetComponent>().CurrentTarget;
                 if (!IsLiveEnemy(actors, attacker, targetId, out var target) ||
-                    Distance(attacker, target) > AttackDistance(attacker, target))
+                    !IsAttackTriggerOverlapping(attacker, target))
                     continue;
 
                 var cooldown = attacker.Components.Get<AttackCooldownComponent>();
@@ -203,20 +205,26 @@ namespace RPG.Core.Actors
             }
         }
 
-        private static SimulationVector2 ResolveOverlap(ActorRegistry actors, Actor movingActor, SimulationVector2 candidate)
+        private static SimulationVector2 ResolveOverlap(
+            ActorRegistry actors,
+            Actor movingActor,
+            SimulationVector2 candidate,
+            SpatialHash spatialHash,
+            List<EntityId> nearby)
         {
-            var movingBody = movingActor.Components.Get<BodyComponent>();
+            var movingRadius = movingActor.Components.Get<ColliderComponent>().Compound.BoundingRadius;
+            spatialHash.Collect(candidate, movingRadius + 1f, nearby);
             for (var pass = 0; pass < 3; pass++)
             {
-                for (var index = 0; index < actors.SlotCount; index++)
+                for (var index = 0; index < nearby.Count; index++)
                 {
-                    if (!actors.TryGetAt(index, out var other) || other.Id == movingActor.Id ||
+                    if (!actors.TryGet(nearby[index], out var other) || other.Id == movingActor.Id ||
                         other.Components.Get<HealthComponent>().IsDead)
                         continue;
 
                     var otherPosition = other.Components.Get<PositionComponent>().Position;
                     var difference = candidate - otherPosition;
-                    var minimumDistance = movingBody.Radius + other.Components.Get<BodyComponent>().Radius;
+                    var minimumDistance = movingRadius + other.Components.Get<ColliderComponent>().Compound.BoundingRadius;
                     var distanceSquared = difference.LengthSquared;
                     if (distanceSquared >= minimumDistance * minimumDistance)
                         continue;
@@ -240,9 +248,20 @@ namespace RPG.Core.Actors
                    source.Components.Get<FactionComponent>().Faction;
         }
 
+        private static bool IsTargetVisible(Actor source, Actor target)
+        {
+            var difference = target.Components.Get<PositionComponent>().Position -
+                             source.Components.Get<PositionComponent>().Position;
+            var vision = source.Components.Get<VisionComponent>().Range +
+                         source.Components.Get<BodyComponent>().Radius +
+                         target.Components.Get<BodyComponent>().Radius;
+            return difference.LengthSquared <= vision * vision;
+        }
+
         private static float Distance(Actor left, Actor right)
         {
-            var difference = right.Components.Get<PositionComponent>().Position - left.Components.Get<PositionComponent>().Position;
+            var difference = right.Components.Get<PositionComponent>().Position -
+                             left.Components.Get<PositionComponent>().Position;
             return System.MathF.Sqrt(difference.LengthSquared);
         }
 
@@ -253,10 +272,26 @@ namespace RPG.Core.Actors
         }
 
         private static float AttackDistance(Actor attacker, Actor target) =>
-            attacker.Components.Get<BodyComponent>().Radius +
-            target.Components.Get<BodyComponent>().Radius +
+            attacker.Components.Get<ColliderComponent>().Compound.BoundingRadius +
+            target.Components.Get<ColliderComponent>().Compound.BoundingRadius +
             attacker.Components.Get<AttackRangeComponent>().Reach;
 
-        private static float MovingBodyRadius(Actor actor) => actor.Components.Get<BodyComponent>().Radius;
+        private static bool IsAttackTriggerOverlapping(Actor attacker, Actor target)
+        {
+            var attackerCollider = attacker.Components.Get<ColliderComponent>().Compound;
+            for (var index = 0; index < attackerCollider.Count; index++)
+            {
+                var shape = attackerCollider.GetAt(index);
+                if (shape.Mode == ColliderMode.Solid &&
+                    target.Components.Get<ColliderComponent>().Compound.HasInteraction(ColliderMode.Solid, shape.Filter) &&
+                    Distance(attacker, target) <= AttackDistance(attacker, target))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static float MovingBodyRadius(Actor actor) =>
+            actor.Components.Get<ColliderComponent>().Compound.BoundingRadius;
     }
 }

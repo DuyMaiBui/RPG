@@ -35,7 +35,7 @@ namespace RPG.Core.Navigation
             out SimulationVector2[] path)
         {
             path = null;
-            if (!TryFindPath(start, destination, radius, _pathScratch, out var length))
+            if (!TryFindPath(start, destination, radius, null, _pathScratch, out var length))
                 return false;
 
             path = new SimulationVector2[length];
@@ -43,10 +43,21 @@ namespace RPG.Core.Navigation
             return true;
         }
 
-        private bool TryFindPath(
+        public bool TryFindPath(
             SimulationVector2 start,
             SimulationVector2 destination,
             float radius,
+            SimulationVector2[] output,
+            out int pathLength)
+        {
+            return TryFindPath(start, destination, radius, null, output, out pathLength);
+        }
+
+        public bool TryFindPath(
+            SimulationVector2 start,
+            SimulationVector2 destination,
+            float radius,
+            DynamicOccupancyGrid occupancy,
             SimulationVector2[] output,
             out int pathLength)
         {
@@ -88,7 +99,10 @@ namespace RPG.Core.Navigation
                     if (!_grid.IsWalkableForRadius(neighbor, radius)) continue;
 
                     var index = ToIndex(neighbor);
-                    var cost = _costs[currentIndex] + 1f;
+                    var occupancyCost = occupancy == null
+                        ? 0f
+                        : occupancy.GetStationaryCount(neighbor) * 8f;
+                    var cost = _costs[currentIndex] + 1f + occupancyCost;
                     if (cost >= _costs[index]) continue;
                     _costs[index] = cost;
                     _parents[index] = currentIndex;
