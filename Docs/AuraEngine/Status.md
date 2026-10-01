@@ -128,9 +128,9 @@ Bugs found by the edge-case suite and fixed:
 
 ## Not yet implemented
 
-- Platform builds of `libaura` (Windows/Linux/Android/iOS); the CI matrix (M16)
-  currently runs the native ABI and benchmark jobs, while the Editor plugin is
-  built locally for macOS/arm64 via `build_editor.sh`.
+- Platform builds of `libaura`: the build (`build_plugin.sh`) and CI matrix
+  cover macOS/Windows/Linux (x86_64/arm64) with uploaded plugin artifacts;
+  Android/iOS still need a mobile toolchain and are not built.
 - Runtime triangle-mesh collision on the managed backend (M12, documented
   limitation): the managed engine has no mesh narrowphase, so it rejects
   `AuraShapeType.TriangleMesh`; the Jolt backend implements `MeshShape`
@@ -148,15 +148,20 @@ Bugs found by the edge-case suite and fixed:
 
 ## Known environment issues
 
-- Enabling the native P/Invoke test assembly crashes the Unity Editor. The
-  `NativeBackendTests` suite is compiled out behind `#if AURA_NATIVE` and the
-  EditMode test asmdef deliberately does not reference `AuraEngine.Physics.Native`.
-  Referencing that assembly and running the suite made the Editor hard-crash
-  twice (a segfault whose mono `PrintStackTraceOSX` handler recursed until the
-  stack overflowed, masking the original frame). The native path is therefore
-  validated through the standalone headless ABI harness (`build.sh` /
-  `build_editor.sh`) instead. Fixing this is a prerequisite for in-Editor native
-  integration tests.
+- Running the native P/Invoke test suite inside the Editor aborts the Editor.
+  The isolated failing test is `NativeBackend_SaveState_RestoresBodyState`,
+  which calls `AuraSimulationWorld.SaveState` -> `NativePhysicsWorld.SaveState`.
+  The captured native stack is `abort -> malloc_vreport ->
+  ___BUG_IN_CLIENT_OF_LIBMALLOC_POINTER_BEING_FREED_WAS_NOT_ALLOCATED ->
+  monoeg_g_ptr_array_free -> mono_save_seq_point_info -> mini_method_compile`:
+  the crash is inside mono's JIT (freeing the sequence-point array while
+  compiling the method), not inside `libaura` (the identical serialize/snapshot
+  flow passes in the headless harness). It is an Editor/JIT environment issue,
+  so `NativeBackendTests` stays behind `#if AURA_NATIVE` and the asmdef does not
+  reference `AuraEngine.Physics.Native`; the native path is validated through
+  the headless ABI harness and standalone .NET probes. Compile-time and
+  load-time issues were hardened regardless (`IsAvailable` also catches
+  `BadImageFormatException`; `SaveState` documents the native-free probe path).
 
 ## Validation evidence
 

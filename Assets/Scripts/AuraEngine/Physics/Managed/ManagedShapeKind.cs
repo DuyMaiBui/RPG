@@ -6,5 +6,8 @@ namespace AuraEngine.Physics
         Sphere = 1,
         Capsule = 2,
         Box = 3,
+        Triangle = 4,
+        TriangleMesh = 5,
+        HeightField = 6,
     }
 }

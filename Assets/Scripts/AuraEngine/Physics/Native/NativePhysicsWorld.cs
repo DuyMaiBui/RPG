@@ -277,6 +277,9 @@ namespace AuraEngine.Physics.Native
 
         byte[] IPhysicsSerialization.SaveState()
         {
+            /* Size probe with an empty capacity; the native side writes the
+               required size through outSize and returns CAPACITY_EXCEEDED. The
+               managed caller must stay native-free on this failure path. */
             NativeMethods.Aura_SerializeState(_world, IntPtr.Zero, 0, out var size);
             if (size == 0)
                 return Array.Empty<byte>();

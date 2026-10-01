@@ -15,6 +15,12 @@ namespace AuraEngine.Physics
             if (a.Kind == ManagedShapeKind.None || b.Kind == ManagedShapeKind.None)
                 return false;
 
+            if (a.Kind == ManagedShapeKind.TriangleMesh || b.Kind == ManagedShapeKind.TriangleMesh)
+                return MeshContact(a, b, manifold);
+
+            if (a.Kind == ManagedShapeKind.HeightField || b.Kind == ManagedShapeKind.HeightField)
+                return HeightFieldContact(a, b, manifold);
+
             if (a.Kind == ManagedShapeKind.Box && b.Kind == ManagedShapeKind.Box)
                 return BoxBox(a, b, mode, manifold);
 
@@ -73,6 +79,10 @@ namespace AuraEngine.Physics
                     return RayBox(ray, view, mode, maxDistance, out distance, out point, out normal);
                 case ManagedShapeKind.Capsule:
                     return RayCapsule(ray, view.A, view.B, view.Radius, maxDistance, out distance, out point, out normal);
+                case ManagedShapeKind.TriangleMesh:
+                    return RayMesh(ray, view, maxDistance, out distance, out point, out normal);
+                case ManagedShapeKind.HeightField:
+                    return RayHeightField(ray, view, maxDistance, out distance, out point, out normal);
                 default:
                     distance = 0f;
                     point = AuraVector3.Zero;
@@ -93,6 +103,235 @@ namespace AuraEngine.Physics
 
             var t = Math.Clamp(AuraVector3.Dot(point - a, segment) / lengthSquared, 0f, 1f);
             return a + segment * t;
+        }
+
+        /* Triangle-mesh and height-field contacts are swept over their triangles
+           and resolved as primitive-vs-triangle contacts. Triangle vertices are
+           already in world space and the mesh is treated as static geometry. */
+        private static bool MeshContact(in ManagedShapeView a, in ManagedShapeView b, ManagedManifold manifold)
+        {
+            if (a.Kind == ManagedShapeKind.TriangleMesh && b.Kind == ManagedShapeKind.TriangleMesh)
+                return false;
+
+            var mesh = a.Kind == ManagedShapeKind.TriangleMesh ? a : b;
+            var other = a.Kind == ManagedShapeKind.TriangleMesh ? b : a;
+            if (other.Kind == ManagedShapeKind.Triangle)
+                return Single(TriangleTriangle(mesh, other), manifold);
+            if (other.Kind == ManagedShapeKind.None || other.Kind == ManagedShapeKind.TriangleMesh || other.Kind == ManagedShapeKind.HeightField)
+                return false;
+
+            return Single(TrianglePrimitive(mesh, other), manifold);
+        }
+
+        private static bool HeightFieldContact(in ManagedShapeView a, in ManagedShapeView b, ManagedManifold manifold)
+        {
+            if (a.Kind == ManagedShapeKind.HeightField && b.Kind == ManagedShapeKind.HeightField)
+                return false;
+
+            var field = a.Kind == ManagedShapeKind.HeightField ? a : b;
+            var other = a.Kind == ManagedShapeKind.HeightField ? b : a;
+            if (other.Kind == ManagedShapeKind.None || other.Kind == ManagedShapeKind.TriangleMesh || other.Kind == ManagedShapeKind.HeightField)
+                return false;
+
+            return Single(HeightFieldPrimitive(field, other), manifold);
+        }
+
+        private static ContactResult TrianglePrimitive(in ManagedShapeView mesh, in ManagedShapeView primitive)
+        {
+            if (mesh.MeshVertices == null || mesh.MeshIndices == null)
+                return default(ContactResult);
+
+            ContactResult best = default;
+            for (var index = 0; index + 2 < mesh.MeshIndices.Length; index += 3)
+            {
+                var tri = ManagedShapeView.Triangle(
+                    mesh.MeshVertices[mesh.MeshIndices[index]],
+                    mesh.MeshVertices[mesh.MeshIndices[index + 1]],
+                    mesh.MeshVertices[mesh.MeshIndices[index + 2]]);
+                var result = PrimitiveTriangle(primitive, tri);
+                if (result.Hit && (!best.Hit || result.Penetration > best.Penetration))
+                    best = result;
+            }
+
+            return best;
+        }
+
+        private static ContactResult TriangleTriangle(in ManagedShapeView mesh, in ManagedShapeView triangle)
+        {
+            var best = default(ContactResult);
+            if (mesh.MeshVertices == null || mesh.MeshIndices == null)
+                return best;
+
+            for (var index = 0; index + 2 < mesh.MeshIndices.Length; index += 3)
+            {
+                var tri = ManagedShapeView.Triangle(
+                    mesh.MeshVertices[mesh.MeshIndices[index]],
+                    mesh.MeshVertices[mesh.MeshIndices[index + 1]],
+                    mesh.MeshVertices[mesh.MeshIndices[index + 2]]);
+                var result = TriangleTrianglePair(tri, triangle);
+                if (result.Hit && (!best.Hit || result.Penetration > best.Penetration))
+                    best = result;
+            }
+
+            return best;
+        }
+
+        private static ContactResult HeightFieldPrimitive(in ManagedShapeView field, in ManagedShapeView primitive)
+        {
+            if (field.HeightSamples == null || field.HeightResolution < 2)
+                return default(ContactResult);
+
+            var best = default(ContactResult);
+            var resolution = field.HeightResolution;
+            for (var row = 0; row < resolution - 1; row++)
+            {
+                for (var column = 0; column < resolution - 1; column++)
+                {
+                    var v00 = HeightVertex(field, column, row);
+                    var v10 = HeightVertex(field, column + 1, row);
+                    var v01 = HeightVertex(field, column, row + 1);
+                    var v11 = HeightVertex(field, column + 1, row + 1);
+
+                    var result = PrimitiveTriangle(primitive, ManagedShapeView.Triangle(v00, v01, v11));
+                    if (result.Hit && (!best.Hit || result.Penetration > best.Penetration))
+                        best = result;
+
+                    result = PrimitiveTriangle(primitive, ManagedShapeView.Triangle(v00, v11, v10));
+                    if (result.Hit && (!best.Hit || result.Penetration > best.Penetration))
+                        best = result;
+                }
+            }
+
+            return best;
+        }
+
+        private static AuraVector3 HeightVertex(in ManagedShapeView field, int x, int z) =>
+            new AuraVector3(
+                x * field.HeightScale.X,
+                field.HeightSamples[z * field.HeightResolution + x] * field.HeightScale.Y,
+                z * field.HeightScale.Z);
+
+        private static ContactResult PrimitiveTriangle(in ManagedShapeView primitive, in ManagedShapeView triangle)
+        {
+            switch (primitive.Kind)
+            {
+                case ManagedShapeKind.Sphere:
+                    return SphereTriangle(primitive.Center, primitive.Radius, triangle);
+                case ManagedShapeKind.Capsule:
+                    return CapsuleTriangle(primitive, triangle);
+                case ManagedShapeKind.Box:
+                    return BoxTriangle(primitive, triangle);
+                default:
+                    return default(ContactResult);
+            }
+        }
+
+        private static ContactResult SphereTriangle(AuraVector3 center, float radius, in ManagedShapeView triangle)
+        {
+            var closest = ClosestPointOnTriangle(center, triangle.A, triangle.B, triangle.C);
+            var delta = center - closest;
+            var distance = delta.Length;
+            if (distance > radius + Epsilon)
+                return default(ContactResult);
+
+            var normal = distance > Epsilon ? delta / distance : triangle.Normal();
+            var point = closest;
+            var penetration = radius - distance;
+            return new ContactResult { Hit = true, Normal = normal, Point = point, Penetration = penetration > 0f ? penetration : 0f };
+        }
+
+        private static ContactResult CapsuleTriangle(in ManagedShapeView capsule, in ManagedShapeView triangle)
+        {
+            var center = ClosestPointOnSegment(triangle.Center, capsule.A, capsule.B);
+            var closest = ClosestPointOnTriangle(center, triangle.A, triangle.B, triangle.C);
+            var delta = center - closest;
+            var distance = delta.Length;
+            if (distance > capsule.Radius + Epsilon)
+                return default(ContactResult);
+
+            var normal = distance > Epsilon ? delta / distance : triangle.Normal();
+            var penetration = capsule.Radius - distance;
+            return new ContactResult { Hit = true, Normal = normal, Point = closest, Penetration = penetration > 0f ? penetration : 0f };
+        }
+
+        private static ContactResult BoxTriangle(in ManagedShapeView box, in ManagedShapeView triangle)
+        {
+            /* Sample the box's support direction toward the triangle and test the
+               closest point; accurate enough for a static mesh floor/ramp. */
+            var normal = triangle.Normal();
+            var boxSupport = Support(box, normal);
+            var projection = AuraVector3.Dot(boxSupport - triangle.A, normal);
+            if (projection > Epsilon)
+                return default(ContactResult);
+
+            var towardBox = box.Center - triangle.Center;
+            var direction = towardBox.LengthSquared > Epsilon ? towardBox.Normalized() : -normal;
+            var triangleClosest = ClosestPointOnTriangle(box.Center, triangle.A, triangle.B, triangle.C);
+            var boxLocal = box.Rotation.InverseRotate(triangleClosest - box.Center);
+            var boxClosestLocal = new AuraVector3(
+                Math.Clamp(boxLocal.X, -box.Extents.X, box.Extents.X),
+                Math.Clamp(boxLocal.Y, -box.Extents.Y, box.Extents.Y),
+                Math.Clamp(boxLocal.Z, -box.Extents.Z, box.Extents.Z));
+            var boxClosest = box.Center + box.Rotation.Rotate(boxClosestLocal);
+            var delta2 = boxClosest - triangleClosest;
+            var distance = delta2.Length;
+            var contactNormal = distance > Epsilon ? delta2 / distance : normal;
+            if (AuraVector3.Dot(contactNormal, direction) < 0f)
+                contactNormal = -contactNormal;
+
+            return new ContactResult { Hit = true, Normal = contactNormal, Point = triangleClosest, Penetration = distance };
+        }
+
+        private static ContactResult TriangleTrianglePair(in ManagedShapeView a, in ManagedShapeView b)
+        {
+            var aClosest = ClosestPointOnTriangle(b.Center, a.A, a.B, a.C);
+            var bClosest = ClosestPointOnTriangle(a.Center, b.A, b.B, b.C);
+            var delta = bClosest - aClosest;
+            var distance = delta.Length;
+            var maxRadius = MathF.Max(a.Radius, b.Radius);
+            if (distance > maxRadius + Epsilon)
+                return default(ContactResult);
+
+            var normal = distance > Epsilon ? delta / distance : a.Normal();
+            return new ContactResult { Hit = true, Normal = normal, Point = aClosest, Penetration = maxRadius - distance };
+        }
+
+        private static AuraVector3 ClosestPointOnTriangle(AuraVector3 point, AuraVector3 a, AuraVector3 b, AuraVector3 c)
+        {
+            var ab = b - a;
+            var ac = c - a;
+            var ap = point - a;
+            var d1 = AuraVector3.Dot(ab, ap);
+            var d2 = AuraVector3.Dot(ac, ap);
+            if (d1 <= 0f && d2 <= 0f)
+                return a;
+
+            var bp = point - b;
+            var d3 = AuraVector3.Dot(ab, bp);
+            var d4 = AuraVector3.Dot(ac, bp);
+            if (d3 >= 0f && d4 <= d3)
+                return b;
+
+            var vc = d1 * d4 - d3 * d2;
+            if (vc <= 0f && d1 >= 0f && d3 <= 0f)
+                return a + ab * (d1 / (d1 - d3));
+
+            var cp = point - c;
+            var d5 = AuraVector3.Dot(ab, cp);
+            var d6 = AuraVector3.Dot(ac, cp);
+            if (d6 >= 0f && d5 <= d6)
+                return c;
+
+            var vb = d5 * d2 - d1 * d6;
+            if (vb <= 0f && d2 >= 0f && d6 <= 0f)
+                return a + ac * (d2 / (d2 - d6));
+
+            var va = d3 * d6 - d5 * d4;
+            if (va <= 0f && (d4 - d3) >= 0f && (d5 - d6) >= 0f)
+                return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
+
+            var denom = 1f / (va + vb + vc);
+            return a + ab * (vb * denom) + ac * (vc * denom);
         }
 
         private static bool Single(ContactResult result, ManagedManifold manifold)
@@ -126,7 +365,7 @@ namespace AuraEngine.Physics
             var distance = delta.Length;
             var sum = ra + rb;
             if (distance >= sum)
-                return default;
+                return default(ContactResult);
 
             var normal = distance > Epsilon ? delta / distance : AuraVector3.UnitX;
             return new ContactResult { Hit = true, Normal = normal, Point = ca + normal * ra, Penetration = sum - distance };
@@ -139,7 +378,7 @@ namespace AuraEngine.Physics
             var distance = delta.Length;
             var sum = radius + capsuleRadius;
             if (distance >= sum)
-                return default;
+                return default(ContactResult);
 
             var normal = distance > Epsilon ? delta / distance : AuraVector3.UnitX;
             return new ContactResult { Hit = true, Normal = normal, Point = center + normal * radius, Penetration = sum - distance };
@@ -152,7 +391,7 @@ namespace AuraEngine.Physics
             var distance = delta.Length;
             var sum = ra + rb;
             if (distance >= sum)
-                return default;
+                return default(ContactResult);
 
             var normal = distance > Epsilon ? delta / distance : AuraVector3.UnitX;
             return new ContactResult { Hit = true, Normal = normal, Point = p + normal * ra, Penetration = sum - distance };
@@ -170,7 +409,7 @@ namespace AuraEngine.Physics
             var distance = delta.Length;
 
             if (distance > radius + Epsilon)
-                return default;
+                return default(ContactResult);
 
             AuraVector3 normalWorld;
             AuraVector3 point;
@@ -544,6 +783,127 @@ namespace AuraEngine.Physics
             }
 
             return false;
+        }
+
+        private static bool RayMesh(in AuraRay ray, in ManagedShapeView mesh, float maxDistance, out float distance, out AuraVector3 point, out AuraVector3 normal)
+        {
+            distance = float.MaxValue;
+            point = AuraVector3.Zero;
+            normal = AuraVector3.Zero;
+            var hit = false;
+            var bestNormal = AuraVector3.UnitY;
+
+            if (mesh.MeshVertices == null || mesh.MeshIndices == null)
+            {
+                distance = 0f;
+                return false;
+            }
+
+            for (var index = 0; index + 2 < mesh.MeshIndices.Length; index += 3)
+            {
+                var a = mesh.MeshVertices[mesh.MeshIndices[index]];
+                var b = mesh.MeshVertices[mesh.MeshIndices[index + 1]];
+                var c = mesh.MeshVertices[mesh.MeshIndices[index + 2]];
+                if (RayTriangle(ray, a, b, c, maxDistance, out var t))
+                {
+                    if (t < distance)
+                    {
+                        distance = t;
+                        point = ray.GetPoint(t);
+                        bestNormal = AuraVector3.Cross(b - a, c - a).Normalized();
+                        if (AuraVector3.Dot(bestNormal, ray.Direction) > 0f)
+                            bestNormal = -bestNormal;
+                        hit = true;
+                    }
+                }
+            }
+
+            if (!hit)
+                distance = 0f;
+            normal = bestNormal;
+            return hit;
+        }
+
+        private static bool RayHeightField(in AuraRay ray, in ManagedShapeView field, float maxDistance, out float distance, out AuraVector3 point, out AuraVector3 normal)
+        {
+            distance = float.MaxValue;
+            point = AuraVector3.Zero;
+            normal = AuraVector3.Zero;
+            var hit = false;
+            var bestNormal = AuraVector3.UnitY;
+
+            if (field.HeightSamples == null || field.HeightResolution < 2)
+            {
+                distance = 0f;
+                return false;
+            }
+
+            var resolution = field.HeightResolution;
+            for (var row = 0; row < resolution - 1; row++)
+            {
+                for (var column = 0; column < resolution - 1; column++)
+                {
+                    var v00 = HeightVertex(field, column, row);
+                    var v10 = HeightVertex(field, column + 1, row);
+                    var v01 = HeightVertex(field, column, row + 1);
+                    var v11 = HeightVertex(field, column + 1, row + 1);
+
+                    if (RayTriangle(ray, v00, v01, v11, maxDistance, out var t) && t < distance)
+                    {
+                        distance = t;
+                        point = ray.GetPoint(t);
+                        bestNormal = ManagedShapeView.Triangle(v00, v01, v11).Normal();
+                        if (AuraVector3.Dot(bestNormal, ray.Direction) > 0f)
+                            bestNormal = -bestNormal;
+                        hit = true;
+                    }
+
+                    if (RayTriangle(ray, v00, v11, v10, maxDistance, out var t2) && t2 < distance)
+                    {
+                        distance = t2;
+                        point = ray.GetPoint(t2);
+                        bestNormal = ManagedShapeView.Triangle(v00, v11, v10).Normal();
+                        if (AuraVector3.Dot(bestNormal, ray.Direction) > 0f)
+                            bestNormal = -bestNormal;
+                        hit = true;
+                    }
+                }
+            }
+
+            if (!hit)
+                distance = 0f;
+            normal = bestNormal;
+            return hit;
+        }
+
+        private static bool RayTriangle(in AuraRay ray, AuraVector3 a, AuraVector3 b, AuraVector3 c, float maxDistance, out float distance)
+        {
+            const float epsilon = 1e-6f;
+            distance = 0f;
+            var edge1 = b - a;
+            var edge2 = c - a;
+            var pvec = AuraVector3.Cross(ray.Direction, edge2);
+            var det = AuraVector3.Dot(edge1, pvec);
+            if (MathF.Abs(det) < epsilon)
+                return false;
+
+            var invDet = 1f / det;
+            var tvec = ray.Origin - a;
+            var u = AuraVector3.Dot(tvec, pvec) * invDet;
+            if (u < 0f || u > 1f)
+                return false;
+
+            var qvec = AuraVector3.Cross(tvec, edge1);
+            var v = AuraVector3.Dot(ray.Direction, qvec) * invDet;
+            if (v < 0f || u + v > 1f)
+                return false;
+
+            var t = AuraVector3.Dot(edge2, qvec) * invDet;
+            if (t < 0f || t > maxDistance)
+                return false;
+
+            distance = t;
+            return true;
         }
 
         private static float Component(AuraVector3 value, int component)

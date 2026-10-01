@@ -1,0 +1,36 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "plugin",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/plugin-${hostSystemName}-${hostSystemProcessor}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "AURA_USE_JOLT": "ON",
+        "AURA_USE_BOX2D": "ON",
+        "AURA_BUILD_PLUGIN": "ON",
+        "AURA_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "reference",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/reference-${hostSystemName}-${hostSystemProcessor}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "AURA_BUILD_TESTS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "plugin",
+      "configurePreset": "plugin"
+    },
+    {
+      "name": "reference",
+      "configurePreset": "reference"
+    }
+  ]
+}

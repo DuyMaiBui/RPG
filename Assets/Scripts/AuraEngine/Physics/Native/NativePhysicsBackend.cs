@@ -44,6 +44,10 @@ namespace AuraEngine.Physics.Native
             {
                 return false;
             }
+            catch (BadImageFormatException)
+            {
+                return false;
+            }
         }
     }
 }

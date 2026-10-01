@@ -14,6 +14,8 @@ namespace AuraEngine.Physics
             AuraPhysicsCapabilities.BodyKinematic |
             AuraPhysicsCapabilities.ShapeBox |
             AuraPhysicsCapabilities.ShapeSphere |
+            AuraPhysicsCapabilities.ShapeTriangleMesh |
+            AuraPhysicsCapabilities.ShapeHeightField |
             AuraPhysicsCapabilities.QueryRaycast |
             AuraPhysicsCapabilities.QueryOverlap |
             AuraPhysicsCapabilities.Triggers |

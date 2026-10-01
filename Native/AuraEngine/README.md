@@ -51,6 +51,23 @@ adapters.
   cmake --build build/native
   ```
 
+- `build_plugin.sh` is the cross-platform build used by CI: it fetches anything
+  missing, builds Jolt + Box2D, runs the headless test and copies the plugin to
+  `Assets/Plugins/AuraEngine/<platform>` (`macOS` -> `libaura.dylib`,
+  `Windows/x86_64` -> `aura.dll`, `Linux/x86_64` -> `libaura.so`). On Windows
+  the ABI uses the default `cdecl` convention, so the file is also copied as
+  `aura.dll` next to the executable (where `DllImport("aura")` resolves it).
+
+  ```sh
+  ./Native/AuraEngine/build_plugin.sh
+  ```
+
+  > Native caveat: running the native P/Invoke test suite inside the Editor
+  > aborts mono when it JIT-compiles a managed method (a libmalloc
+  > "pointer being freed was not allocated" during `mono_save_seq_point_info`),
+  > so `NativeBackendTests` stays behind `#if AURA_NATIVE` and the native path
+  > is validated by the headless harness / standalone probes instead.
+
 The ABI is consumed by `AuraEngine.Physics.Native`
 (`NativePhysicsBackend`), which validates `Aura_AbiVersion` and maps native
 results onto `AuraResult`. `AuraSimulationInstance` can select the Jolt backend

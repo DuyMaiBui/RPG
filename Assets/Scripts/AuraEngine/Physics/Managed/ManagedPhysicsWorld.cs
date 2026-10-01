@@ -8,6 +8,7 @@ namespace AuraEngine.Physics
     public sealed class ManagedPhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsContacts, IPhysicsSerialization
     {
         private const float Epsilon = 1e-5f;
+        private const float MaxPositionCorrection = 0.2f;
         private const int ShapesPerBody = 64;
         private const int SweepSteps = 64;
 
@@ -52,6 +53,8 @@ namespace AuraEngine.Physics
             AuraPhysicsCapabilities.ShapeSphere |
             AuraPhysicsCapabilities.ShapeCapsule |
             AuraPhysicsCapabilities.ShapeCylinder |
+            AuraPhysicsCapabilities.ShapeTriangleMesh |
+            AuraPhysicsCapabilities.ShapeHeightField |
             AuraPhysicsCapabilities.QueryRaycast |
             AuraPhysicsCapabilities.QueryShapeCast |
             AuraPhysicsCapabilities.QueryOverlap |
@@ -587,6 +590,11 @@ namespace AuraEngine.Physics
                     HalfExtents = source.Geometry.HalfExtents,
                     Radius = source.Geometry.Radius,
                     Height = source.Geometry.Height,
+                    MeshVertices = source.Geometry.MeshVertices,
+                    MeshIndices = source.Geometry.MeshIndices,
+                    HeightSamples = source.Geometry.HeightSamples,
+                    HeightResolution = source.Geometry.HeightResolution,
+                    HeightScale = source.Geometry.HeightScale,
                 };
             }
 
@@ -901,9 +909,14 @@ namespace AuraEngine.Physics
 
                 for (var pointIndex = 0; pointIndex < manifold.Count; pointIndex++)
                 {
-                    var penetration = manifold.Points[pointIndex].Penetration - _settings.PenetrationSlop;
+                    var penetration = manifold.Points[pointIndex].Penetration;
                     if (penetration <= 0f)
                         continue;
+
+                    /* Clamp position correction like a max-correction setting so a
+                       deep first overlap cannot teleport a body. */
+                    if (penetration > MaxPositionCorrection)
+                        penetration = MaxPositionCorrection;
 
                     var correction = manifold.Normal * (penetration * _settings.Baumgarte / total);
                     bodyA.Pose = new AuraPose(bodyA.Pose.Position - correction * invMassA, bodyA.Pose.Rotation);
