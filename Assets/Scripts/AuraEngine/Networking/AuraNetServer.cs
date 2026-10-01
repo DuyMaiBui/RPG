@@ -25,15 +25,34 @@ namespace AuraEngine.Networking
 
         public SimulationTick CurrentTick => _world.CurrentTick;
 
-        public void Pump()
+        public Exception Fault { get; private set; }
+
+        public void Pump() => PumpFrom(_transport, TimeSpan.Zero);
+
+        public void PumpFrom(IAuraTransport transport, TimeSpan receiveBudget)
         {
-            while (_transport.TryReceive(out var payload))
+            var deadline = DateTime.UtcNow + receiveBudget;
+            try
             {
-                if (AuraNetCodec.TryDecodeInput(payload, out var command))
+                do
                 {
-                    _world.EnqueueCommand(command);
-                    _lastAcknowledged[command.ClientId] = command.Sequence;
+                    while (transport.TryReceive(out var payload))
+                    {
+                        if (AuraNetCodec.TryDecodeInput(payload, out var command))
+                        {
+                            _world.EnqueueCommand(command);
+                            _lastAcknowledged[command.ClientId] = command.Sequence;
+                        }
+                    }
+
+                    if (receiveBudget <= TimeSpan.Zero || DateTime.UtcNow >= deadline)
+                        break;
                 }
+                while (true);
+            }
+            catch (Exception exception)
+            {
+                Fault = exception;
             }
         }
 

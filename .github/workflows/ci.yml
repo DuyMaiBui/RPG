@@ -44,6 +44,42 @@ jobs:
             Native/AuraEngine/build/plugin/aura.dll
           if-no-files-found: warn
 
+  mobile:
+    name: Mobile plugin (${{ matrix.target }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - target: ios
+            arch: arm64
+          - target: android
+            abi: arm64-v8a
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cmake + ninja
+        uses: lukka/get-cmake@latest
+      - name: Build iOS plugin
+        if: matrix.target == 'ios'
+        run: |
+          ./Native/AuraEngine/fetch_jolt.sh
+          ./Native/AuraEngine/fetch_box2d.sh
+          IOS_ARCH=${{ matrix.arch }} ./Native/AuraEngine/build_ios.sh
+      - name: Build Android plugin
+        if: matrix.target == 'android'
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          ./Native/AuraEngine/fetch_jolt.sh
+          ./Native/AuraEngine/fetch_box2d.sh
+          ANDROID_ABI=${{ matrix.abi }} ./Native/AuraEngine/build_android.sh
+      - name: Upload mobile artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libaura-${{ matrix.target }}
+          path: |
+            Assets/Plugins/AuraEngine/iOS/libaura.*
+            Assets/Plugins/AuraEngine/Android/**/libaura.*
+          if-no-files-found: warn
+
   bench:
     name: Performance benchmark (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

@@ -128,9 +128,11 @@ Bugs found by the edge-case suite and fixed:
 
 ## Not yet implemented
 
-- Platform builds of `libaura`: the build (`build_plugin.sh`) and CI matrix
-  cover macOS/Windows/Linux (x86_64/arm64) with uploaded plugin artifacts;
-  Android/iOS still need a mobile toolchain and are not built.
+- Platform builds of `libaura`: `build_plugin.sh` covers the desktop hosts;
+  `build_android.sh` (NDK) and `build_ios.sh` (Xcode) add Android/iOS with
+  CMake toolchains, and CI builds them on `macos-latest` with uploaded
+  artifacts. The mobile scripts are lint/parse verified here but not built
+  locally (no NDK / Xcode SDK on this machine).
 - Runtime triangle-mesh collision on the managed backend (M12, documented
   limitation): the managed engine has no mesh narrowphase, so it rejects
   `AuraShapeType.TriangleMesh`; the Jolt backend implements `MeshShape`
@@ -141,9 +143,13 @@ Bugs found by the edge-case suite and fixed:
   length-framed input/snapshot/ack codec, `IAuraTransport` with an in-memory
   loopback pair, `AuraLockstepBuffer`, an authoritative `AuraNetServer`, a
   predicting `AuraNetClient`/`AuraPredictedWorld` with re-simulation
-  reconciliation, and `AuraPredictionReplay`. Still open: a real network
-  transport (UDP/WebSocket), per-entity prediction, lag compensation and
-  snapshot delta compression.
+  reconciliation, and `AuraPredictionReplay`. Real transports
+  (`UdpAuraTransport` over `System.Net.Sockets`, `WebSocketAuraTransport` over
+  `System.Net.WebSockets`) are implemented and tested on loopback.
+  `AuraSnapshotDelta` sends quantised per-entity deltas against a baseline, and
+  `AuraLagCompensator` keeps a bounded authoritative history for server-side
+  rewind. Still open: per-entity rollback, snapshot baseline negotiation and a
+  production UDP reliability layer (MTU fragmentation, congestion).
 - `AuraEngine.MCP` (§33) ships a minimal stdio JSON-RPC server
   (`initialize`, `tools/list`, `tools/call`) with tools
   `world_create`, `body_create_box`, `body_create_sphere`, `world_step`,

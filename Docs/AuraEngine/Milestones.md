@@ -24,7 +24,7 @@ platform build that is not available here.
 | M15 Serialization/Replay/Determinism | Done | Binary snapshot, sorted deterministic hashing, replay recorder/player, versioned replay file, initial-state validation |
 | M16 Cross-platform Build & CI | Partial | `.github/workflows/ci.yml` builds and runs the native ABI test on Linux/macOS and adds a `bench` job that builds and runs `aura_bench` (§28). The Unity EditMode job is documented but needs a licensed runner; the Jolt+Box2D plugin path is built locally, not in CI. Platform matrix (Android/iOS/ARM64) not built. |
 | M17 Production Server | Native/Partial | Headless C# host exists; native server runtime and load/soak testing pending. |
-| M18 Networking/Prediction | Partial | `AuraEngine.Networking`: input/snapshot/ack codec, `IAuraTransport` + in-memory loopback, `AuraLockstepBuffer`, authoritative `AuraNetServer`, predicting `AuraNetClient`/`AuraPredictedWorld` with re-simulation reconciliation. No real (UDP/WebSocket) transport or rollback yet. |
+| M18 Networking/Prediction | Partial | `AuraEngine.Networking`: input/snapshot/ack codec, `IAuraTransport` + in-memory loopback, `AuraLockstepBuffer`, authoritative `AuraNetServer`, predicting `AuraNetClient`/`AuraPredictedWorld` with re-simulation reconciliation, `UdpAuraTransport` + `WebSocketAuraTransport`, `AuraSnapshotDelta` and `AuraLagCompensator`. No per-entity rollback or UDP reliability layer yet. |
 
 ## Plan sections beyond the milestone list
 
