@@ -1,0 +1,17 @@
+{
+  "name": "AuraEngine.Server",
+  "rootNamespace": "AuraEngine.Server",
+  "references": [
+    "AuraEngine.Core",
+    "AuraEngine.Simulation"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

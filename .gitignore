@@ -49,3 +49,6 @@ ExportedObj/
 
 # Addressables and local build output
 /ServerData/
+
+# AuraEngine native third-party sources (fetched by Native/AuraEngine/fetch_jolt.sh)
+Native/AuraEngine/third_party/

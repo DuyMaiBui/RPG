@@ -1,0 +1,19 @@
+{
+  "name": "AuraEngine.Demo",
+  "rootNamespace": "AuraEngine.Demo",
+  "references": [
+    "AuraEngine.Core",
+    "AuraEngine.Physics",
+    "AuraEngine.Simulation",
+    "AuraEngine.Unity"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

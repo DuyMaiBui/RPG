@@ -1,0 +1,16 @@
+{
+  "name": "AuraEngine.Physics",
+  "rootNamespace": "AuraEngine.Physics",
+  "references": [
+    "AuraEngine.Core"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

@@ -3,9 +3,7 @@
   "references": [
     "RPG.Simulation.Contracts"
   ],
-  "includePlatforms": [
-    "Editor"
-  ],
+  "includePlatforms": [],
   "optionalUnityReferences": [
     "TestAssemblies"
   ]

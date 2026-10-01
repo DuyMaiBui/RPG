@@ -1,0 +1,16 @@
+{
+  "name": "AuraEngine.Tests",
+  "references": [
+    "AuraEngine.Core",
+    "AuraEngine.Physics",
+    "AuraEngine.Simulation",
+    "AuraEngine.Serialization",
+    "AuraEngine.Server"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

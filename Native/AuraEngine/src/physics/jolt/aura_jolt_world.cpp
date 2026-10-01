@@ -1,0 +1,348 @@
+#include "aura_jolt_internal.h"
+
+#include <Jolt/Physics/Body/AllowedDOFs.h>
+#include <Jolt/RegisterTypes.h>
+
+#include <cstdarg>
+#include <cstdio>
+
+namespace aura
+{
+namespace
+{
+void AuraJoltTrace(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    std::vfprintf(stderr, fmt, args);
+    va_end(args);
+}
+
+#ifdef JPH_ENABLE_ASSERTS
+bool AuraJoltAssertFailed(const char* expression, const char* message, const char* file, JPH::uint line)
+{
+    std::fprintf(stderr, "[aura][jolt-assert] %s : %s (%s:%u)\n", expression, message != nullptr ? message : "", file, line);
+    return false;
+}
+#endif
+
+struct JoltGlobal
+{
+    bool initialized = false;
+
+    void Ensure()
+    {
+        if (initialized)
+            return;
+
+        JPH::Trace = &AuraJoltTrace;
+#ifdef JPH_ENABLE_ASSERTS
+        JPH::AssertFailed = &AuraJoltAssertFailed;
+#endif
+
+        JPH::RegisterDefaultAllocator();
+        JPH::Factory::sInstance = new JPH::Factory();
+        JPH::RegisterTypes();
+        initialized = true;
+    }
+};
+
+JoltGlobal& Global()
+{
+    static JoltGlobal instance;
+    return instance;
+}
+} // namespace
+
+JoltWorld::Impl* JoltWorld::CreateImpl(const AuraWorldDesc& desc)
+{
+    Global().Ensure();
+    return new Impl(desc);
+}
+
+JoltWorld::JoltWorld(const AuraWorldDesc& desc)
+    : impl_(CreateImpl(desc))
+{
+}
+
+JoltWorld::~JoltWorld()
+{
+    delete impl_;
+}
+
+AuraResultCode JoltWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* outBody)
+{
+    if (outBody == nullptr || desc.shapeCount == 0 || desc.shapes == nullptr)
+        return AURA_INVALID_DEFINITION;
+
+    if (desc.type == AURA_BODY_DYNAMIC)
+    {
+        for (uint32_t i = 0; i < desc.shapeCount; ++i)
+            if (desc.shapes[i].type == AURA_SHAPE_TRIANGLE_MESH)
+                return AURA_UNSUPPORTED_SHAPE;
+    }
+
+    bool sensor = false;
+    JPH::RefConst<JPH::Shape> shape = impl_->BuildShape(desc, sensor);
+    if (shape == nullptr)
+        return AURA_UNSUPPORTED_SHAPE;
+
+    int index;
+    if (!impl_->freeSlots.empty())
+    {
+        index = impl_->freeSlots.back();
+        impl_->freeSlots.pop_back();
+    }
+    else
+    {
+        index = static_cast<int>(impl_->slots.size());
+        impl_->slots.push_back(Impl::Slot{});
+    }
+
+    Impl::Slot& slot = impl_->slots[index];
+    const uint32_t generation = index < static_cast<int>(impl_->slots.size()) ? slot.generation : 0;
+
+    JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
+    const JPH::EMotionType motion = desc.type == AURA_BODY_STATIC ? JPH::EMotionType::Static
+        : (desc.type == AURA_BODY_KINEMATIC ? JPH::EMotionType::Kinematic : JPH::EMotionType::Dynamic);
+
+    const AuraBodyHandle handle{ static_cast<uint32_t>(index), generation };
+    JPH::BodyCreationSettings settings(shape.GetPtr(), ToRVec3(desc.initialPose.position), ToQuat(desc.initialPose.rotation), motion, desc.layer);
+
+    /* Per-shape material: when the body-level material is unset, take friction
+       and restitution from the first shape, matching the managed backend. */
+    float friction = desc.friction;
+    float restitution = desc.restitution;
+    if (friction == 0.0f && restitution == 0.0f && desc.shapeCount > 0)
+    {
+        friction = desc.shapes[0].friction;
+        restitution = desc.shapes[0].restitution;
+    }
+    settings.mFriction = friction;
+    settings.mRestitution = restitution;
+    settings.mEnhancedInternalEdgeRemoval = true;
+    settings.mGravityFactor = desc.gravityScale;
+    settings.mIsSensor = sensor;
+    settings.mUserData = UserDataFromHandle(handle);
+    settings.mLinearDamping = desc.linearDamping;
+    settings.mAngularDamping = desc.angularDamping;
+    settings.mAllowSleeping = desc.allowSleeping != 0;
+    settings.mMotionQuality = desc.collisionDetection == 1 ? JPH::EMotionQuality::LinearCast : JPH::EMotionQuality::Discrete;
+    if (desc.maxLinearVelocity > 0.0f)
+        settings.mMaxLinearVelocity = desc.maxLinearVelocity;
+    if (desc.maxAngularVelocity > 0.0f)
+        settings.mMaxAngularVelocity = desc.maxAngularVelocity;
+
+    const uint32_t allowed = 0x3Fu & ~desc.freezeFlags;
+    settings.mAllowedDOFs = static_cast<JPH::EAllowedDOFs>(allowed == 0 ? 0x3Fu : allowed);
+
+    if (motion == JPH::EMotionType::Dynamic)
+    {
+        settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
+        settings.mMassPropertiesOverride.mMass = desc.mass > 0.0f ? desc.mass : 1.0f;
+        settings.mInertiaMultiplier = desc.inertiaMultiplier > 0.0f ? desc.inertiaMultiplier : 1.0f;
+
+        if (desc.centerOfMass.x != 0.0f || desc.centerOfMass.y != 0.0f || desc.centerOfMass.z != 0.0f)
+        {
+            JPH::OffsetCenterOfMassShapeSettings comSettings(
+                JPH::Vec3(desc.centerOfMass.x, desc.centerOfMass.y, desc.centerOfMass.z), shape.GetPtr());
+            JPH::ShapeSettings::ShapeResult comResult = comSettings.Create();
+            if (comResult.IsValid())
+                shape = comResult.Get();
+        }
+    }
+
+    JPH::Body* body = bi.CreateBody(settings);
+    if (body == nullptr)
+        return AURA_OUT_OF_MEMORY;
+
+
+    const JPH::BodyID id = body->GetID();
+    bi.AddBody(id, JPH::EActivation::Activate);
+    bi.SetLinearVelocity(id, ToVec3(desc.initialLinearVelocity));
+    bi.SetAngularVelocity(id, ToVec3(desc.initialAngularVelocity));
+
+    slot.occupied = true;
+    slot.id = id;
+    slot.body = body;
+    slot.sensor = sensor;
+    impl_->idToSlot[id.GetIndex()] = static_cast<uint32_t>(index);
+
+    *outBody = handle;
+    return AURA_SUCCESS;
+}
+
+AuraResultCode JoltWorld::DestroyBody(AuraBodyHandle body)
+{
+    Impl::Slot* slot = impl_->Find(body);
+    if (slot == nullptr)
+        return AURA_INVALID_HANDLE;
+
+    JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
+    impl_->idToSlot.erase(slot->id.GetIndex());
+
+    for (size_t index = 0; index < impl_->jointSlots.size(); ++index)
+    {
+        Impl::JointSlot& joint = impl_->jointSlots[index];
+        if (!joint.occupied)
+            continue;
+        const bool touchesA = joint.bodyA.index == body.index && joint.bodyA.generation == body.generation;
+        const bool touchesB = joint.bodyB.index == body.index && joint.bodyB.generation == body.generation;
+        if (!touchesA && !touchesB)
+            continue;
+        if (joint.constraint != nullptr)
+        {
+            impl_->physics.RemoveConstraint(joint.constraint);
+            joint.constraint->Release();
+            joint.constraint = nullptr;
+        }
+        joint.occupied = false;
+        joint.generation += 1;
+        impl_->freeJointSlots.push_back(static_cast<int>(index));
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(impl_->eventMutex);
+        for (auto it = impl_->contacts.begin(); it != impl_->contacts.end();)
+        {
+            const bool touchesA = it->second.bodyA.index == body.index && it->second.bodyA.generation == body.generation;
+            const bool touchesB = it->second.bodyB.index == body.index && it->second.bodyB.generation == body.generation;
+            it = (touchesA || touchesB) ? impl_->contacts.erase(it) : ++it;
+        }
+    }
+
+    bi.RemoveBody(slot->id);
+    bi.DestroyBody(slot->id);
+    slot->occupied = false;
+    slot->body = nullptr;
+    slot->generation += 1;
+    impl_->freeSlots.push_back(static_cast<int>(body.index));
+    return AURA_SUCCESS;
+}
+
+AuraResultCode JoltWorld::SetKinematicTarget(AuraBodyHandle body, const AuraPose& pose)
+{
+    Impl::Slot* slot = impl_->Find(body);
+    if (slot == nullptr)
+        return AURA_INVALID_HANDLE;
+
+    const JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
+    const_cast<JPH::BodyInterface&>(bi).MoveKinematic(slot->id, ToRVec3(pose.position), ToQuat(pose.rotation), impl_->lastDelta);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode JoltWorld::GetBodyState(AuraBodyHandle body, AuraBodyState* outState) const
+{
+    const Impl::Slot* slot = impl_->Find(body);
+    if (slot == nullptr || outState == nullptr)
+        return AURA_INVALID_HANDLE;
+
+    impl_->FillState(body, *slot, *outState);
+    return AURA_SUCCESS;
+}
+
+uint32_t JoltWorld::CopyBodyStates(AuraBodyState* buffer, uint32_t capacity) const
+{
+    uint32_t written = 0;
+    for (size_t index = 0; index < impl_->slots.size() && written < capacity; ++index)
+    {
+        const Impl::Slot& slot = impl_->slots[index];
+        if (!slot.occupied)
+            continue;
+        impl_->FillState(Impl::MakeHandle(slot, static_cast<int>(index)), slot, buffer[written]);
+        ++written;
+    }
+    return written;
+}
+
+uint32_t JoltWorld::BodyCount() const
+{
+    uint32_t count = 0;
+    for (const Impl::Slot& slot : impl_->slots)
+        if (slot.occupied)
+            ++count;
+    return count;
+}
+
+void JoltWorld::Step(float deltaTime)
+{
+    impl_->lastDelta = deltaTime;
+    std::vector<uint32_t> wake;
+    {
+        std::lock_guard<std::mutex> lock(impl_->eventMutex);
+        impl_->events.clear();
+        wake.assign(impl_->wakeOnStep.begin(), impl_->wakeOnStep.end());
+        impl_->wakeOnStep.clear();
+    }
+
+    {
+        JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
+        for (uint32_t index : wake)
+        {
+            if (index < impl_->slots.size() && impl_->slots[index].occupied)
+                bi.ActivateBody(impl_->slots[index].id);
+        }
+    }
+
+    impl_->physics.Update(deltaTime, 1, &impl_->tempAllocator, &impl_->jobSystem);
+}
+
+uint32_t JoltWorld::PendingEventCount() const
+{
+    std::lock_guard<std::mutex> lock(impl_->eventMutex);
+    return static_cast<uint32_t>(impl_->events.size());
+}
+
+uint32_t JoltWorld::CopyEvents(AuraPhysicsEvent* buffer, uint32_t capacity)
+{
+    std::lock_guard<std::mutex> lock(impl_->eventMutex);
+    const uint32_t count = std::min(static_cast<uint32_t>(impl_->events.size()), capacity);
+    for (uint32_t i = 0; i < count; ++i)
+        buffer[i] = impl_->events[i];
+    impl_->events.erase(impl_->events.begin(), impl_->events.begin() + count);
+    return count;
+}
+
+uint64_t JoltWorld::ComputeStateHash() const
+{
+    uint64_t hash = 14695981039346656037ull;
+    auto combine = [&hash](uint64_t value)
+    {
+        hash ^= value;
+        hash *= 1099511628211ull;
+    };
+
+    AuraBodyState state{};
+    for (size_t index = 0; index < impl_->slots.size(); ++index)
+    {
+        const Impl::Slot& slot = impl_->slots[index];
+        if (!slot.occupied)
+            continue;
+        impl_->FillState(Impl::MakeHandle(slot, static_cast<int>(index)), slot, state);
+        combine(index);
+        combine(static_cast<uint32_t>(state.pose.position.x * 1000.0f));
+        combine(static_cast<uint32_t>(state.pose.position.y * 1000.0f));
+        combine(static_cast<uint32_t>(state.pose.position.z * 1000.0f));
+    }
+    return hash;
+}
+
+AuraResultCode JoltWorld::ApplyStates(const AuraBodyState* states, uint32_t count)
+{
+    JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        const AuraBodyState& state = states[i];
+        Impl::Slot* slot = impl_->Find(state.body);
+        if (slot == nullptr)
+            return AURA_INVALID_HANDLE;
+
+        bi.SetPosition(slot->id, ToRVec3(state.pose.position), JPH::EActivation::Activate);
+        bi.SetRotation(slot->id, ToQuat(state.pose.rotation), JPH::EActivation::Activate);
+        bi.SetLinearVelocity(slot->id, ToVec3(state.linearVelocity));
+        bi.SetAngularVelocity(slot->id, ToVec3(state.angularVelocity));
+    }
+    return AURA_SUCCESS;
+}
+
+} // namespace aura

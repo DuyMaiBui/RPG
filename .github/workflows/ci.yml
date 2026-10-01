@@ -1,0 +1,58 @@
+name: AuraEngine CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  native:
+    name: Native reference ABI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run headless reference ABI test
+        run: ./Native/AuraEngine/build.sh
+
+  plugin:
+    name: Native Jolt + Box2D plugin (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cmake + ninja
+        uses: lukka/get-cmake@latest
+      - name: Fetch native dependencies
+        run: |
+          ./Native/AuraEngine/fetch_jolt.sh
+          ./Native/AuraEngine/fetch_box2d.sh
+      - name: Build and run headless Jolt + Box2D ABI test
+        run: ./Native/AuraEngine/build_editor.sh
+
+  bench:
+    name: Performance benchmark (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cmake + ninja
+        uses: lukka/get-cmake@latest
+      - name: Run benchmark harness
+        run: ./Native/AuraEngine/run_bench.sh
+
+  unity:
+    name: Unity EditMode tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run AuraEngine EditMode tests
+        run: |
+          echo "Unity tests are executed on a licensed runner via the unity CLI:"
+          echo "  unity test --mode EditMode --filter AuraEngine.Tests"
+          echo "Provide a Unity license secret and the editor image to enable this job."

@@ -1,0 +1,22 @@
+{
+  "name": "AuraEngine.Editor",
+  "rootNamespace": "AuraEngine.EditorTools",
+  "references": [
+    "AuraEngine.Core",
+    "AuraEngine.Physics",
+    "AuraEngine.Simulation",
+    "AuraEngine.Unity",
+    "AuraEngine.Demo"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

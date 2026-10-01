@@ -1,0 +1,107 @@
+# AuraEngine Unity demo
+
+Two authored scenes show AuraEngine running inside Unity, one 3D and one 2D,
+without using Unity physics at runtime:
+
+- `Assets/AuraEngine.Demo/Scenes/AuraDemo3D.unity`
+- `Assets/AuraEngine.Demo/Scenes/AuraDemo2D.unity`
+
+Open a scene and press Play. The HUD shows the live tick, entity/body count,
+deterministic state hash, pending event count and the result of a camera-center
+raycast. Because Unity pauses play mode when the Editor window is unfocused,
+focus the Editor to let the simulation advance.
+
+## What the scenes demonstrate
+
+Both scenes contain one `AuraSimulationInstance` whose children are authored
+physics actors. Every actor is a plain MeshRenderer GameObject with
+`AuraPhysicsView` + `AuraPhysicsBodyAuthoring` + a collider authoring component;
+the simulation, not Unity, owns the transforms.
+
+- Dynamic spheres, capsules, cylinders and a stacked pile of boxes under
+  gravity, colliding with the static ground and each other (oriented-box SAT +
+  sequential-impulse solver with warm starting).
+- A kinematic platform driven by `AuraDemoKinematicMover` that pushes the
+  dynamic bodies.
+- A static trigger volume; the sphere touches produce trigger events.
+- `AuraDemoRayProbe` casts through the camera center each frame and reports the
+  hit entity and distance.
+- `AuraDemoHud` renders tick, counts, state hash and raycast status with IMGUI.
+
+The 3D scene uses `AuraPhysicsMode.Full3D`; the 2D scene uses
+`AuraPhysicsMode.Plane2D` and an orthographic camera, exercising the same body,
+collider and query API.
+
+## Physics backend
+
+The project uses the URP **3D** renderer (`Assets/Settings/Renderer3D.asset`).
+Quality levels previously pointed at the 2D renderer (`UniversalRP.asset`,
+`Renderer2D`), which leaves 3D Lit materials unlit; `ProjectSettings/Graphics`
+and every quality level now use `Renderer3D` so the demo receives the
+directional light and shadows.
+
+Both scenes run on the native backend
+(`AuraSimulationInstance` = `AuraBackendKind.Native`, provided by
+`Assets/Plugins/AuraEngine/macOS/libaura.dylib`); the HUD shows
+`Backend: AuraEngine.Native`. The single plugin dispatches by mode: the 3D
+scene uses Jolt, the 2D scene uses Box2D. If the plugin is absent, the instance
+falls back to the managed engine.
+
+`ManagedPhysicsBackend` (`AuraEngine.Physics.Managed`) is a deterministic, pure
+C# reference backend used for headless tests and the 2D scene:
+
+- Body types: static, dynamic, kinematic.
+- Shapes: sphere (3D) / circle (2D), box (AABB), capsule, cylinder (capsule
+  approximation) and compound bodies. Convex/triangle meshes are declared
+  unsupported by this managed backend; authoring reports them through
+  capability validation rather than dropping them silently. The native Jolt
+  backend supports box, sphere, cylinder, capsule, plane, tapered capsule,
+  tapered cylinder, convex hull and (static) triangle mesh; the 3D scene
+  includes tapered actors.
+- Semi-implicit Euler integration, penetration separation, restitution and
+  friction impulses, collision matrix and per-body layer/mask filtering.
+- Collision/trigger enter/exit events, raycast and the full cast/overlap query
+  family (sphere/capsule/box/shape cast, point/sphere/box/capsule/shape
+  overlap). Casts use a bounded substep sweep.
+
+It is a reference backend for the demo and for headless tests, not a
+production-grade solver. The Jolt (3D) and Box2D (2D) adapters replace it
+behind the same `IPhysicsBackend` contract. `ManagedPhysicsWorld` publishes its
+supported capabilities so policy code can adapt.
+
+## Editor tooling
+
+- **Collider handles**: select a collider authoring GameObject to drag its
+  center (position handle) and resize it (radius handle for spheres,
+  scale handle for boxes/capsules/cylinders) directly in the Scene view.
+  Handles respect Undo and prefab overrides.
+- **Layer dropdown**: `AuraPhysicsBodyAuthoring` shows a dropdown of the named
+  layers in the assigned `AuraPhysicsLayers` asset. Layer 0 is always `Default`;
+  a layer with an empty name is forced to no interaction, is hidden from the
+  matrix and cannot be selected, so a body cannot reference an undefined layer.
+  Naming a new layer adds it to the matrix with default interactions.
+- **Collision matrix (inline)**: selecting the `AuraPhysicsLayers` asset or the
+  `AuraSimulationInstance` shows the layer list (rename + Add Layer) and the
+  row/column interaction grid directly in the Inspector (with All/None) for the
+  authored layers only; the raw mask/name arrays are hidden. The resulting
+  matrix is applied to the simulation world at startup. No separate window.
+- **Odin Inspector**: inspectors derive from Odin's `OdinEditor` and use Odin
+  attributes (boxes, value dropdowns) when Odin is installed; a built-in Unity
+  fallback works without it.
+
+## Regenerating the scenes
+
+The scenes are plain serialized assets and are the source of truth. They were
+generated by the editor tool `AuraDemoSceneBuilder`
+(`Assets/Scripts/AuraEngine/Editor`), available at
+**AuraEngine ▸ Build Demo Scenes**. The tool sets private serialized fields
+(backend mode, gravity, body type, collider size, cross-references) that cannot
+be authored from text reliably; it is kept as a documented project editor tool
+and does not ship in player builds (Editor-only assembly).
+
+## Tests
+
+`Assets/Tests/EditMode/AuraEngine.Tests/ManagedPhysicsTests.cs` covers the
+managed backend headlessly: gravity landing, sphere-sphere separation, triggers,
+raycast against sphere and box, Plane2D constraint, collision-matrix filtering
+and determinism.
