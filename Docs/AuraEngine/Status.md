@@ -137,8 +137,13 @@ Bugs found by the edge-case suite and fixed:
   (static bodies only) and `ConvexHullShape`. The Unity baking pipeline
   (`AuraMeshColliderBaker` writes `AuraPhysicsMeshData`) and the physics
   material assets exist and feed the shape geometry.
-- Networking/prediction (M18) is not started; the milestone list tracks it
-  after the simulation API freezes.
+- Networking/prediction (M18) ships `AuraEngine.Networking` (engine-free): a
+  length-framed input/snapshot/ack codec, `IAuraTransport` with an in-memory
+  loopback pair, `AuraLockstepBuffer`, an authoritative `AuraNetServer`, a
+  predicting `AuraNetClient`/`AuraPredictedWorld` with re-simulation
+  reconciliation, and `AuraPredictionReplay`. Still open: a real network
+  transport (UDP/WebSocket), per-entity prediction, lag compensation and
+  snapshot delta compression.
 - `AuraEngine.MCP` (§33) ships a minimal stdio JSON-RPC server
   (`initialize`, `tools/list`, `tools/call`) with tools
   `world_create`, `body_create_box`, `body_create_sphere`, `world_step`,

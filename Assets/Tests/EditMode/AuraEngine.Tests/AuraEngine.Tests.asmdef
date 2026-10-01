@@ -5,7 +5,8 @@
     "AuraEngine.Physics",
     "AuraEngine.Simulation",
     "AuraEngine.Serialization",
-    "AuraEngine.Server"
+    "AuraEngine.Server",
+    "AuraEngine.Networking"
   ],
   "includePlatforms": [
     "Editor"

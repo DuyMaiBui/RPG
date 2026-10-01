@@ -24,7 +24,7 @@ platform build that is not available here.
 | M15 Serialization/Replay/Determinism | Done | Binary snapshot, sorted deterministic hashing, replay recorder/player, versioned replay file, initial-state validation |
 | M16 Cross-platform Build & CI | Partial | `.github/workflows/ci.yml` builds and runs the native ABI test on Linux/macOS and adds a `bench` job that builds and runs `aura_bench` (§28). The Unity EditMode job is documented but needs a licensed runner; the Jolt+Box2D plugin path is built locally, not in CI. Platform matrix (Android/iOS/ARM64) not built. |
 | M17 Production Server | Native/Partial | Headless C# host exists; native server runtime and load/soak testing pending. |
-| M18 Networking/Prediction | Not started | Requires the simulation to be finalized; no transport, prediction, reconciliation or rollback modules added. |
+| M18 Networking/Prediction | Partial | `AuraEngine.Networking`: input/snapshot/ack codec, `IAuraTransport` + in-memory loopback, `AuraLockstepBuffer`, authoritative `AuraNetServer`, predicting `AuraNetClient`/`AuraPredictedWorld` with re-simulation reconciliation. No real (UDP/WebSocket) transport or rollback yet. |
 
 ## Plan sections beyond the milestone list
 
@@ -46,4 +46,5 @@ platform build that is not available here.
    (M12) once the managed solver supports them (Jolt already provides both).
 2. Platform build/CI matrix (M16): Windows/Linux/Android/iOS plugin builds and a
    licensed Unity runner. The native ABI and benchmark jobs already run in CI.
-3. Networking/prediction (M18) only after the simulation API is frozen.
+3. A real network transport + snapshot delta/lag compensation for M18; the
+   in-memory prediction/reconciliation core is already in place and tested.

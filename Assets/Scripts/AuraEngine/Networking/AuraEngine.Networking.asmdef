@@ -1,0 +1,19 @@
+{
+  "name": "AuraEngine.Networking",
+  "rootNamespace": "AuraEngine.Networking",
+  "references": [
+    "AuraEngine.Core",
+    "AuraEngine.Physics",
+    "AuraEngine.Simulation",
+    "AuraEngine.Serialization"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}
