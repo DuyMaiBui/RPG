@@ -110,6 +110,13 @@ namespace AuraEngine.Physics.Native
                         shape.Indices = pin.AddrOfPinnedObject();
                     }
 
+                    if (geometry.MaterialIndices != null && geometry.MaterialIndices.Length > 0)
+                    {
+                        var pin = GCHandle.Alloc(geometry.MaterialIndices, GCHandleType.Pinned);
+                        pins.Add(pin);
+                        shape.MaterialIndices = pin.AddrOfPinnedObject();
+                    }
+
                     Marshal.StructureToPtr(shape, shapes + index * shapeSize, false);
                 }
 

@@ -15,7 +15,8 @@ namespace AuraEngine.Core
             float topRadius,
             float[] heightSamples = null,
             int heightResolution = 0,
-            AuraVector3 heightScale = default)
+            AuraVector3 heightScale = default,
+            int[] materialIndices = null)
         {
             HalfExtents = halfExtents;
             Radius = radius;
@@ -28,6 +29,7 @@ namespace AuraEngine.Core
             HeightSamples = heightSamples;
             HeightResolution = heightResolution;
             HeightScale = heightScale;
+            MaterialIndices = materialIndices;
         }
 
         public AuraVector3 HalfExtents { get; }
@@ -41,6 +43,11 @@ namespace AuraEngine.Core
         public float[] HeightSamples { get; }
         public int HeightResolution { get; }
         public AuraVector3 HeightScale { get; }
+        public int[] MaterialIndices { get; }
+
+        public AuraShapeGeometry WithMaterialIndices(int[] materialIndices) =>
+            new AuraShapeGeometry(HalfExtents, Radius, Height, MeshAssetId, MeshVertices, MeshIndices, PlaneNormal, TopRadius,
+                HeightSamples, HeightResolution, HeightScale, materialIndices);
 
         public AuraShapeGeometry Scaled(AuraVector3 scale)
         {
@@ -65,7 +72,7 @@ namespace AuraEngine.Core
             }
 
             return new AuraShapeGeometry(halfExtents, radius, height, MeshAssetId, vertices, MeshIndices, PlaneNormal, topRadius,
-                HeightSamples, HeightResolution, new AuraVector3(HeightScale.X * scale.X, HeightScale.Y * scale.Y, HeightScale.Z * scale.Z));
+                HeightSamples, HeightResolution, new AuraVector3(HeightScale.X * scale.X, HeightScale.Y * scale.Y, HeightScale.Z * scale.Z), MaterialIndices);
         }
 
         private static float Max(float left, float right) => left > right ? left : right;

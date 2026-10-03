@@ -76,5 +76,46 @@ namespace AuraEngine.Tests
             Assert.IsFalse(compensator.TryRewind(0u, maxLagTicks: 100, out _), "old snapshots should be evicted.");
             Assert.IsTrue(compensator.TryRewind(4u, maxLagTicks: 100, out _));
         }
+
+        [Test]
+        public void ReliableChannel_FragmentAndAcknowledge()
+        {
+            var channel = new AuraReliableChannel(64);
+            var payload = new byte[150];
+            for (var index = 0; index < payload.Length; index++)
+                payload[index] = (byte)index;
+
+            var packets = channel.Enqueue(payload);
+            Assert.AreEqual(3, packets.Count);
+            Assert.AreEqual(1u, packets[0].Sequence);
+            Assert.AreEqual(0, packets[0].FragmentIndex);
+            Assert.AreEqual(2, packets[2].FragmentIndex);
+            Assert.AreEqual(1, channel.PendingCount);
+
+            channel.Acknowledge(1u);
+            Assert.AreEqual(0, channel.PendingCount);
+        }
+
+        [Test]
+        public void ReliableChannel_RejectsOutOfOrder()
+        {
+            var channel = new AuraReliableChannel();
+            Assert.IsFalse(channel.TryAccept(2u));
+            Assert.IsTrue(channel.TryAccept(0u));
+            Assert.IsFalse(channel.TryAccept(0u));
+        }
+
+        [Test]
+        public void BaselineNegotiator_SelectsAndBoundsHistory()
+        {
+            var negotiator = new AuraSnapshotBaselineNegotiator(2);
+            negotiator.Record(10u);
+            negotiator.Record(11u);
+            negotiator.Record(12u);
+            Assert.AreEqual(2, negotiator.Count);
+            Assert.IsTrue(negotiator.TrySelect(0u, 12u, out var baseline));
+            Assert.AreEqual(12u, baseline.ServerTick);
+            Assert.IsFalse(negotiator.TrySelect(1u, 10u, out _));
+        }
     }
 }

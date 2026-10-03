@@ -58,6 +58,7 @@ namespace AuraEngine.Physics.Native
                     ? (heights != null ? (uint)heights.Length : 0u)
                     : (vertices != null ? (uint)vertices.Length : 0u),
                 IndexCount = indices != null ? (uint)indices.Length : 0u,
+                MaterialIndexCount = shape.Geometry.MaterialIndices != null ? (uint)shape.Geometry.MaterialIndices.Length : 0u,
                 ShapeFilterGroup = 0,
                 ShapeFilterMask = uint.MaxValue,
                 ActiveEdgeMode = 0,
