@@ -37,6 +37,7 @@ namespace AuraEngine.Physics.Native
                            AuraPhysicsCapabilities.BodyDynamic |
                            AuraPhysicsCapabilities.BodyKinematic |
                            AuraPhysicsCapabilities.QueryRaycast |
+                           AuraPhysicsCapabilities.QueryShapeCast |
                            AuraPhysicsCapabilities.QueryOverlap |
                            AuraPhysicsCapabilities.Triggers |
                            AuraPhysicsCapabilities.Contacts |
@@ -55,8 +56,8 @@ namespace AuraEngine.Physics.Native
                        AuraPhysicsCapabilities.ShapePlane |
                        AuraPhysicsCapabilities.ShapeTaperedCapsule |
                        AuraPhysicsCapabilities.ShapeTaperedCylinder |
-                       AuraPhysicsCapabilities.ShapeHeightField |
-                       AuraPhysicsCapabilities.Characters;
+                           AuraPhysicsCapabilities.ShapeHeightField |
+                           AuraPhysicsCapabilities.Characters;
             }
         }
 
@@ -429,7 +430,13 @@ namespace AuraEngine.Physics.Native
             return result == AuraResult.Success && hasHit != 0;
         }
 
-        int IPhysicsQuery.SphereCastAll(AuraVector3 origin, float radius, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
+        int IPhysicsQuery.SphereCastAll(AuraVector3 origin, float radius, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results)
+        {
+            if (results.Length == 0 || !((IPhysicsQuery)this).SphereCast(origin, radius, direction, maxDistance, filter, out var hit))
+                return 0;
+            results[0] = hit;
+            return 1;
+        }
 
         bool IPhysicsQuery.CapsuleCast(AuraVector3 pointA, AuraVector3 pointB, float radius, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, out AuraPhysicsQueryHit hit)
         {
@@ -439,7 +446,13 @@ namespace AuraEngine.Physics.Native
             return result == AuraResult.Success && hasHit != 0;
         }
 
-        int IPhysicsQuery.CapsuleCastAll(AuraVector3 pointA, AuraVector3 pointB, float radius, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
+        int IPhysicsQuery.CapsuleCastAll(AuraVector3 pointA, AuraVector3 pointB, float radius, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results)
+        {
+            if (results.Length == 0 || !((IPhysicsQuery)this).CapsuleCast(pointA, pointB, radius, direction, maxDistance, filter, out var hit))
+                return 0;
+            results[0] = hit;
+            return 1;
+        }
 
         bool IPhysicsQuery.BoxCast(AuraVector3 center, AuraVector3 halfExtents, AuraQuaternion rotation, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, out AuraPhysicsQueryHit hit)
         {
@@ -449,15 +462,39 @@ namespace AuraEngine.Physics.Native
             return result == AuraResult.Success && hasHit != 0;
         }
 
-        int IPhysicsQuery.BoxCastAll(AuraVector3 center, AuraVector3 halfExtents, AuraQuaternion rotation, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
+        int IPhysicsQuery.BoxCastAll(AuraVector3 center, AuraVector3 halfExtents, AuraQuaternion rotation, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results)
+        {
+            if (results.Length == 0 || !((IPhysicsQuery)this).BoxCast(center, halfExtents, rotation, direction, maxDistance, filter, out var hit))
+                return 0;
+            results[0] = hit;
+            return 1;
+        }
 
         bool IPhysicsQuery.ShapeCast(in AuraPhysicsShapeDefinition shape, AuraPose pose, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, out AuraPhysicsQueryHit hit)
         {
-            hit = default;
-            return false;
+            switch (shape.Type)
+            {
+                case AuraShapeType.Sphere:
+                    return ((IPhysicsQuery)this).SphereCast(pose.Position, shape.Geometry.Radius, direction, maxDistance, filter, out hit);
+                case AuraShapeType.Capsule:
+                    var axis = pose.Rotation.Rotate(AuraVector3.UnitY);
+                    var half = Math.Max(0f, shape.Geometry.Height * 0.5f - shape.Geometry.Radius);
+                    return ((IPhysicsQuery)this).CapsuleCast(pose.Position - axis * half, pose.Position + axis * half, shape.Geometry.Radius, direction, maxDistance, filter, out hit);
+                case AuraShapeType.Box:
+                    return ((IPhysicsQuery)this).BoxCast(pose.Position, shape.Geometry.HalfExtents, pose.Rotation, direction, maxDistance, filter, out hit);
+                default:
+                    hit = default;
+                    return false;
+            }
         }
 
-        int IPhysicsQuery.ShapeCastAll(in AuraPhysicsShapeDefinition shape, AuraPose pose, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
+        int IPhysicsQuery.ShapeCastAll(in AuraPhysicsShapeDefinition shape, AuraPose pose, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results)
+        {
+            if (results.Length == 0 || !((IPhysicsQuery)this).ShapeCast(shape, pose, direction, maxDistance, filter, out var hit))
+                return 0;
+            results[0] = hit;
+            return 1;
+        }
 
         int IPhysicsQuery.OverlapPoint(AuraVector3 point, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) =>
             CopyOverlapPoint(point, filter, results);
@@ -494,7 +531,24 @@ namespace AuraEngine.Physics.Native
         int IPhysicsQuery.OverlapCapsule(AuraVector3 pointA, AuraVector3 pointB, float radius, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) =>
             CopyOverlapCapsule(pointA, pointB, radius, filter, results);
 
-        int IPhysicsQuery.OverlapShape(in AuraPhysicsShapeDefinition shape, AuraPose pose, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
+        int IPhysicsQuery.OverlapShape(in AuraPhysicsShapeDefinition shape, AuraPose pose, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results)
+        {
+            if (results.Length == 0)
+                return 0;
+            switch (shape.Type)
+            {
+                case AuraShapeType.Sphere:
+                    return ((IPhysicsQuery)this).OverlapSphere(pose.Position, shape.Geometry.Radius, filter, results);
+                case AuraShapeType.Box:
+                    return ((IPhysicsQuery)this).OverlapBox(pose.Position, shape.Geometry.HalfExtents, pose.Rotation, filter, results);
+                case AuraShapeType.Capsule:
+                    var axis = pose.Rotation.Rotate(AuraVector3.UnitY);
+                    var half = Math.Max(0f, shape.Geometry.Height * 0.5f - shape.Geometry.Radius);
+                    return ((IPhysicsQuery)this).OverlapCapsule(pose.Position - axis * half, pose.Position + axis * half, shape.Geometry.Radius, filter, results);
+                default:
+                    return 0;
+            }
+        }
 
         void IDisposable.Dispose()
         {
