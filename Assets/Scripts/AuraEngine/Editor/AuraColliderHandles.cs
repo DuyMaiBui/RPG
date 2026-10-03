@@ -84,19 +84,23 @@ namespace AuraEngine.EditorTools
             if (MoveCenter(collider, serialized, centerProperty, transform, ref world, rotation))
                 return;
 
-            /* Front pass draws the wireframe; the occluded pass fades anything
-               hidden behind geometry. Handles are drawn once, on top, so they
-               stay easy to grab. */
-            Handles.zTest = CompareFunction.LessEqual;
-            DrawShapes(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation, color);
-            DrawHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation);
-
-            Handles.zTest = CompareFunction.Greater;
+            /* Front pass draws the wireframe and the handles in full color; the
+               occluded pass fades everything hidden behind geometry, handles
+               included, so a square behind a mesh is dimmer too. */
             var occluded = OccludedColor;
             occluded.r = color.r;
             occluded.g = color.g;
             occluded.b = color.b;
-            DrawShapes(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation, occluded);
+
+            Handles.zTest = CompareFunction.LessEqual;
+            Handles.color = color;
+            DrawShapes(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation);
+            DrawHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation, false);
+
+            Handles.zTest = CompareFunction.Greater;
+            Handles.color = occluded;
+            DrawShapes(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation);
+            DrawHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation, true);
 
             Handles.zTest = CompareFunction.Always;
         }
@@ -124,10 +128,8 @@ namespace AuraEngine.EditorTools
             SerializedProperty sizeProperty,
             SerializedProperty normalProperty,
             Vector3 world,
-            Quaternion rotation,
-            Color color)
+            Quaternion rotation)
         {
-            Handles.color = color;
             switch (collider.ShapeType)
             {
                 case AuraShapeType.Sphere:
@@ -211,34 +213,38 @@ namespace AuraEngine.EditorTools
             SerializedProperty sizeProperty,
             SerializedProperty normalProperty,
             Vector3 world,
-            Quaternion rotation)
+            Quaternion rotation,
+            bool occluded)
         {
             switch (collider.ShapeType)
             {
                 case AuraShapeType.Sphere:
-                    if (radiusProperty != null)
+                    if (radiusProperty != null && !occluded)
                         DrawRadius(collider, serialized, radiusProperty, world, rotation);
                     break;
 
                 case AuraShapeType.Box:
-                    DrawBoxHandles(collider, serialized, sizeProperty, world, rotation);
+                    DrawBoxHandles(collider, serialized, sizeProperty, world, rotation, occluded);
                     break;
 
                 case AuraShapeType.Cylinder:
-                    DrawBodyHandles(collider, serialized, radiusProperty, radiusProperty, heightProperty, world, rotation);
+                    DrawBodyHandles(collider, serialized, radiusProperty, radiusProperty, heightProperty, world, rotation, occluded, false);
                     break;
 
                 case AuraShapeType.TaperedCylinder:
-                case AuraShapeType.TaperedCapsule:
-                    DrawBodyHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, world, rotation);
+                    DrawBodyHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, world, rotation, occluded, false);
                     break;
 
                 case AuraShapeType.Capsule:
-                    DrawBodyHandles(collider, serialized, radiusProperty, radiusProperty, heightProperty, world, rotation);
+                    DrawBodyHandles(collider, serialized, radiusProperty, radiusProperty, heightProperty, world, rotation, occluded, true);
+                    break;
+
+                case AuraShapeType.TaperedCapsule:
+                    DrawBodyHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, world, rotation, occluded, true);
                     break;
 
                 case AuraShapeType.Plane:
-                    if (normalProperty != null)
+                    if (normalProperty != null && !occluded)
                         DrawPlaneNormal(collider, serialized, normalProperty, world, rotation);
                     break;
             }
@@ -264,20 +270,37 @@ namespace AuraEngine.EditorTools
             SerializedProperty topRadiusProperty,
             SerializedProperty heightProperty,
             Vector3 world,
-            Quaternion rotation)
+            Quaternion rotation,
+            bool occluded,
+            bool rounded)
         {
             if (bottomRadiusProperty == null || topRadiusProperty == null || heightProperty == null)
                 return;
 
             var height = Mathf.Max(0.001f, heightProperty.floatValue);
+            var bottomRadius = Mathf.Max(0.0001f, bottomRadiusProperty.floatValue);
+            var topRadius = Mathf.Max(0.0001f, topRadiusProperty.floatValue);
             var up = rotation * Vector3.up;
             var half = height * 0.5f;
-            var bottom = world - up * half;
-            var top = world + up * half;
+
+            /* Radius handles sit on the seam ring where the body meets the cap,
+               so a capsule's handles are not left floating at the pole. */
+            var bodyHalfBottom = rounded ? Mathf.Max(0f, half - bottomRadius) : half;
+            var bodyHalfTop = rounded ? Mathf.Max(0f, half - topRadius) : half;
+            var bottom = world - up * bodyHalfBottom;
+            var top = world + up * bodyHalfTop;
+
+            if (occluded)
+            {
+                DrawRadiusSquareMarks(bottom, rotation, bottomRadius);
+                DrawRadiusSquareMarks(top, rotation, topRadius);
+                DrawHeightSquareMarks(world, up, half);
+                return;
+            }
 
             Handles.color = HandleColor;
-            DrawRadiusSquares(collider, serialized, bottomRadiusProperty, bottom, rotation, Mathf.Max(0.0001f, bottomRadiusProperty.floatValue));
-            DrawRadiusSquares(collider, serialized, topRadiusProperty, top, rotation, Mathf.Max(0.0001f, topRadiusProperty.floatValue));
+            DrawRadiusSquares(collider, serialized, bottomRadiusProperty, bottom, rotation, bottomRadius);
+            DrawRadiusSquares(collider, serialized, topRadiusProperty, top, rotation, topRadius);
             DrawHeightHandle(collider, serialized, heightProperty, world, up);
         }
 
@@ -310,6 +333,25 @@ namespace AuraEngine.EditorTools
             MarkDirty(collider);
         }
 
+        /* Non-interactive square marks used in the occluded pass so handles fade
+           with the wireframe instead of disappearing. */
+        private static void DrawRadiusSquareMarks(Vector3 center, Quaternion rotation, float radius)
+        {
+            var size = HandleUtility.GetHandleSize(center) * 0.07f;
+            for (var index = 0; index < Ties.Length; index++)
+            {
+                var position = center + rotation * (Ties[index] * radius);
+                DrawSolidSquare(position, size);
+            }
+        }
+
+        private static void DrawHeightSquareMarks(Vector3 world, Vector3 up, float half)
+        {
+            var size = HandleUtility.GetHandleSize(world) * 0.07f;
+            DrawSolidSquare(world + up * half, size);
+            DrawSolidSquare(world - up * half, size);
+        }
+
         private static void DrawHeightHandle(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 world, Vector3 up)
         {
             var half = Mathf.Max(0.001f, property.floatValue) * 0.5f;
@@ -330,7 +372,7 @@ namespace AuraEngine.EditorTools
             MarkDirty(collider);
         }
 
-        private static void DrawBoxHandles(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 world, Quaternion rotation)
+        private static void DrawBoxHandles(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 world, Quaternion rotation, bool occluded)
         {
             if (property == null)
                 return;
@@ -341,6 +383,14 @@ namespace AuraEngine.EditorTools
             var axes = new[] { Vector3.right, Vector3.up, Vector3.forward };
             var size = HandleUtility.GetHandleSize(world) * 0.07f;
             var changed = false;
+
+            if (occluded)
+            {
+                for (var axis = 0; axis < 3; axis++)
+                    for (var side = -1; side <= 1; side += 2)
+                        DrawSolidSquare(world + rotation * (axes[axis] * side) * extents[axis], size);
+                return;
+            }
 
             Handles.color = HandleColor;
             for (var axis = 0; axis < 3; axis++)
@@ -458,8 +508,13 @@ namespace AuraEngine.EditorTools
                 return;
             }
 
+            DrawSolidSquare(position, size);
+        }
+
+        private static void DrawSolidSquare(Vector3 position, float size)
+        {
             var camera = Camera.current;
-            var normal = camera != null ? (camera.transform.position - position).normalized : rotation * Vector3.forward;
+            var normal = camera != null ? (camera.transform.position - position).normalized : Vector3.forward;
             var billboard = Quaternion.LookRotation(normal, camera != null ? camera.transform.up : Vector3.up);
             var half = size * 0.5f;
             var a = position + billboard * new Vector3(-half, -half, 0f);
@@ -467,7 +522,7 @@ namespace AuraEngine.EditorTools
             var c = position + billboard * new Vector3(half, half, 0f);
             var d = position + billboard * new Vector3(-half, half, 0f);
 
-            Handles.DrawSolidRectangleWithOutline(new[] { a, b, c, d }, HandleColor, HandleColor);
+            Handles.DrawSolidRectangleWithOutline(new[] { a, b, c, d }, Handles.color, Handles.color);
         }
 
         private static void MarkDirty(Object target)
