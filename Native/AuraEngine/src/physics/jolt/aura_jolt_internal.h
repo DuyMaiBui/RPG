@@ -12,6 +12,7 @@
 #include "aura/aura_types.h"
 #include "aura_world.h"
 #include "aura_jolt_world.h"
+#include "aura_jolt_vehicle.h"
 
 #include <Jolt/Jolt.h>
 
@@ -219,6 +220,14 @@ struct JoltWorld::Impl
         AuraLayer layer = 0;
     };
 
+    struct VehicleSlot
+    {
+        bool occupied = false;
+        uint32_t generation = 0;
+        std::unique_ptr<aura::jolt_vehicle::Vehicle> vehicle;
+        AuraBodyHandle chassis{};
+    };
+
     std::vector<Slot> slots;
     std::vector<int> freeSlots;
     std::vector<JointSlot> jointSlots;
@@ -246,6 +255,9 @@ struct JoltWorld::Impl
     JPH::TempAllocatorImpl tempAllocator{ 64 * 1024 * 1024 };
     JPH::JobSystemThreadPool jobSystem{ JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, static_cast<int>(std::max(1u, std::thread::hardware_concurrency()) - 1u) };
     JPH::PhysicsSystem physics;
+    /* Declared after physics so vehicles are destroyed before the Jolt system. */
+    std::vector<VehicleSlot> vehicleSlots;
+    std::vector<int> freeVehicleSlots;
     AuraSimShapeFilter simShapeFilter;
 
     AuraPhysicsMode mode = AURA_MODE_FULL_3D;
@@ -379,6 +391,29 @@ struct JoltWorld::Impl
     static uint64_t MakeCharacterHandle(const CharacterSlot& slot, int index)
     {
         return (static_cast<uint64_t>(slot.generation) << 32) | static_cast<uint32_t>(index);
+    }
+
+    static AuraVehicleHandle MakeVehicleHandle(const VehicleSlot& slot, int index)
+    {
+        return AuraVehicleHandle{ (static_cast<uint64_t>(slot.generation) << 32) | static_cast<uint32_t>(index) };
+    }
+
+    VehicleSlot* FindVehicle(AuraVehicleHandle handle)
+    {
+        const uint32_t index = static_cast<uint32_t>(handle.opaque);
+        const uint32_t generation = static_cast<uint32_t>(handle.opaque >> 32);
+        if (index < vehicleSlots.size() && vehicleSlots[index].occupied && vehicleSlots[index].generation == generation)
+            return &vehicleSlots[index];
+        return nullptr;
+    }
+
+    const VehicleSlot* FindVehicle(AuraVehicleHandle handle) const
+    {
+        const uint32_t index = static_cast<uint32_t>(handle.opaque);
+        const uint32_t generation = static_cast<uint32_t>(handle.opaque >> 32);
+        if (index < vehicleSlots.size() && vehicleSlots[index].occupied && vehicleSlots[index].generation == generation)
+            return &vehicleSlots[index];
+        return nullptr;
     }
 
     CharacterSlot* FindCharacter(uint64_t handle)

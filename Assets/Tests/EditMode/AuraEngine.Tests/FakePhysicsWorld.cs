@@ -5,7 +5,7 @@ using AuraEngine.Physics;
 
 namespace AuraEngine.Tests
 {
-    public sealed class FakePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsContacts, IPhysicsSerialization
+    public sealed class FakePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly List<AuraPhysicsEvent> _events;
         private readonly List<FakePhysicsBody> _bodies = new List<FakePhysicsBody>();
@@ -120,6 +120,20 @@ namespace AuraEngine.Tests
         IPhysicsCharacters IPhysicsWorld.Characters => this;
 
         IPhysicsContacts IPhysicsWorld.Contacts => this;
+
+        IPhysicsVehicles IPhysicsWorld.Vehicles => this;
+
+        AuraVehicleId IPhysicsVehicles.CreateVehicle(in AuraVehicleDefinition definition) => AuraVehicleId.Invalid;
+
+        AuraResult IPhysicsVehicles.DestroyVehicle(AuraVehicleId vehicle) => AuraResult.InvalidHandle;
+
+        AuraResult IPhysicsVehicles.SetVehicleInput(AuraVehicleId vehicle, float forward, float steering, float brake, float handBrake) => AuraResult.InvalidHandle;
+
+        bool IPhysicsVehicles.TryGetWheelState(AuraVehicleId vehicle, int wheelIndex, out AuraVehicleWheelState state)
+        {
+            state = default;
+            return false;
+        }
 
         IPhysicsSerialization IPhysicsWorld.Serialization => this;
 

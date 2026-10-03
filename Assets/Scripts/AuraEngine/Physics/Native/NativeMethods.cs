@@ -92,6 +92,18 @@ namespace AuraEngine.Physics.Native
         public static extern int Aura_MoveCharacter(NativeWorldHandle world, ulong character, NativeVector3 desiredTranslation, float deltaTime);
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_CreateVehicle(NativeWorldHandle world, ref NativeVehicleDesc desc, out NativeVehicleHandle outVehicle);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_DestroyVehicle(NativeWorldHandle world, NativeVehicleHandle vehicle);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_SetVehicleInput(NativeWorldHandle world, NativeVehicleHandle vehicle, float forward, float steering, float brake, float handBrake);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_GetVehicleWheelState(NativeWorldHandle world, NativeVehicleHandle vehicle, uint wheelIndex, out NativeVehicleWheelState outState);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         public static extern int Aura_SerializeState(NativeWorldHandle world, IntPtr buffer, uint capacity, out uint outSize);
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]

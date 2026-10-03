@@ -14,6 +14,7 @@ namespace AuraEngine.Physics
         IPhysicsJoints Joints { get; }
 
         IPhysicsCharacters Characters { get; }
+        IPhysicsVehicles Vehicles { get; }
 
         IPhysicsContacts Contacts { get; }
 

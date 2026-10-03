@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 #ifndef AURA_ENGINE_ABI_VERSION
-#define AURA_ENGINE_ABI_VERSION 6u
+#define AURA_ENGINE_ABI_VERSION 7u
 #endif
 
 typedef uint32_t AuraEntityIndex;
@@ -305,6 +305,41 @@ typedef struct AuraWorldHandle
 {
     uint64_t opaque;
 } AuraWorldHandle;
+
+/* Vehicle ABI types are appended so existing layouts remain unchanged. */
+typedef struct AuraVehicleHandle
+{
+    uint64_t opaque;
+} AuraVehicleHandle;
+
+typedef struct AuraVehicleDesc
+{
+    AuraBodyHandle chassis;
+    AuraVec3 up;
+    AuraVec3 forward;
+    AuraVec3 wheelPositions[4];
+    float wheelRadius;
+    float wheelWidth;
+    float suspensionMinLength;
+    float suspensionMaxLength;
+    float suspensionFrequency;
+    float suspensionDamping;
+    float maxSteerAngle;
+    float maxPitchRollAngle;
+    float maxEngineTorque;
+    AuraLayer wheelObjectLayer;
+    uint32_t _pad0;
+} AuraVehicleDesc;
+
+typedef struct AuraVehicleWheelState
+{
+    uint8_t hasContact;
+    uint8_t _pad0[3];
+    float suspensionLength;
+    float steerAngle;
+    float angularVelocity;
+    AuraVec3 contactNormal;
+} AuraVehicleWheelState;
 
 #ifdef __cplusplus
 }

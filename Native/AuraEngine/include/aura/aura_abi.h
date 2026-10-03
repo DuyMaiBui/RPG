@@ -60,6 +60,11 @@ AuraResultCode Aura_DestroyCharacter(AuraWorldHandle world, uint64_t character);
 AuraResultCode Aura_GetCharacterState(AuraWorldHandle world, uint64_t character, AuraCharacterState* outState);
 AuraResultCode Aura_MoveCharacter(AuraWorldHandle world, uint64_t character, AuraVec3 desiredTranslation, float deltaTime);
 
+AuraResultCode Aura_CreateVehicle(AuraWorldHandle world, const AuraVehicleDesc* desc, AuraVehicleHandle* outVehicle);
+AuraResultCode Aura_DestroyVehicle(AuraWorldHandle world, AuraVehicleHandle vehicle);
+AuraResultCode Aura_SetVehicleInput(AuraWorldHandle world, AuraVehicleHandle vehicle, float forward, float steering, float brake, float handBrake);
+AuraResultCode Aura_GetVehicleWheelState(AuraWorldHandle world, AuraVehicleHandle vehicle, uint32_t wheelIndex, AuraVehicleWheelState* outState);
+
 AuraResultCode Aura_ComputeStateHash(AuraWorldHandle world, uint64_t* outHash);
 
 AuraResultCode Aura_SerializeState(AuraWorldHandle world, uint8_t* buffer, uint32_t capacity, uint32_t* outSize);

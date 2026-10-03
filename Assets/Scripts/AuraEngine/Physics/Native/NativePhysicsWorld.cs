@@ -5,7 +5,7 @@ using AuraEngine.Core;
 
 namespace AuraEngine.Physics.Native
 {
-    public sealed class NativePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsContacts, IPhysicsSerialization
+    public sealed class NativePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly NativeWorldHandle _world;
         private readonly AuraPhysicsMode _mode;
@@ -56,8 +56,9 @@ namespace AuraEngine.Physics.Native
                        AuraPhysicsCapabilities.ShapePlane |
                        AuraPhysicsCapabilities.ShapeTaperedCapsule |
                        AuraPhysicsCapabilities.ShapeTaperedCylinder |
-                           AuraPhysicsCapabilities.ShapeHeightField |
-                           AuraPhysicsCapabilities.Characters;
+                            AuraPhysicsCapabilities.ShapeHeightField |
+                            AuraPhysicsCapabilities.Characters |
+                            AuraPhysicsCapabilities.Vehicles;
             }
         }
 
@@ -171,6 +172,7 @@ namespace AuraEngine.Physics.Native
         IPhysicsJoints IPhysicsWorld.Joints => this;
 
         IPhysicsCharacters IPhysicsWorld.Characters => this;
+        IPhysicsVehicles IPhysicsWorld.Vehicles => this;
 
         IPhysicsContacts IPhysicsWorld.Contacts => this;
 
@@ -237,6 +239,37 @@ namespace AuraEngine.Physics.Native
             if (!character.IsValid)
                 return;
             NativeMethods.Aura_MoveCharacter(_world, ToCharacterHandle(character), NativeVector3.From(desiredTranslation), deltaTime);
+        }
+
+        AuraVehicleId IPhysicsVehicles.CreateVehicle(in AuraVehicleDefinition definition)
+        {
+            if (definition.WheelPositions == null || definition.WheelPositions.Length != 4)
+                return AuraVehicleId.Invalid;
+            var desc = NativeVehicleDesc.From(definition);
+            var result = (AuraResult)NativeMethods.Aura_CreateVehicle(_world, ref desc, out var handle);
+            return result == AuraResult.Success ? handle.ToManaged() : AuraVehicleId.Invalid;
+        }
+
+        AuraResult IPhysicsVehicles.DestroyVehicle(AuraVehicleId vehicle)
+        {
+            return vehicle.IsValid ? (AuraResult)NativeMethods.Aura_DestroyVehicle(_world, NativeVehicleHandle.From(vehicle)) : AuraResult.InvalidHandle;
+        }
+
+        AuraResult IPhysicsVehicles.SetVehicleInput(AuraVehicleId vehicle, float forward, float steering, float brake, float handBrake)
+        {
+            return vehicle.IsValid ? (AuraResult)NativeMethods.Aura_SetVehicleInput(_world, NativeVehicleHandle.From(vehicle), forward, steering, brake, handBrake) : AuraResult.InvalidHandle;
+        }
+
+        bool IPhysicsVehicles.TryGetWheelState(AuraVehicleId vehicle, int wheelIndex, out AuraVehicleWheelState state)
+        {
+            state = default;
+            if (!vehicle.IsValid || wheelIndex < 0)
+                return false;
+            var result = (AuraResult)NativeMethods.Aura_GetVehicleWheelState(_world, NativeVehicleHandle.From(vehicle), (uint)wheelIndex, out var native);
+            if (result != AuraResult.Success)
+                return false;
+            state = native.ToManaged();
+            return true;
         }
 
         private static ulong ToCharacterHandle(AuraCharacterId character) =>

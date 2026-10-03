@@ -189,6 +189,13 @@ AuraResultCode JoltWorld::DestroyBody(AuraBodyHandle body)
     if (slot == nullptr)
         return AURA_INVALID_HANDLE;
 
+    for (size_t index = 0; index < impl_->vehicleSlots.size(); ++index)
+    {
+        Impl::VehicleSlot& vehicle = impl_->vehicleSlots[index];
+        if (vehicle.occupied && vehicle.chassis.index == body.index && vehicle.chassis.generation == body.generation)
+            DestroyVehicle(Impl::MakeVehicleHandle(vehicle, static_cast<int>(index)));
+    }
+
     JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
     impl_->idToSlot.erase(slot->id.GetIndex());
     impl_->shapeFilterGroups.erase(slot->id.GetIndex());

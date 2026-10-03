@@ -60,6 +60,11 @@ public:
     virtual uint32_t CharacterCount() const = 0;
     virtual uint32_t CopyCharacterStates(AuraCharacterState* buffer, uint32_t capacity) const = 0;
     virtual AuraResultCode ApplyCharacterStates(const AuraCharacterState* states, uint32_t count) = 0;
+
+    virtual AuraResultCode CreateVehicle(const AuraVehicleDesc&, AuraVehicleHandle*) { return AURA_UNSUPPORTED_SHAPE; }
+    virtual AuraResultCode DestroyVehicle(AuraVehicleHandle) { return AURA_UNSUPPORTED_SHAPE; }
+    virtual AuraResultCode SetVehicleInput(AuraVehicleHandle, float, float, float, float) { return AURA_UNSUPPORTED_SHAPE; }
+    virtual AuraResultCode GetVehicleWheelState(AuraVehicleHandle, uint32_t, AuraVehicleWheelState*) const { return AURA_UNSUPPORTED_SHAPE; }
 };
 
 IWorld* CreateWorldImpl(const AuraWorldDesc& desc);

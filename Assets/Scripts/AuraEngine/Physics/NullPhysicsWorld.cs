@@ -4,7 +4,7 @@ using AuraEngine.Core;
 
 namespace AuraEngine.Physics
 {
-    public sealed class NullPhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsContacts, IPhysicsSerialization
+    public sealed class NullPhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly List<NullBodySlot> _slots;
         private readonly List<int> _freeSlots = new List<int>();
@@ -103,6 +103,7 @@ namespace AuraEngine.Physics
         IPhysicsJoints IPhysicsWorld.Joints => this;
 
         IPhysicsCharacters IPhysicsWorld.Characters => this;
+        IPhysicsVehicles IPhysicsWorld.Vehicles => this;
 
         IPhysicsContacts IPhysicsWorld.Contacts => this;
 
@@ -127,6 +128,11 @@ namespace AuraEngine.Physics
         void IPhysicsCharacters.MoveCharacter(AuraCharacterId character, AuraVector3 desiredTranslation, float deltaTime)
         {
         }
+
+        AuraVehicleId IPhysicsVehicles.CreateVehicle(in AuraVehicleDefinition definition) => AuraVehicleId.Invalid;
+        AuraResult IPhysicsVehicles.DestroyVehicle(AuraVehicleId vehicle) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsVehicles.SetVehicleInput(AuraVehicleId vehicle, float forward, float steering, float brake, float handBrake) => AuraResult.InvalidHandle;
+        bool IPhysicsVehicles.TryGetWheelState(AuraVehicleId vehicle, int wheelIndex, out AuraVehicleWheelState state) { state = default; return false; }
 
         int IPhysicsContacts.CopyContacts(Span<AuraContact> buffer) => 0;
 

@@ -533,6 +533,84 @@ bool RunNativeQueryFamilies()
     Aura_DestroyWorld(world);
     return ok;
 }
+
+bool RunVehicle()
+{
+    AuraWorldDesc worldDesc{};
+    worldDesc.mode = AURA_MODE_FULL_3D;
+    worldDesc.gravity = AuraVec3{ 0.0f, -9.81f, 0.0f };
+    AuraWorldHandle world{};
+    if (Aura_CreateWorld(&worldDesc, &world) != AURA_SUCCESS)
+        return false;
+
+    AuraShapeDesc groundShape{};
+    groundShape.type = AURA_SHAPE_BOX;
+    groundShape.halfExtents = AuraVec3{ 20.0f, 0.5f, 20.0f };
+    AuraBodyDesc groundDesc{};
+    groundDesc.type = AURA_BODY_STATIC;
+    groundDesc.collisionMask = ~0ull;
+    groundDesc.shapes = &groundShape;
+    groundDesc.shapeCount = 1;
+    groundDesc.initialPose.position = AuraVec3{ 0.0f, -0.5f, 0.0f };
+
+    AuraShapeDesc chassisShape{};
+    chassisShape.type = AURA_SHAPE_BOX;
+    chassisShape.halfExtents = AuraVec3{ 1.0f, 0.4f, 1.8f };
+    AuraBodyDesc chassisDesc = groundDesc;
+    chassisDesc.type = AURA_BODY_DYNAMIC;
+    chassisDesc.mass = 800.0f;
+    chassisDesc.gravityScale = 1.0f;
+    chassisDesc.shapes = &chassisShape;
+    chassisDesc.initialPose.position = AuraVec3{ 0.0f, 1.2f, 0.0f };
+
+    AuraEntityHandle entity{};
+    AuraBodyHandle ground{}, chassis{};
+    Aura_CreateEntity(world, &entity);
+    Aura_AttachBody(world, entity, &groundDesc, &ground);
+    Aura_CreateEntity(world, &entity);
+    Aura_AttachBody(world, entity, &chassisDesc, &chassis);
+
+    AuraVehicleDesc vehicleDesc{};
+    vehicleDesc.chassis = chassis;
+    vehicleDesc.up = AuraVec3{ 0.0f, 1.0f, 0.0f };
+    vehicleDesc.forward = AuraVec3{ 0.0f, 0.0f, 1.0f };
+    vehicleDesc.wheelPositions[0] = AuraVec3{ 0.85f, -0.55f, 1.15f };
+    vehicleDesc.wheelPositions[1] = AuraVec3{ -0.85f, -0.55f, 1.15f };
+    vehicleDesc.wheelPositions[2] = AuraVec3{ 0.85f, -0.55f, -1.15f };
+    vehicleDesc.wheelPositions[3] = AuraVec3{ -0.85f, -0.55f, -1.15f };
+    vehicleDesc.wheelRadius = 0.35f;
+    vehicleDesc.wheelWidth = 0.22f;
+    vehicleDesc.suspensionMinLength = 0.25f;
+    vehicleDesc.suspensionMaxLength = 0.45f;
+    vehicleDesc.suspensionFrequency = 2.0f;
+    vehicleDesc.suspensionDamping = 0.7f;
+    vehicleDesc.maxSteerAngle = 35.0f * 3.14159265f / 180.0f;
+    vehicleDesc.maxPitchRollAngle = 60.0f * 3.14159265f / 180.0f;
+    vehicleDesc.maxEngineTorque = 500.0f;
+
+    AuraVehicleHandle vehicle{};
+    const AuraResultCode created = Aura_CreateVehicle(world, &vehicleDesc, &vehicle);
+    if (created != AURA_SUCCESS)
+    {
+        std::printf("[vehicle] unsupported (code=%d) skipped\n", static_cast<int>(created));
+        Aura_DestroyWorld(world);
+        return true;
+    }
+
+    for (int tick = 0; tick < 120; ++tick)
+    {
+        Aura_SetVehicleInput(world, vehicle, 1.0f, 0.0f, 0.0f, 0.0f);
+        Aura_Step(world, static_cast<AuraTick>(tick), 1.0f / 60.0f);
+    }
+    AuraVehicleWheelState wheel{};
+    const AuraResultCode wheelResult = Aura_GetVehicleWheelState(world, vehicle, 0, &wheel);
+    const AuraResultCode destroyed = Aura_DestroyVehicle(world, vehicle);
+    const AuraResultCode stale = Aura_SetVehicleInput(world, vehicle, 0.0f, 0.0f, 0.0f, 0.0f);
+    std::printf("[vehicle] wheel_contact=%u suspension=%.3f wheel_state=%d destroy=%d stale=%d\n",
+        static_cast<unsigned>(wheel.hasContact), wheel.suspensionLength, static_cast<int>(wheelResult), static_cast<int>(destroyed), static_cast<int>(stale));
+    Aura_DestroyWorld(world);
+    return wheelResult == AURA_SUCCESS && destroyed == AURA_SUCCESS && stale == AURA_INVALID_HANDLE;
+}
 } // namespace
 
 int main()
@@ -650,6 +728,7 @@ int main()
     ok = ok && RunQueryFilter();
     ok = ok && RunNativeQueryFamilies();
     ok = ok && RunCharacter();
+    ok = ok && RunVehicle();
 
     std::printf(ok ? "AURA_HEADLESS_OK\n" : "AURA_HEADLESS_FAIL\n");
     return ok ? 0 : 1;

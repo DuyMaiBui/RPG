@@ -56,6 +56,11 @@ public:
     uint32_t CopyCharacterStates(AuraCharacterState* buffer, uint32_t capacity) const override;
     AuraResultCode ApplyCharacterStates(const AuraCharacterState* states, uint32_t count) override;
 
+    AuraResultCode CreateVehicle(const AuraVehicleDesc& desc, AuraVehicleHandle* outVehicle) override;
+    AuraResultCode DestroyVehicle(AuraVehicleHandle vehicle) override;
+    AuraResultCode SetVehicleInput(AuraVehicleHandle vehicle, float forward, float steering, float brake, float handBrake) override;
+    AuraResultCode GetVehicleWheelState(AuraVehicleHandle vehicle, uint32_t wheelIndex, AuraVehicleWheelState* outState) const override;
+
 private:
     struct Impl;
     static Impl* CreateImpl(const AuraWorldDesc& desc);
