@@ -36,6 +36,7 @@ namespace AuraEngine.Core
         ShapeHeightField = 1 << 20,
         Vehicles = 1 << 21,
         SoftBodies = 1 << 22,
+        Hair = 1 << 23,
 
         All = ~0,
     }

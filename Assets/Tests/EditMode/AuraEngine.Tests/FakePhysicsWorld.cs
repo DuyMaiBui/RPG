@@ -5,7 +5,7 @@ using AuraEngine.Physics;
 
 namespace AuraEngine.Tests
 {
-    public sealed class FakePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsContacts, IPhysicsSerialization
+    public sealed class FakePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsHair, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly List<AuraPhysicsEvent> _events;
         private readonly List<FakePhysicsBody> _bodies = new List<FakePhysicsBody>();
@@ -124,6 +124,11 @@ namespace AuraEngine.Tests
         IPhysicsVehicles IPhysicsWorld.Vehicles => this;
         IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;
         IPhysicsRagdolls IPhysicsWorld.Ragdolls => this;
+        IPhysicsHair IPhysicsWorld.Hair => this;
+
+        AuraHairId IPhysicsHair.CreateHair(in AuraHairDefinition definition) => AuraHairId.Invalid;
+        AuraResult IPhysicsHair.DestroyHair(AuraHairId hair) => AuraResult.InvalidHandle;
+        bool IPhysicsHair.TryGetState(AuraHairId hair, out AuraHairState state) { state = default; return false; }
 
         AuraRagdollId IPhysicsRagdolls.CreateRagdoll(in AuraRagdollDefinition definition) => AuraRagdollId.Invalid;
         AuraResult IPhysicsRagdolls.DestroyRagdoll(AuraRagdollId ragdoll) => AuraResult.InvalidHandle;

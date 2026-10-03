@@ -5,7 +5,7 @@ using AuraEngine.Core;
 
 namespace AuraEngine.Physics.Native
 {
-    public sealed class NativePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsContacts, IPhysicsSerialization
+    public sealed class NativePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsHair, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly NativeWorldHandle _world;
         private readonly AuraPhysicsMode _mode;
@@ -176,6 +176,7 @@ namespace AuraEngine.Physics.Native
         IPhysicsVehicles IPhysicsWorld.Vehicles => this;
         IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;
         IPhysicsRagdolls IPhysicsWorld.Ragdolls => this;
+        IPhysicsHair IPhysicsWorld.Hair => this;
 
         IPhysicsContacts IPhysicsWorld.Contacts => this;
 
@@ -319,6 +320,10 @@ namespace AuraEngine.Physics.Native
         AuraResult IPhysicsRagdolls.DestroyRagdoll(AuraRagdollId ragdoll) => AuraResult.InvalidHandle;
         AuraResult IPhysicsRagdolls.GetPose(AuraRagdollId ragdoll, Span<AuraPose> poses) => AuraResult.InvalidHandle;
         AuraResult IPhysicsRagdolls.SetPose(AuraRagdollId ragdoll, ReadOnlySpan<AuraPose> poses) => AuraResult.InvalidHandle;
+
+        AuraHairId IPhysicsHair.CreateHair(in AuraHairDefinition definition) => AuraHairId.Invalid;
+        AuraResult IPhysicsHair.DestroyHair(AuraHairId hair) => AuraResult.UnsupportedShape;
+        bool IPhysicsHair.TryGetState(AuraHairId hair, out AuraHairState state) { state = default; return false; }
 
         bool IPhysicsSoftBodies.TryGetState(AuraSoftBodyId softBody, out AuraSoftBodyState state)
         {

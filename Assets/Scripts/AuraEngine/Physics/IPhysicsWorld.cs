@@ -17,6 +17,7 @@ namespace AuraEngine.Physics
         IPhysicsVehicles Vehicles { get; }
         IPhysicsSoftBodies SoftBodies { get; }
         IPhysicsRagdolls Ragdolls { get; }
+        IPhysicsHair Hair { get; }
 
         IPhysicsContacts Contacts { get; }
 
