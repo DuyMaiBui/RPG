@@ -2,27 +2,29 @@ using AuraEngine.Core;
 using AuraEngine.Unity;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace AuraEngine.EditorTools
 {
-    /* Scene-view authoring for Aura colliders. Draws a depth-tested wireframe
-       (so parts behind geometry look dimmer, like the built-in sphere radius
-       handle) together with the radius/height drag points.
+    /* Scene-view authoring for Aura colliders.
 
-         Sphere           one radius handle (unchanged)
-         Box              twelve edges + six face points
-         Cylinder         two rings + four vertical ties + four radius points
-         TaperedCylinder  two rings (bottom/top radius points) + four ties
-         Capsule          body rings + a half sphere on each cap + radius/height
-         TaperedCapsule   tapered body rings + a half sphere on each cap
+       The wireframe and the drag handles are drawn twice: once with
+       CompareFunction.LessEqual (visible in front, full color) and once with
+       CompareFunction.Greater (occluded by geometry, faded). Handles are solid
+       white billboard squares.
 
-       The wireframe and the handles are both drawn in the Handles pass so they
-       share the same depth testing as the native sphere handle. */
+         Sphere           radius handle (unchanged) + two rings
+         Box              twelve edges + six face squares
+         Cylinder         two rings + four vertical ties + four radius squares
+         TaperedCylinder  bottom/top radius squares + four ties
+         Capsule          body rings + a half sphere on each cap (no seam rings)
+         TaperedCapsule   tapered body + a half sphere on each cap */
     [InitializeOnLoad]
     public static class AuraColliderHandles
     {
-        private const int RingSegments = 32;
-        private const int HalfSphereSegments = 10;
+        private const int RingSegments = 48;
+        private const int HalfSphereMeridians = 4;
+        private const int HalfSphereSegments = 20;
 
         private static readonly Vector3[] Ties =
         {
@@ -34,6 +36,9 @@ namespace AuraEngine.EditorTools
 
         private static readonly Color SolidColor = new Color(1f, 0.6f, 0.1f);
         private static readonly Color TriggerColor = new Color(0.2f, 0.8f, 1f);
+        private static readonly Color OccludedColor = new Color(1f, 1f, 1f, 0.25f);
+        private static readonly Color HandleColor = Color.white;
+        private static readonly Color HandleOccluded = new Color(1f, 1f, 1f, 0.35f);
 
         static AuraColliderHandles()
         {
@@ -79,36 +84,21 @@ namespace AuraEngine.EditorTools
             if (MoveCenter(collider, serialized, centerProperty, transform, ref world, rotation))
                 return;
 
-            switch (collider.ShapeType)
-            {
-                case AuraShapeType.Sphere:
-                    DrawSphere(collider, serialized, radiusProperty, world, rotation, color);
-                    break;
+            /* Front pass draws the wireframe; the occluded pass fades anything
+               hidden behind geometry. Handles are drawn once, on top, so they
+               stay easy to grab. */
+            Handles.zTest = CompareFunction.LessEqual;
+            DrawShapes(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation, color);
+            DrawHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation);
 
-                case AuraShapeType.Box:
-                    DrawBox(collider, serialized, sizeProperty, world, rotation, color);
-                    break;
+            Handles.zTest = CompareFunction.Greater;
+            var occluded = OccludedColor;
+            occluded.r = color.r;
+            occluded.g = color.g;
+            occluded.b = color.b;
+            DrawShapes(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation, occluded);
 
-                case AuraShapeType.Cylinder:
-                    DrawCylinder(collider, serialized, radiusProperty, radiusProperty, heightProperty, world, rotation, color, false);
-                    break;
-
-                case AuraShapeType.TaperedCylinder:
-                    DrawCylinder(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, world, rotation, color, false);
-                    break;
-
-                case AuraShapeType.Capsule:
-                    DrawCylinder(collider, serialized, radiusProperty, radiusProperty, heightProperty, world, rotation, color, true);
-                    break;
-
-                case AuraShapeType.TaperedCapsule:
-                    DrawCylinder(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, world, rotation, color, true);
-                    break;
-
-                case AuraShapeType.Plane:
-                    DrawPlaneNormal(collider, serialized, normalProperty, world, rotation);
-                    break;
-            }
+            Handles.zTest = CompareFunction.Always;
         }
 
         private static bool MoveCenter(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty centerProperty, Transform transform, ref Vector3 world, Quaternion rotation)
@@ -125,35 +115,63 @@ namespace AuraEngine.EditorTools
             return true;
         }
 
-        private static void DrawSphere(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty radiusProperty, Vector3 world, Quaternion rotation, Color color)
-        {
-            if (radiusProperty == null)
-                return;
-
-            Handles.color = color;
-            Handles.DrawWireDisc(world, rotation * Vector3.up, radiusProperty.floatValue);
-            Handles.DrawWireDisc(world, rotation * Vector3.right, radiusProperty.floatValue);
-
-            var radius = Handles.RadiusHandle(rotation, world, radiusProperty.floatValue);
-            if (Mathf.Approximately(radius, radiusProperty.floatValue))
-                return;
-
-            Undo.RecordObject(collider, "Resize Aura Collider");
-            radiusProperty.floatValue = Mathf.Max(0.001f, radius);
-            serialized.ApplyModifiedProperties();
-            MarkDirty(collider);
-        }
-
-        private static void DrawCylinder(
+        private static void DrawShapes(
             AuraColliderAuthoring collider,
             SerializedObject serialized,
-            SerializedProperty bottomRadiusProperty,
+            SerializedProperty radiusProperty,
             SerializedProperty topRadiusProperty,
             SerializedProperty heightProperty,
+            SerializedProperty sizeProperty,
+            SerializedProperty normalProperty,
             Vector3 world,
             Quaternion rotation,
-            Color color,
-            bool rounded)
+            Color color)
+        {
+            Handles.color = color;
+            switch (collider.ShapeType)
+            {
+                case AuraShapeType.Sphere:
+                    if (radiusProperty != null)
+                    {
+                        var r = radiusProperty.floatValue;
+                        DrawRing(world, rotation, r);
+                        Handles.DrawWireDisc(world, rotation * Vector3.up, r);
+                    }
+                    break;
+
+                case AuraShapeType.Box:
+                    if (sizeProperty != null)
+                        DrawBoxWire(world, rotation, sizeProperty.vector3Value * 0.5f);
+                    break;
+
+                case AuraShapeType.Cylinder:
+                    DrawBody(world, rotation, radiusProperty, radiusProperty, heightProperty, false);
+                    break;
+
+                case AuraShapeType.TaperedCylinder:
+                    DrawBody(world, rotation, radiusProperty, topRadiusProperty, heightProperty, false);
+                    break;
+
+                case AuraShapeType.Capsule:
+                    DrawBody(world, rotation, radiusProperty, radiusProperty, heightProperty, true);
+                    break;
+
+                case AuraShapeType.TaperedCapsule:
+                    DrawBody(world, rotation, radiusProperty, topRadiusProperty, heightProperty, true);
+                    break;
+
+                case AuraShapeType.Plane:
+                    if (normalProperty != null)
+                    {
+                        var normal = (rotation * normalProperty.vector3Value.normalized).normalized;
+                        Handles.DrawWireDisc(world, normal, 1f);
+                        Handles.DrawLine(world, world + normal);
+                    }
+                    break;
+            }
+        }
+
+        private static void DrawBody(Vector3 world, Quaternion rotation, SerializedProperty bottomRadiusProperty, SerializedProperty topRadiusProperty, SerializedProperty heightProperty, bool rounded)
         {
             if (bottomRadiusProperty == null || topRadiusProperty == null || heightProperty == null)
                 return;
@@ -163,13 +181,12 @@ namespace AuraEngine.EditorTools
             var topRadius = Mathf.Max(0.0001f, topRadiusProperty.floatValue);
             var up = rotation * Vector3.up;
             var half = height * 0.5f;
-            var bodyHalf = rounded ? Mathf.Max(0f, half - bottomRadius) : half;
+            var bodyHalfBottom = rounded ? Mathf.Max(0f, half - bottomRadius) : half;
             var bodyHalfTop = rounded ? Mathf.Max(0f, half - topRadius) : half;
 
-            var bottom = world - up * bodyHalf;
+            var bottom = world - up * bodyHalfBottom;
             var top = world + up * bodyHalfTop;
 
-            Handles.color = color;
             DrawRing(bottom, rotation, bottomRadius);
             DrawRing(top, rotation, topRadius);
             for (var index = 0; index < Ties.Length; index++)
@@ -178,31 +195,97 @@ namespace AuraEngine.EditorTools
                 Handles.DrawLine(bottom + direction * bottomRadius, top + direction * topRadius);
             }
 
-            if (rounded)
-            {
-                DrawHalfSphere(bottom, rotation, bottomRadius, false);
-                DrawHalfSphere(top, rotation, topRadius, true);
-            }
+            if (!rounded)
+                return;
 
-            DrawRadiusPoints(collider, serialized, bottomRadiusProperty, bottom, rotation, bottomRadius);
-            var topRadiusUpdated = DrawRadiusPoints(collider, serialized, topRadiusProperty, top, rotation, topRadius);
-            if (topRadiusUpdated)
-            {
-                heightProperty.floatValue = Mathf.Max(0.001f, height);
-                serialized.ApplyModifiedProperties();
-            }
-
-            DrawHeight(collider, serialized, heightProperty, world, up);
+            DrawHalfSphere(bottom, rotation, bottomRadius, false);
+            DrawHalfSphere(top, rotation, topRadius, true);
         }
 
-        /* Draws the four radius points on a ring; returns true when the radius
-           changed. Dragging any point sets the shared radius from the distance
-           to the held point. */
-        private static bool DrawRadiusPoints(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 center, Quaternion rotation, float radius)
+        private static void DrawHandles(
+            AuraColliderAuthoring collider,
+            SerializedObject serialized,
+            SerializedProperty radiusProperty,
+            SerializedProperty topRadiusProperty,
+            SerializedProperty heightProperty,
+            SerializedProperty sizeProperty,
+            SerializedProperty normalProperty,
+            Vector3 world,
+            Quaternion rotation)
+        {
+            switch (collider.ShapeType)
+            {
+                case AuraShapeType.Sphere:
+                    if (radiusProperty != null)
+                        DrawRadius(collider, serialized, radiusProperty, world, rotation);
+                    break;
+
+                case AuraShapeType.Box:
+                    DrawBoxHandles(collider, serialized, sizeProperty, world, rotation);
+                    break;
+
+                case AuraShapeType.Cylinder:
+                    DrawBodyHandles(collider, serialized, radiusProperty, radiusProperty, heightProperty, world, rotation);
+                    break;
+
+                case AuraShapeType.TaperedCylinder:
+                case AuraShapeType.TaperedCapsule:
+                    DrawBodyHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, world, rotation);
+                    break;
+
+                case AuraShapeType.Capsule:
+                    DrawBodyHandles(collider, serialized, radiusProperty, radiusProperty, heightProperty, world, rotation);
+                    break;
+
+                case AuraShapeType.Plane:
+                    if (normalProperty != null)
+                        DrawPlaneNormal(collider, serialized, normalProperty, world, rotation);
+                    break;
+            }
+        }
+
+        private static void DrawRadius(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 world, Quaternion rotation)
+        {
+            Handles.color = HandleColor;
+            var radius = Handles.RadiusHandle(rotation, world, property.floatValue);
+            if (Mathf.Approximately(radius, property.floatValue))
+                return;
+
+            Undo.RecordObject(collider, "Resize Aura Collider");
+            property.floatValue = Mathf.Max(0.001f, radius);
+            serialized.ApplyModifiedProperties();
+            MarkDirty(collider);
+        }
+
+        private static void DrawBodyHandles(
+            AuraColliderAuthoring collider,
+            SerializedObject serialized,
+            SerializedProperty bottomRadiusProperty,
+            SerializedProperty topRadiusProperty,
+            SerializedProperty heightProperty,
+            Vector3 world,
+            Quaternion rotation)
+        {
+            if (bottomRadiusProperty == null || topRadiusProperty == null || heightProperty == null)
+                return;
+
+            var height = Mathf.Max(0.001f, heightProperty.floatValue);
+            var up = rotation * Vector3.up;
+            var half = height * 0.5f;
+            var bottom = world - up * half;
+            var top = world + up * half;
+
+            Handles.color = HandleColor;
+            DrawRadiusSquares(collider, serialized, bottomRadiusProperty, bottom, rotation, Mathf.Max(0.0001f, bottomRadiusProperty.floatValue));
+            DrawRadiusSquares(collider, serialized, topRadiusProperty, top, rotation, Mathf.Max(0.0001f, topRadiusProperty.floatValue));
+            DrawHeightHandle(collider, serialized, heightProperty, world, up);
+        }
+
+        private static void DrawRadiusSquares(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 center, Quaternion rotation, float radius)
         {
             var changed = false;
             var updated = radius;
-            var handleSize = HandleUtility.GetHandleSize(center) * 0.06f;
+            var size = HandleUtility.GetHandleSize(center) * 0.07f;
 
             for (var index = 0; index < Ties.Length; index++)
             {
@@ -210,42 +293,78 @@ namespace AuraEngine.EditorTools
                 var position = center + direction * radius;
 
                 EditorGUI.BeginChangeCheck();
-                var moved = Handles.FreeMoveHandle(position, handleSize, Vector3.zero, Handles.CircleHandleCap);
+                var moved = Handles.FreeMoveHandle(position, size, Vector3.zero, CubeHandleCap);
                 if (!EditorGUI.EndChangeCheck())
                     continue;
 
-                var projected = Vector3.Dot(moved - center, direction);
-                updated = Mathf.Max(0.0001f, projected);
+                updated = Mathf.Max(0.0001f, Vector3.Dot(moved - center, direction));
                 changed = true;
             }
 
             if (!changed)
-                return false;
+                return;
 
             Undo.RecordObject(collider, "Resize Aura Collider");
             property.floatValue = updated;
             serialized.ApplyModifiedProperties();
             MarkDirty(collider);
-            return true;
         }
 
-        private static void DrawHeight(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 world, Vector3 up)
+        private static void DrawHeightHandle(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 world, Vector3 up)
         {
             var half = Mathf.Max(0.001f, property.floatValue) * 0.5f;
-            var handleSize = HandleUtility.GetHandleSize(world) * 0.06f;
+            var size = HandleUtility.GetHandleSize(world) * 0.07f;
             var top = world + up * half;
             var bottom = world - up * half;
 
-            Handles.color = new Color(1f, 0.6f, 0.1f);
-            var newTop = Handles.Slider(top, up, handleSize, Handles.SphereHandleCap, 0f);
-            var newBottom = Handles.Slider(bottom, -up, handleSize, Handles.SphereHandleCap, 0f);
-
+            Handles.color = HandleColor;
+            var newTop = Handles.Slider(top, up, size, CubeHandleCap, 0f);
+            var newBottom = Handles.Slider(bottom, -up, size, CubeHandleCap, 0f);
             if (newTop == top && newBottom == bottom)
                 return;
 
             var height = Vector3.Dot(newTop - newBottom, up);
             Undo.RecordObject(collider, "Resize Aura Collider");
             property.floatValue = Mathf.Max(0.001f, height);
+            serialized.ApplyModifiedProperties();
+            MarkDirty(collider);
+        }
+
+        private static void DrawBoxHandles(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 world, Quaternion rotation)
+        {
+            if (property == null)
+                return;
+
+            var current = property.vector3Value;
+            current = new Vector3(Mathf.Max(0.001f, current.x), Mathf.Max(0.001f, current.y), Mathf.Max(0.001f, current.z));
+            var extents = current * 0.5f;
+            var axes = new[] { Vector3.right, Vector3.up, Vector3.forward };
+            var size = HandleUtility.GetHandleSize(world) * 0.07f;
+            var changed = false;
+
+            Handles.color = HandleColor;
+            for (var axis = 0; axis < 3; axis++)
+            {
+                for (var side = -1; side <= 1; side += 2)
+                {
+                    var worldDirection = rotation * (axes[axis] * side);
+                    var position = world + worldDirection * extents[axis];
+
+                    EditorGUI.BeginChangeCheck();
+                    var moved = Handles.FreeMoveHandle(position, size, Vector3.zero, CubeHandleCap);
+                    if (!EditorGUI.EndChangeCheck())
+                        continue;
+
+                    current[axis] = Mathf.Max(0.001f, Vector3.Dot(moved - world, worldDirection) * 2f);
+                    changed = true;
+                }
+            }
+
+            if (!changed)
+                return;
+
+            Undo.RecordObject(collider, "Resize Aura Collider");
+            property.vector3Value = current;
             serialized.ApplyModifiedProperties();
             MarkDirty(collider);
         }
@@ -262,16 +381,17 @@ namespace AuraEngine.EditorTools
             }
         }
 
-        /* Half sphere on a cap, matching how the sphere collider is drawn. */
+        /* Half sphere on a cap. No seam ring is drawn where the cap meets the
+           body: the body ring already marks that boundary. */
         private static void DrawHalfSphere(Vector3 center, Quaternion rotation, float radius, bool top)
         {
             var axis = rotation * Vector3.up * (top ? 1f : -1f);
             var right = rotation * Vector3.right;
             var forward = rotation * Vector3.forward;
 
-            for (var meridian = 0; meridian < 2; meridian++)
+            for (var meridian = 0; meridian < HalfSphereMeridians; meridian++)
             {
-                var planeAxis = meridian == 0 ? right : forward;
+                var planeAxis = rotation * Quaternion.AngleAxis(meridian * 180f / HalfSphereMeridians, Vector3.up) * Vector3.right;
                 var previous = center + planeAxis * radius;
                 for (var index = 1; index <= HalfSphereSegments; index++)
                 {
@@ -281,60 +401,6 @@ namespace AuraEngine.EditorTools
                     previous = point;
                 }
             }
-
-            var ringCenter = center + axis * radius;
-            var ringPrevious = ringCenter + right * radius;
-            for (var index = 1; index <= RingSegments; index++)
-            {
-                var angle = index * Mathf.PI * 2f / RingSegments;
-                var point = ringCenter + right * (Mathf.Cos(angle) * radius) + forward * (Mathf.Sin(angle) * radius);
-                Handles.DrawLine(ringPrevious, point);
-                ringPrevious = point;
-            }
-        }
-
-        private static void DrawBox(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 world, Quaternion rotation, Color color)
-        {
-            if (property == null)
-                return;
-
-            var current = property.vector3Value;
-            current = new Vector3(Mathf.Max(0.001f, current.x), Mathf.Max(0.001f, current.y), Mathf.Max(0.001f, current.z));
-            var extents = current * 0.5f;
-
-            Handles.color = color;
-            DrawBoxWire(world, rotation, extents);
-
-            var axes = new[] { Vector3.right, Vector3.up, Vector3.forward };
-            var handleSize = HandleUtility.GetHandleSize(world) * 0.06f;
-            var changed = false;
-
-            for (var axis = 0; axis < 3; axis++)
-            {
-                for (var side = -1; side <= 1; side += 2)
-                {
-                    var localDirection = axes[axis] * side;
-                    var worldDirection = rotation * localDirection;
-                    var position = world + worldDirection * extents[axis];
-
-                    EditorGUI.BeginChangeCheck();
-                    var moved = Handles.FreeMoveHandle(position, handleSize, Vector3.zero, Handles.CircleHandleCap);
-                    if (!EditorGUI.EndChangeCheck())
-                        continue;
-
-                    var extent = Vector3.Dot(moved - world, worldDirection);
-                    current[axis] = Mathf.Max(0.001f, extent * 2f);
-                    changed = true;
-                }
-            }
-
-            if (!changed)
-                return;
-
-            Undo.RecordObject(collider, "Resize Aura Collider");
-            property.vector3Value = current;
-            serialized.ApplyModifiedProperties();
-            MarkDirty(collider);
         }
 
         private static void DrawBoxWire(Vector3 center, Quaternion rotation, Vector3 extents)
@@ -362,17 +428,11 @@ namespace AuraEngine.EditorTools
 
         private static void DrawPlaneNormal(AuraColliderAuthoring collider, SerializedObject serialized, SerializedProperty property, Vector3 world, Quaternion rotation)
         {
-            if (property == null)
-                return;
-
             var localNormal = property.vector3Value.sqrMagnitude < 1e-6f ? Vector3.up : property.vector3Value.normalized;
             var worldNormal = (rotation * localNormal).normalized;
             var handleRotation = Quaternion.LookRotation(worldNormal, Mathf.Abs(Vector3.Dot(worldNormal, Vector3.up)) > 0.99f ? Vector3.right : Vector3.up);
 
-            Handles.color = new Color(1f, 0.6f, 0.1f);
-            Handles.DrawWireDisc(world, worldNormal, 1f);
-            Handles.DrawLine(world, world + worldNormal);
-
+            Handles.color = HandleColor;
             EditorGUI.BeginChangeCheck();
             var newRotation = Handles.RotationHandle(handleRotation, world);
             if (!EditorGUI.EndChangeCheck())
@@ -382,6 +442,32 @@ namespace AuraEngine.EditorTools
             property.vector3Value = Quaternion.Inverse(rotation) * (newRotation * Vector3.forward);
             serialized.ApplyModifiedProperties();
             MarkDirty(collider);
+        }
+
+        /* CubeHandleCap looks 3D; a billboard quad reads as a flat white square
+           facing the camera. It is drawn through Handles.RectangleHandleCap's
+           wireframe plus a filled quad via Handles.DrawSolidRectangleWithOutline. */
+        private static void CubeHandleCap(int controlId, Vector3 position, Quaternion rotation, float size, EventType eventType)
+        {
+            if (eventType != EventType.Repaint && eventType != EventType.Layout)
+                return;
+
+            if (eventType == EventType.Layout)
+            {
+                HandleUtility.AddControl(controlId, HandleUtility.DistanceToRectangle(position, rotation, size));
+                return;
+            }
+
+            var camera = Camera.current;
+            var normal = camera != null ? (camera.transform.position - position).normalized : rotation * Vector3.forward;
+            var billboard = Quaternion.LookRotation(normal, camera != null ? camera.transform.up : Vector3.up);
+            var half = size * 0.5f;
+            var a = position + billboard * new Vector3(-half, -half, 0f);
+            var b = position + billboard * new Vector3(half, -half, 0f);
+            var c = position + billboard * new Vector3(half, half, 0f);
+            var d = position + billboard * new Vector3(-half, half, 0f);
+
+            Handles.DrawSolidRectangleWithOutline(new[] { a, b, c, d }, HandleColor, HandleColor);
         }
 
         private static void MarkDirty(Object target)
