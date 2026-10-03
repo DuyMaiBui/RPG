@@ -5,7 +5,7 @@ using AuraEngine.Physics;
 
 namespace AuraEngine.Tests
 {
-    public sealed class FakePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsContacts, IPhysicsSerialization
+    public sealed class FakePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly List<AuraPhysicsEvent> _events;
         private readonly List<FakePhysicsBody> _bodies = new List<FakePhysicsBody>();
@@ -123,6 +123,17 @@ namespace AuraEngine.Tests
 
         IPhysicsVehicles IPhysicsWorld.Vehicles => this;
         IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;
+        IPhysicsRagdolls IPhysicsWorld.Ragdolls => this;
+
+        AuraRagdollId IPhysicsRagdolls.CreateRagdoll(in AuraRagdollDefinition definition) => AuraRagdollId.Invalid;
+        AuraResult IPhysicsRagdolls.DestroyRagdoll(AuraRagdollId ragdoll) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsRagdolls.GetPose(AuraRagdollId ragdoll, Span<AuraPose> poses) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsRagdolls.SetPose(AuraRagdollId ragdoll, ReadOnlySpan<AuraPose> poses) => AuraResult.InvalidHandle;
+
+        AuraWaterId IPhysicsWorld.CreateWater(in AuraWaterDefinition definition) => AuraWaterId.Invalid;
+        AuraResult IPhysicsWorld.DestroyWater(AuraWaterId water) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsWorld.SetWaterParameters(AuraWaterId water, in AuraWaterDefinition definition) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsWorld.ApplyWaterStep(AuraWaterId water, float deltaTime) => AuraResult.InvalidHandle;
 
         AuraVehicleId IPhysicsVehicles.CreateVehicle(in AuraVehicleDefinition definition) => AuraVehicleId.Invalid;
 

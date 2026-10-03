@@ -21,6 +21,8 @@ set(AURA_SOURCES
     src/capi/aura_capi_character.cpp
     src/capi/aura_capi_vehicle.cpp
     src/capi/aura_capi_softbody.cpp
+    src/capi/aura_capi_ragdoll.cpp
+    src/capi/aura_capi_water.cpp
     src/capi/aura_capi_snapshot.cpp
 )
 
@@ -55,7 +57,8 @@ if(AURA_USE_JOLT)
         src/physics/jolt/aura_jolt_vehicle.cpp
         src/physics/jolt/aura_jolt_vehicle_registry.cpp
          src/physics/jolt/aura_jolt_softbody.cpp
-         src/physics/jolt/aura_jolt_softbody_registry.cpp)
+         src/physics/jolt/aura_jolt_softbody_registry.cpp
+         src/physics/jolt/aura_jolt_ragdoll.cpp)
 endif()
 
 if(AURA_USE_BOX2D)
@@ -77,7 +80,7 @@ endif()
 
 add_library(aura_native STATIC ${AURA_SOURCES})
 target_include_directories(aura_native PUBLIC include PRIVATE src)
-target_compile_definitions(aura_native PUBLIC AURA_ENGINE_ABI_VERSION=8)
+target_compile_definitions(aura_native PUBLIC AURA_ENGINE_ABI_VERSION=9)
 set_target_properties(aura_native PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(AURA_USE_JOLT)
@@ -93,7 +96,7 @@ endif()
 if(AURA_BUILD_PLUGIN)
     add_library(aura_shared SHARED ${AURA_SOURCES})
     target_include_directories(aura_shared PUBLIC include PRIVATE src)
-    target_compile_definitions(aura_shared PUBLIC AURA_ENGINE_ABI_VERSION=8)
+    target_compile_definitions(aura_shared PUBLIC AURA_ENGINE_ABI_VERSION=9)
     set_target_properties(aura_shared PROPERTIES OUTPUT_NAME aura)
     if(AURA_USE_JOLT)
         target_compile_definitions(aura_shared PRIVATE AURA_USE_JOLT=1 JPH_ENABLE_ASSERTS=1)

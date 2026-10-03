@@ -5,7 +5,7 @@ using AuraEngine.Core;
 
 namespace AuraEngine.Physics.Native
 {
-    public sealed class NativePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsContacts, IPhysicsSerialization
+    public sealed class NativePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly NativeWorldHandle _world;
         private readonly AuraPhysicsMode _mode;
@@ -175,6 +175,7 @@ namespace AuraEngine.Physics.Native
         IPhysicsCharacters IPhysicsWorld.Characters => this;
         IPhysicsVehicles IPhysicsWorld.Vehicles => this;
         IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;
+        IPhysicsRagdolls IPhysicsWorld.Ragdolls => this;
 
         IPhysicsContacts IPhysicsWorld.Contacts => this;
 
@@ -313,6 +314,11 @@ namespace AuraEngine.Physics.Native
 
         AuraResult IPhysicsSoftBodies.DestroySoftBody(AuraSoftBodyId softBody) =>
             softBody.IsValid ? (AuraResult)NativeMethods.Aura_DestroySoftBody(_world, NativeSoftBodyHandle.From(softBody)) : AuraResult.InvalidHandle;
+
+        AuraRagdollId IPhysicsRagdolls.CreateRagdoll(in AuraRagdollDefinition definition) => AuraRagdollId.Invalid;
+        AuraResult IPhysicsRagdolls.DestroyRagdoll(AuraRagdollId ragdoll) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsRagdolls.GetPose(AuraRagdollId ragdoll, Span<AuraPose> poses) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsRagdolls.SetPose(AuraRagdollId ragdoll, ReadOnlySpan<AuraPose> poses) => AuraResult.InvalidHandle;
 
         bool IPhysicsSoftBodies.TryGetState(AuraSoftBodyId softBody, out AuraSoftBodyState state)
         {
@@ -474,6 +480,21 @@ namespace AuraEngine.Physics.Native
         }
 
         void IPhysicsWorld.Step(float deltaTime) => NativeMethods.Aura_Step(_world, 0u, deltaTime);
+
+        AuraWaterId IPhysicsWorld.CreateWater(in AuraWaterDefinition definition)
+        {
+            var desc = NativeWaterDesc.From(definition);
+            var result = (AuraResult)NativeMethods.Aura_CreateWater(_world, ref desc, out var handle);
+            return result == AuraResult.Success ? new AuraWaterId(handle.Opaque) : AuraWaterId.Invalid;
+        }
+        AuraResult IPhysicsWorld.DestroyWater(AuraWaterId water) => water.IsValid ? (AuraResult)NativeMethods.Aura_DestroyWater(_world, new NativeWaterHandle { Opaque = water.Value }) : AuraResult.InvalidHandle;
+        AuraResult IPhysicsWorld.SetWaterParameters(AuraWaterId water, in AuraWaterDefinition definition)
+        {
+            if (!water.IsValid) return AuraResult.InvalidHandle;
+            var desc = NativeWaterDesc.From(definition);
+            return (AuraResult)NativeMethods.Aura_SetWaterParameters(_world, new NativeWaterHandle { Opaque = water.Value }, ref desc);
+        }
+        AuraResult IPhysicsWorld.ApplyWaterStep(AuraWaterId water, float deltaTime) => water.IsValid ? (AuraResult)NativeMethods.Aura_ApplyWaterStep(_world, new NativeWaterHandle { Opaque = water.Value }, deltaTime) : AuraResult.InvalidHandle;
 
         int IPhysicsEventSource.CopyEvents(Span<AuraPhysicsEvent> buffer)
         {

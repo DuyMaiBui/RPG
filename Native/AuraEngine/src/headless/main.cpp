@@ -652,6 +652,77 @@ bool RunSoftBody()
     Aura_DestroyWorld(world);
     return probe == AURA_CAPACITY_EXCEEDED && read == AURA_SUCCESS && state.vertexCount == 4 && destroyed == AURA_SUCCESS && stale == AURA_INVALID_HANDLE;
 }
+
+bool RunRagdoll()
+{
+    AuraWorldDesc worldDesc{};
+    worldDesc.mode = AURA_MODE_FULL_3D;
+    worldDesc.gravity = AuraVec3{ 0.0f, -9.81f, 0.0f };
+    AuraWorldHandle world{};
+    if (Aura_CreateWorld(&worldDesc, &world) != AURA_SUCCESS)
+        return false;
+
+    AuraShapeDesc shape{};
+    shape.type = AURA_SHAPE_CAPSULE;
+    shape.radius = 0.25f;
+    shape.height = 1.0f;
+    AuraRigJointDesc joints[2]{};
+    joints[0].parentIndex = -1;
+    joints[0].bindPose.rotation.w = 1.0f;
+    joints[0].bindPose.position = AuraVec3{ 0.0f, 2.0f, 0.0f };
+    joints[1].parentIndex = 0;
+    joints[1].bindPose.rotation.w = 1.0f;
+    joints[1].bindPose.position = AuraVec3{ 0.0f, 1.0f, 0.0f };
+
+    AuraRagdollPartDesc parts[2]{};
+    for (int index = 0; index < 2; ++index)
+    {
+        parts[index].body.type = AURA_BODY_DYNAMIC;
+        parts[index].body.layer = 0;
+        parts[index].body.collisionMask = ~0ull;
+        parts[index].body.mass = 1.0f;
+        parts[index].body.gravityScale = 1.0f;
+        parts[index].body.shapes = &shape;
+        parts[index].body.shapeCount = 1;
+        parts[index].body.initialPose = joints[index].bindPose;
+    }
+    parts[1].jointToParent.type = AURA_JOINT_FIXED;
+    parts[1].jointToParent.anchorA = AuraVec3{ 0.0f, 1.5f, 0.0f };
+    parts[1].jointToParent.anchorB = AuraVec3{ 0.0f, 1.5f, 0.0f };
+
+    AuraRagdollDesc desc{};
+    desc.rig.joints = joints;
+    desc.rig.jointCount = 2;
+    desc.parts = parts;
+    desc.partCount = 2;
+    AuraRagdollHandle ragdoll{};
+    const AuraResultCode created = Aura_CreateRagdoll(world, &desc, &ragdoll);
+    if (created != AURA_SUCCESS)
+    {
+        std::printf("[ragdoll] create=%d\n", static_cast<int>(created));
+        Aura_DestroyWorld(world);
+        return false;
+    }
+
+    AuraPose poses[2]{};
+    uint32_t count = 0;
+    const AuraResultCode read = Aura_GetRagdollPose(world, ragdoll, poses, 2, &count);
+    poses[0].position.x += 0.25f;
+    const AuraResultCode set = Aura_SetRagdollPose(world, ragdoll, poses, count);
+    AuraPose roundTrip[2]{};
+    uint32_t roundTripCount = 0;
+    const AuraResultCode reread = Aura_GetRagdollPose(world, ragdoll, roundTrip, 2, &roundTripCount);
+    const AuraResultCode destroyed = Aura_DestroyRagdoll(world, ragdoll);
+    const AuraResultCode stale = Aura_DestroyRagdoll(world, ragdoll);
+    Aura_DestroyWorld(world);
+    const bool ok = read == AURA_SUCCESS && set == AURA_SUCCESS && reread == AURA_SUCCESS
+        && count == 2 && roundTripCount == 2
+        && destroyed == AURA_SUCCESS && stale == AURA_INVALID_HANDLE;
+    std::printf("[ragdoll] read=%d set=%d reread=%d count=%u destroy=%d stale=%d ok=%u\n",
+        static_cast<int>(read), static_cast<int>(set), static_cast<int>(reread), count,
+        static_cast<int>(destroyed), static_cast<int>(stale), static_cast<unsigned>(ok));
+    return ok;
+}
 } // namespace
 
 int main()
@@ -771,6 +842,7 @@ int main()
     ok = ok && RunCharacter();
     ok = ok && RunVehicle();
     ok = ok && RunSoftBody();
+    ok = ok && RunRagdoll();
 
     std::printf(ok ? "AURA_HEADLESS_OK\n" : "AURA_HEADLESS_FAIL\n");
     return ok ? 0 : 1;

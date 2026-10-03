@@ -53,6 +53,7 @@ namespace AuraEngine.KernelTests
                 ("conveyor_drags_body", Conveyor_DragsBody),
                 ("sphere_cast_hits", SphereCast_Hits),
                 ("surface_velocity_roundtrip", SurfaceVelocity_RoundTrip),
+                ("water_buoyancy_lifts_box", Water_BuoyancyLiftsBox),
             };
 
             foreach (var (name, body) in cases)
@@ -586,6 +587,25 @@ namespace AuraEngine.KernelTests
             var entity = FindEntity(world, ball);
             var result = world.SetSurfaceVelocity(entity, new AuraVector3(2f, 0f, 0f));
             Check(result == AuraResult.Success, "SetSurfaceVelocity failed.");
+        }
+
+        private static void Water_BuoyancyLiftsBox()
+        {
+            using var world = NewWorld();
+            var box = world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateDynamic(
+                new AuraPose(new AuraVector3(0f, 0f, 0f), AuraQuaternion.Identity),
+                AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All,
+                AuraPhysicsShapeDefinition.Box(new AuraVector3(0.5f, 0.5f, 0.5f))));
+            var water = world.Physics.CreateWater(new AuraWaterDefinition(0.25f, AuraVector3.UnitY));
+            Check(water.IsValid, "water creation failed.");
+            for (var index = 0; index < 30; index++)
+            {
+                Check(world.Physics.ApplyWaterStep(water, Dt) == AuraResult.Success, "water step failed.");
+                world.Step(new SimulationStep(new SimulationTick((uint)index + 1u), Dt));
+            }
+            world.TryGetBodyState(box, out var state);
+            Check(state.LinearVelocity.Y > 0f, $"water did not lift box, velocity={state.LinearVelocity.Y}.");
+            Check(world.Physics.DestroyWater(water) == AuraResult.Success, "water destroy failed.");
         }
 
         private static void NetPrediction_MatchesServer()

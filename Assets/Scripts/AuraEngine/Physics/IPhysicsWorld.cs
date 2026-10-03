@@ -16,6 +16,7 @@ namespace AuraEngine.Physics
         IPhysicsCharacters Characters { get; }
         IPhysicsVehicles Vehicles { get; }
         IPhysicsSoftBodies SoftBodies { get; }
+        IPhysicsRagdolls Ragdolls { get; }
 
         IPhysicsContacts Contacts { get; }
 
@@ -38,5 +39,9 @@ namespace AuraEngine.Physics
         int CopyBodyStates(Span<AuraBodyState> buffer);
 
         void Step(float deltaTime);
+        AuraWaterId CreateWater(in AuraWaterDefinition definition);
+        AuraResult DestroyWater(AuraWaterId water);
+        AuraResult SetWaterParameters(AuraWaterId water, in AuraWaterDefinition definition);
+        AuraResult ApplyWaterStep(AuraWaterId water, float deltaTime);
     }
 }

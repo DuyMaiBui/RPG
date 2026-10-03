@@ -4,7 +4,7 @@ using AuraEngine.Core;
 
 namespace AuraEngine.Physics
 {
-    public sealed class NullPhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsContacts, IPhysicsSerialization
+    public sealed class NullPhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly List<NullBodySlot> _slots;
         private readonly List<int> _freeSlots = new List<int>();
@@ -105,6 +105,7 @@ namespace AuraEngine.Physics
         IPhysicsCharacters IPhysicsWorld.Characters => this;
         IPhysicsVehicles IPhysicsWorld.Vehicles => this;
         IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;
+        IPhysicsRagdolls IPhysicsWorld.Ragdolls => this;
 
         IPhysicsContacts IPhysicsWorld.Contacts => this;
 
@@ -137,6 +138,10 @@ namespace AuraEngine.Physics
         AuraSoftBodyId IPhysicsSoftBodies.CreateSoftBody(in AuraSoftBodyDefinition definition) => AuraSoftBodyId.Invalid;
         AuraResult IPhysicsSoftBodies.DestroySoftBody(AuraSoftBodyId softBody) => AuraResult.InvalidHandle;
         bool IPhysicsSoftBodies.TryGetState(AuraSoftBodyId softBody, out AuraSoftBodyState state) { state = default; return false; }
+        AuraRagdollId IPhysicsRagdolls.CreateRagdoll(in AuraRagdollDefinition definition) => AuraRagdollId.Invalid;
+        AuraResult IPhysicsRagdolls.DestroyRagdoll(AuraRagdollId ragdoll) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsRagdolls.GetPose(AuraRagdollId ragdoll, Span<AuraPose> poses) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsRagdolls.SetPose(AuraRagdollId ragdoll, ReadOnlySpan<AuraPose> poses) => AuraResult.InvalidHandle;
 
         int IPhysicsContacts.CopyContacts(Span<AuraContact> buffer) => 0;
 
@@ -193,6 +198,11 @@ namespace AuraEngine.Physics
         void IPhysicsWorld.Step(float deltaTime)
         {
         }
+
+        AuraWaterId IPhysicsWorld.CreateWater(in AuraWaterDefinition definition) => definition.Density > 0f ? new AuraWaterId(1) : AuraWaterId.Invalid;
+        AuraResult IPhysicsWorld.DestroyWater(AuraWaterId water) => water.IsValid ? AuraResult.Success : AuraResult.InvalidHandle;
+        AuraResult IPhysicsWorld.SetWaterParameters(AuraWaterId water, in AuraWaterDefinition definition) => water.IsValid && definition.Density > 0f ? AuraResult.Success : AuraResult.InvalidHandle;
+        AuraResult IPhysicsWorld.ApplyWaterStep(AuraWaterId water, float deltaTime) => water.IsValid && deltaTime >= 0f ? AuraResult.Success : AuraResult.InvalidHandle;
 
         bool IPhysicsQuery.Raycast(
             in AuraRay ray,

@@ -37,6 +37,11 @@ namespace AuraEngine.Physics.Native
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         public static extern int Aura_GetBodyState(NativeWorldHandle world, NativeBodyHandle body, out NativeBodyState outState);
 
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_CreateWater(NativeWorldHandle world, ref NativeWaterDesc desc, out NativeWaterHandle outWater);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_DestroyWater(NativeWorldHandle world, NativeWaterHandle water);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetWaterParameters(NativeWorldHandle world, NativeWaterHandle water, ref NativeWaterDesc desc);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_ApplyWaterStep(NativeWorldHandle world, NativeWaterHandle water, float deltaTime);
+
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         public static extern int Aura_CopyBodyStates(NativeWorldHandle world, IntPtr buffer, uint capacity, out uint outCount);
 
@@ -129,5 +134,14 @@ namespace AuraEngine.Physics.Native
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         public static extern int Aura_HasJoint(NativeWorldHandle world, ulong joint, out byte outHas);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_CreateRagdoll(NativeWorldHandle world, ref NativeRagdollDesc desc, out NativeRagdollHandle outRagdoll);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_DestroyRagdoll(NativeWorldHandle world, NativeRagdollHandle ragdoll);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_GetRagdollPose(NativeWorldHandle world, NativeRagdollHandle ragdoll, IntPtr buffer, uint capacity, out uint outCount);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_SetRagdollPose(NativeWorldHandle world, NativeRagdollHandle ragdoll, IntPtr poses, uint poseCount);
     }
 }

@@ -29,6 +29,10 @@ public:
     virtual uint32_t CopyContacts(AuraContact* buffer, uint32_t capacity) const = 0;
 
     virtual AuraResultCode SetSurfaceVelocity(AuraBodyHandle body, const AuraVec3& velocity) = 0;
+    virtual AuraResultCode CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater) = 0;
+    virtual AuraResultCode DestroyWater(AuraWaterHandle water) = 0;
+    virtual AuraResultCode SetWaterParameters(AuraWaterHandle water, const AuraWaterDesc& desc) = 0;
+    virtual AuraResultCode ApplyWaterStep(AuraWaterHandle water, float deltaTime) = 0;
 
     virtual bool Raycast(const AuraRay& ray, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit) = 0;
     virtual uint32_t RaycastAll(const AuraRay& ray, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity) = 0;
@@ -68,6 +72,10 @@ public:
     virtual AuraResultCode CreateSoftBody(const AuraSoftBodyDesc&, AuraSoftBodyHandle*) { return AURA_UNSUPPORTED_SHAPE; }
     virtual AuraResultCode DestroySoftBody(AuraSoftBodyHandle) { return AURA_UNSUPPORTED_SHAPE; }
     virtual AuraResultCode GetSoftBodyState(AuraSoftBodyHandle, float*, uint32_t, AuraSoftBodyState*) const { return AURA_UNSUPPORTED_SHAPE; }
+    virtual AuraResultCode CreateRagdoll(const AuraRagdollDesc&, AuraRagdollHandle*) { return AURA_UNSUPPORTED_SHAPE; }
+    virtual AuraResultCode DestroyRagdoll(AuraRagdollHandle) { return AURA_UNSUPPORTED_SHAPE; }
+    virtual AuraResultCode GetRagdollPose(AuraRagdollHandle, AuraPose*, uint32_t, uint32_t*) const { return AURA_UNSUPPORTED_SHAPE; }
+    virtual AuraResultCode SetRagdollPose(AuraRagdollHandle, const AuraPose*, uint32_t) { return AURA_UNSUPPORTED_SHAPE; }
 };
 
 IWorld* CreateWorldImpl(const AuraWorldDesc& desc);

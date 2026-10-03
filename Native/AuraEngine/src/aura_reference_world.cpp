@@ -302,10 +302,72 @@ uint32_t ReferenceWorld::BodyCount() const
 
 void ReferenceWorld::Step(float deltaTime)
 {
+    if (waterActive_)
+        ApplyWaterStep(AuraWaterHandle{ 1 }, deltaTime);
     Integrate(deltaTime);
     Detect();
     Resolve();
     EmitEvents();
+}
+
+AuraResultCode ReferenceWorld::CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater)
+{
+    if (outWater == nullptr || desc.density <= 0.0f)
+        return AURA_INVALID_DEFINITION;
+    water_ = desc;
+    waterActive_ = true;
+    *outWater = AuraWaterHandle{ 1 };
+    return AURA_SUCCESS;
+}
+
+AuraResultCode ReferenceWorld::DestroyWater(AuraWaterHandle water)
+{
+    if (!waterActive_ || water.opaque != 1)
+        return AURA_INVALID_HANDLE;
+    waterActive_ = false;
+    return AURA_SUCCESS;
+}
+
+AuraResultCode ReferenceWorld::SetWaterParameters(AuraWaterHandle water, const AuraWaterDesc& desc)
+{
+    if (!waterActive_ || water.opaque != 1 || desc.density <= 0.0f)
+        return AURA_INVALID_HANDLE;
+    water_ = desc;
+    return AURA_SUCCESS;
+}
+
+AuraResultCode ReferenceWorld::ApplyWaterStep(AuraWaterHandle water, float deltaTime)
+{
+    if (!waterActive_ || water.opaque != 1 || deltaTime < 0.0f)
+        return AURA_INVALID_HANDLE;
+    for (Body& body : bodies_)
+    {
+        if (!body.occupied || body.type != AURA_BODY_DYNAMIC || body.invMass <= 0.0f || body.shapes.empty())
+            continue;
+        float volume = 0.0f;
+        float halfHeight = 0.0f;
+        for (const Shape& shape : body.shapes)
+        {
+            if (shape.type == AURA_SHAPE_BOX)
+            {
+                volume += 8.0f * shape.halfExtents.x * shape.halfExtents.y * shape.halfExtents.z;
+                halfHeight = std::max(halfHeight, shape.halfExtents.y);
+            }
+            else if (shape.type == AURA_SHAPE_SPHERE)
+            {
+                volume += 4.1887902f * shape.radius * shape.radius * shape.radius;
+                halfHeight = std::max(halfHeight, shape.radius);
+            }
+        }
+        if (volume <= 0.0f || halfHeight <= 0.0f)
+            continue;
+        const float submerged = std::clamp((water_.surfaceHeight - (body.pose.position.y - halfHeight)) / (2.0f * halfHeight), 0.0f, 1.0f);
+        const AuraVec3 force = Scale(gravity_, -water_.density * volume * submerged);
+        body.velocity = Add(body.velocity, Scale(force, body.invMass * deltaTime));
+        if (water_.linearDrag > 0.0f)
+            body.velocity = Scale(body.velocity, std::max(0.0f, 1.0f - water_.linearDrag * deltaTime * submerged));
+    }
+    return AURA_SUCCESS;
 }
 
 void ReferenceWorld::Integrate(float deltaTime)

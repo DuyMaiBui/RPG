@@ -42,6 +42,10 @@ public:
     AuraResultCode ApplyStates(const AuraBodyState* states, uint32_t count) override;
     uint32_t CopyContacts(AuraContact* buffer, uint32_t capacity) const override;
     AuraResultCode SetSurfaceVelocity(AuraBodyHandle body, const AuraVec3& velocity) override;
+    AuraResultCode CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater) override;
+    AuraResultCode DestroyWater(AuraWaterHandle water) override;
+    AuraResultCode SetWaterParameters(AuraWaterHandle water, const AuraWaterDesc& desc) override;
+    AuraResultCode ApplyWaterStep(AuraWaterHandle water, float deltaTime) override;
 
     AuraResultCode CreateJoint(const AuraJointDesc& desc, uint64_t* outJoint) override;
     AuraResultCode DestroyJoint(uint64_t joint) override;

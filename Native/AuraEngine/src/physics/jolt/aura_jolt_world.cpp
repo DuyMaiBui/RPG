@@ -307,6 +307,51 @@ void JoltWorld::Step(float deltaTime)
     impl_->physics.Update(deltaTime, 1, &impl_->tempAllocator, &impl_->jobSystem);
 }
 
+AuraResultCode JoltWorld::CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater)
+{
+    if (outWater == nullptr || desc.density <= 0.0f)
+        return AURA_INVALID_DEFINITION;
+    impl_->water = desc;
+    impl_->waterActive = true;
+    *outWater = AuraWaterHandle{ 1 };
+    return AURA_SUCCESS;
+}
+
+AuraResultCode JoltWorld::DestroyWater(AuraWaterHandle water)
+{
+    if (!impl_->waterActive || water.opaque != 1)
+        return AURA_INVALID_HANDLE;
+    impl_->waterActive = false;
+    return AURA_SUCCESS;
+}
+
+AuraResultCode JoltWorld::SetWaterParameters(AuraWaterHandle water, const AuraWaterDesc& desc)
+{
+    if (!impl_->waterActive || water.opaque != 1 || desc.density <= 0.0f)
+        return AURA_INVALID_HANDLE;
+    impl_->water = desc;
+    return AURA_SUCCESS;
+}
+
+AuraResultCode JoltWorld::ApplyWaterStep(AuraWaterHandle water, float deltaTime)
+{
+    if (!impl_->waterActive || water.opaque != 1 || deltaTime < 0.0f)
+        return AURA_INVALID_HANDLE;
+    JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
+    const JPH::Vec3 gravity = ToVec3(impl_->gravity);
+    for (const Impl::Slot& slot : impl_->slots)
+    {
+        if (!slot.occupied || slot.body == nullptr || slot.body->GetMotionType() != JPH::EMotionType::Dynamic)
+            continue;
+        const JPH::AABox bounds = slot.body->GetWorldSpaceBounds();
+        const float height = bounds.mMax.GetY() - bounds.mMin.GetY();
+        const float submerged = height > 0.0f ? std::clamp((impl_->water.surfaceHeight - bounds.mMin.GetY()) / height, 0.0f, 1.0f) : 0.0f;
+        if (submerged > 0.0f)
+            bi.AddImpulse(slot.id, -gravity * (impl_->water.density * slot.body->GetShape()->GetVolume() * submerged * deltaTime));
+    }
+    return AURA_SUCCESS;
+}
+
 uint32_t JoltWorld::PendingEventCount() const
 {
     std::lock_guard<std::mutex> lock(impl_->eventMutex);

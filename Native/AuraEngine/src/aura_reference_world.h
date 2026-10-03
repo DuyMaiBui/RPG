@@ -73,6 +73,10 @@ public:
     uint32_t CopyContacts(AuraContact* buffer, uint32_t capacity) const;
 
     AuraResultCode SetSurfaceVelocity(AuraBodyHandle body, const AuraVec3& velocity);
+    AuraResultCode CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater);
+    AuraResultCode DestroyWater(AuraWaterHandle water);
+    AuraResultCode SetWaterParameters(AuraWaterHandle water, const AuraWaterDesc& desc);
+    AuraResultCode ApplyWaterStep(AuraWaterHandle water, float deltaTime);
 
     bool Raycast(const AuraRay& ray, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit);
     uint32_t RaycastAll(const AuraRay& ray, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity);
@@ -115,6 +119,8 @@ private:
     std::vector<Contact> contacts_;
     std::vector<Contact> previous_;
     std::vector<AuraPhysicsEvent> events_;
+    AuraWaterDesc water_{};
+    bool waterActive_ = false;
 };
 
 } // namespace aura

@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 #ifndef AURA_ENGINE_ABI_VERSION
-#define AURA_ENGINE_ABI_VERSION 8u
+#define AURA_ENGINE_ABI_VERSION 9u
 #endif
 
 typedef uint32_t AuraEntityIndex;
@@ -306,6 +306,19 @@ typedef struct AuraWorldHandle
     uint64_t opaque;
 } AuraWorldHandle;
 
+typedef struct AuraWaterHandle
+{
+    uint64_t opaque;
+} AuraWaterHandle;
+
+typedef struct AuraWaterDesc
+{
+    float surfaceHeight;
+    AuraVec3 surfaceNormal;
+    float density;
+    float linearDrag;
+} AuraWaterDesc;
+
 /* Vehicle ABI types are appended so existing layouts remain unchanged. */
 typedef struct AuraVehicleHandle
 {
@@ -364,6 +377,18 @@ typedef struct AuraSoftBodyState
     uint32_t vertexCount;
     float* vertexPositions;
 } AuraSoftBodyState;
+
+typedef struct AuraRigJointDesc { int32_t parentIndex; AuraPose bindPose; } AuraRigJointDesc;
+typedef struct AuraRigDesc { const AuraRigJointDesc* joints; uint32_t jointCount; } AuraRigDesc;
+typedef struct AuraRagdollPartDesc { AuraBodyDesc body; AuraJointDesc jointToParent; } AuraRagdollPartDesc;
+typedef struct AuraRagdollDesc
+{
+    AuraRigDesc rig;
+    const AuraRagdollPartDesc* parts;
+    uint32_t partCount;
+    uint32_t collisionGroup;
+} AuraRagdollDesc;
+typedef struct AuraRagdollHandle { uint64_t opaque; } AuraRagdollHandle;
 
 #ifdef __cplusplus
 }

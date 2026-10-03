@@ -26,6 +26,8 @@
 #include <Jolt/Physics/Body/BodyLockInterface.h>
 #include <Jolt/Physics/Body/BodyFilter.h>
 #include <Jolt/Physics/Character/CharacterVirtual.h>
+#include <Jolt/Physics/Ragdoll/Ragdoll.h>
+#include <Jolt/Physics/Constraints/FixedConstraint.h>
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/CollidePointResult.h>
 #include <Jolt/Physics/Collision/CollideShape.h>
@@ -236,6 +238,13 @@ struct JoltWorld::Impl
         std::unique_ptr<aura::jolt_internal::AuraJoltSoftBodyOwner> softBody;
     };
 
+    struct RagdollSlot
+    {
+        bool occupied = false;
+        uint32_t generation = 0;
+        JPH::Ref<JPH::Ragdoll> ragdoll;
+    };
+
     std::vector<Slot> slots;
     std::vector<int> freeSlots;
     std::vector<JointSlot> jointSlots;
@@ -268,12 +277,16 @@ struct JoltWorld::Impl
     std::vector<int> freeVehicleSlots;
     std::vector<SoftBodySlot> softBodySlots;
     std::vector<int> freeSoftBodySlots;
+    std::vector<RagdollSlot> ragdollSlots;
+    std::vector<int> freeRagdollSlots;
     AuraSimShapeFilter simShapeFilter;
 
     AuraPhysicsMode mode = AURA_MODE_FULL_3D;
     AuraVec3 gravity{ 0.0f, -9.81f, 0.0f };
     uint64_t matrix[kMaxLayers];
     float lastDelta = 1.0f / 60.0f;
+    AuraWaterDesc water{};
+    bool waterActive = false;
 
     class Listener final : public JPH::ContactListener
     {
@@ -447,6 +460,27 @@ struct JoltWorld::Impl
         if (index < softBodySlots.size() && softBodySlots[index].occupied && softBodySlots[index].generation == generation)
             return &softBodySlots[index];
         return nullptr;
+    }
+
+    static AuraRagdollHandle MakeRagdollHandle(const RagdollSlot& slot, int index)
+    {
+        return AuraRagdollHandle{ (static_cast<uint64_t>(slot.generation) << 32) | static_cast<uint32_t>(index) };
+    }
+
+    RagdollSlot* FindRagdoll(AuraRagdollHandle handle)
+    {
+        const uint32_t index = static_cast<uint32_t>(handle.opaque);
+        const uint32_t generation = static_cast<uint32_t>(handle.opaque >> 32);
+        return index < ragdollSlots.size() && ragdollSlots[index].occupied && ragdollSlots[index].generation == generation
+            ? &ragdollSlots[index] : nullptr;
+    }
+
+    const RagdollSlot* FindRagdoll(AuraRagdollHandle handle) const
+    {
+        const uint32_t index = static_cast<uint32_t>(handle.opaque);
+        const uint32_t generation = static_cast<uint32_t>(handle.opaque >> 32);
+        return index < ragdollSlots.size() && ragdollSlots[index].occupied && ragdollSlots[index].generation == generation
+            ? &ragdollSlots[index] : nullptr;
     }
 
     CharacterSlot* FindCharacter(uint64_t handle)

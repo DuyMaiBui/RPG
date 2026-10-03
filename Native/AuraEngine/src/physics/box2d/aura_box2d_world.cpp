@@ -86,6 +86,9 @@ struct Box2DWorld::Impl
     std::vector<AuraPhysicsEvent> events;
     uint64_t matrix[kMaxLayers];
     float lastDelta = 1.0f / 60.0f;
+    AuraVec3 gravity{ 0.0f, -9.81f, 0.0f };
+    AuraWaterDesc water{};
+    bool waterActive = false;
 
     static uint64_t MakeJointHandle(const JointSlot& slot, int index)
     {
@@ -122,6 +125,7 @@ struct Box2DWorld::Impl
 
         b2WorldDef worldDef = b2DefaultWorldDef();
         worldDef.gravity = b2Vec2{ desc.gravity.x, desc.gravity.y };
+        gravity = desc.gravity;
         world = b2CreateWorld(&worldDef);
     }
 
@@ -455,6 +459,49 @@ void Box2DWorld::Step(float deltaTime)
     impl_->lastDelta = deltaTime;
     b2World_Step(impl_->world, deltaTime, 4);
     impl_->GatherEvents();
+}
+
+AuraResultCode Box2DWorld::CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater)
+{
+    if (outWater == nullptr || desc.density <= 0.0f)
+        return AURA_INVALID_DEFINITION;
+    impl_->water = desc;
+    impl_->waterActive = true;
+    *outWater = AuraWaterHandle{ 1 };
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::DestroyWater(AuraWaterHandle water)
+{
+    if (!impl_->waterActive || water.opaque != 1)
+        return AURA_INVALID_HANDLE;
+    impl_->waterActive = false;
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetWaterParameters(AuraWaterHandle water, const AuraWaterDesc& desc)
+{
+    if (!impl_->waterActive || water.opaque != 1 || desc.density <= 0.0f)
+        return AURA_INVALID_HANDLE;
+    impl_->water = desc;
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::ApplyWaterStep(AuraWaterHandle water, float deltaTime)
+{
+    if (!impl_->waterActive || water.opaque != 1 || deltaTime < 0.0f)
+        return AURA_INVALID_HANDLE;
+    for (const Impl::Slot& slot : impl_->slots)
+    {
+        if (!slot.occupied || !b2Body_IsValid(slot.body) || b2Body_GetType(slot.body) != b2_dynamicBody)
+            continue;
+        const float fraction = std::clamp((impl_->water.surfaceHeight - b2Body_GetPosition(slot.body).y + 0.5f) / 1.0f, 0.0f, 1.0f);
+        const b2Vec2 impulse{ -impl_->gravity.x * impl_->water.density * fraction * deltaTime * b2Body_GetMass(slot.body) / 1000.0f,
+                              -impl_->gravity.y * impl_->water.density * fraction * deltaTime * b2Body_GetMass(slot.body) / 1000.0f };
+        if (fraction > 0.0f)
+            b2Body_ApplyLinearImpulseToCenter(slot.body, impulse, true);
+    }
+    return AURA_SUCCESS;
 }
 
 uint32_t Box2DWorld::PendingEventCount() const

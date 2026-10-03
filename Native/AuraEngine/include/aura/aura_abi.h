@@ -32,6 +32,11 @@ AuraResultCode Aura_Step(AuraWorldHandle world, AuraTick tick, float deltaTime);
 AuraResultCode Aura_CopyBodyStates(AuraWorldHandle world, AuraBodyState* buffer, uint32_t capacity, uint32_t* outCount);
 AuraResultCode Aura_GetBodyState(AuraWorldHandle world, AuraBodyHandle body, AuraBodyState* outState);
 
+AuraResultCode Aura_CreateWater(AuraWorldHandle world, const AuraWaterDesc* desc, AuraWaterHandle* outWater);
+AuraResultCode Aura_DestroyWater(AuraWorldHandle world, AuraWaterHandle water);
+AuraResultCode Aura_SetWaterParameters(AuraWorldHandle world, AuraWaterHandle water, const AuraWaterDesc* desc);
+AuraResultCode Aura_ApplyWaterStep(AuraWorldHandle world, AuraWaterHandle water, float deltaTime);
+
 AuraResultCode Aura_PendingEventCount(AuraWorldHandle world, uint32_t* outCount);
 AuraResultCode Aura_CopyEvents(AuraWorldHandle world, AuraPhysicsEvent* buffer, uint32_t capacity, uint32_t* outCount);
 
@@ -68,6 +73,10 @@ AuraResultCode Aura_GetVehicleWheelState(AuraWorldHandle world, AuraVehicleHandl
 AuraResultCode Aura_CreateSoftBody(AuraWorldHandle world, const AuraSoftBodyDesc* desc, AuraSoftBodyHandle* outSoftBody);
 AuraResultCode Aura_DestroySoftBody(AuraWorldHandle world, AuraSoftBodyHandle softBody);
 AuraResultCode Aura_GetSoftBodyState(AuraWorldHandle world, AuraSoftBodyHandle softBody, float* vertexPositions, uint32_t vertexCapacity, AuraSoftBodyState* outState);
+AuraResultCode Aura_CreateRagdoll(AuraWorldHandle world, const AuraRagdollDesc* desc, AuraRagdollHandle* outRagdoll);
+AuraResultCode Aura_DestroyRagdoll(AuraWorldHandle world, AuraRagdollHandle ragdoll);
+AuraResultCode Aura_GetRagdollPose(AuraWorldHandle world, AuraRagdollHandle ragdoll, AuraPose* buffer, uint32_t capacity, uint32_t* outCount);
+AuraResultCode Aura_SetRagdollPose(AuraWorldHandle world, AuraRagdollHandle ragdoll, const AuraPose* poses, uint32_t poseCount);
 
 AuraResultCode Aura_ComputeStateHash(AuraWorldHandle world, uint64_t* outHash);
 
