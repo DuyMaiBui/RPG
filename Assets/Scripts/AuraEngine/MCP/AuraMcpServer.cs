@@ -58,6 +58,18 @@ namespace AuraEngine.MCP
                     return Result(id, AuraJsonValue.Obj());
                 case "tools/list":
                     return Result(id, AuraJsonValue.Obj(("tools", ToolSchemas())));
+                case "resources/list":
+                    return Result(id, AuraJsonValue.Obj(("resources", AuraJsonValue.Arr(
+                        AuraJsonValue.Obj(("uri", AuraJsonValue.String("aura://architecture")), ("name", AuraJsonValue.String("AuraEngine architecture"))),
+                        AuraJsonValue.Obj(("uri", AuraJsonValue.String("aura://status")), ("name", AuraJsonValue.String("AuraEngine status")))))));
+                case "resources/read":
+                    return ReadResource(id, request["params"]["uri"].AsString());
+                case "prompts/list":
+                    return Result(id, AuraJsonValue.Obj(("prompts", AuraJsonValue.Arr(
+                        AuraJsonValue.Obj(("name", AuraJsonValue.String("inspect_world")), ("description", AuraJsonValue.String("Inspect the current AuraEngine world state."))),
+                        AuraJsonValue.Obj(("name", AuraJsonValue.String("run_determinism_check")), ("description", AuraJsonValue.String("Run a deterministic fixed-tick state check.")))))));
+                case "prompts/get":
+                    return GetPrompt(id, request["params"]["name"].AsString());
                 case "tools/call":
                     return CallTool(id, request["params"]);
                 default:
@@ -86,6 +98,30 @@ namespace AuraEngine.MCP
                         ("text", AuraJsonValue.String(exception.Message))))),
                     ("isError", AuraJsonValue.Bool(true))));
             }
+        }
+
+        private static AuraJsonValue ReadResource(AuraJsonValue id, string uri)
+        {
+            var text = uri switch
+            {
+                "aura://architecture" => "Physics runs in the native Jolt/Box2D C++ kernel; gameplay orchestration remains C#.",
+                "aura://status" => "Use world_state and the standalone kernel test runner for validation.",
+                _ => throw new InvalidOperationException("Unknown resource: " + uri),
+            };
+            return Result(id, AuraJsonValue.Obj(("contents", AuraJsonValue.Arr(
+                AuraJsonValue.Obj(("uri", AuraJsonValue.String(uri)), ("mimeType", AuraJsonValue.String("text/plain")), ("text", AuraJsonValue.String(text)))))));
+        }
+
+        private static AuraJsonValue GetPrompt(AuraJsonValue id, string name)
+        {
+            var text = name switch
+            {
+                "inspect_world" => "Call world_state, then inspect the reported body count, tick and state hash.",
+                "run_determinism_check" => "Run the standalone kernel test suite and compare repeated state hashes.",
+                _ => throw new InvalidOperationException("Unknown prompt: " + name),
+            };
+            return Result(id, AuraJsonValue.Obj(("description", AuraJsonValue.String(text)), ("messages", AuraJsonValue.Arr(
+                AuraJsonValue.Obj(("role", AuraJsonValue.String("user")), ("content", AuraJsonValue.Obj(("type", AuraJsonValue.String("text")), ("text", AuraJsonValue.String(text)))))))));
         }
 
         private AuraJsonValue Dispatch(string name, AuraJsonValue arguments)
