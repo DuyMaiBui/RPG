@@ -11,6 +11,10 @@ namespace AuraEngine.Physics.Native
         public int Flags;
         public NativeEntityHandle IgnoredEntity;
         public NativeBodyHandle IgnoredBody;
+        public uint ShapeFilterGroup;
+        public uint ShapeFilterMask;
+        public int ActiveEdgeMode;
+        public NativeVector3 ActiveEdgeMovementDirection;
 
         public static NativeQueryFilter From(in AuraPhysicsQueryFilter filter) =>
             new NativeQueryFilter
@@ -28,6 +32,10 @@ namespace AuraEngine.Physics.Native
                     Index = filter.IgnoredBody.IsValid ? (uint)filter.IgnoredBody.Index : uint.MaxValue,
                     Generation = filter.IgnoredBody.IsValid ? (uint)filter.IgnoredBody.Generation : uint.MaxValue,
                 },
+                ShapeFilterGroup = 0,
+                ShapeFilterMask = uint.MaxValue,
+                ActiveEdgeMode = 0,
+                ActiveEdgeMovementDirection = NativeVector3.From(AuraVector3.Zero),
             };
     }
 }

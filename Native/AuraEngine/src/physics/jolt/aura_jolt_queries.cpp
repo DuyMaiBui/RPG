@@ -33,6 +33,24 @@ struct CastShapeCollector final : public JPH::CastShapeCollector
     }
 };
 
+void ConfigureShapeFilter(AuraQueryShapeFilter& result, const AuraQueryFilter& filter,
+                          const std::unordered_map<uint32_t, uint32_t>& groups,
+                          const std::unordered_map<uint32_t, uint32_t>& masks)
+{
+    result.groups = &groups;
+    result.masks = &masks;
+    result.group = filter.shapeFilterGroup == 0u ? 1u : filter.shapeFilterGroup;
+    result.mask = filter.shapeFilterMask == 0u ? ~0u : filter.shapeFilterMask;
+}
+
+uint32_t MaterialIndex(const JPH::Body& body, const JPH::SubShapeID& subShape)
+{
+    const JPH::Shape* shape = body.GetShape();
+    const JPH::MeshShape* mesh = shape != nullptr && shape->GetSubType() == JPH::EShapeSubType::Mesh
+        ? static_cast<const JPH::MeshShape*>(shape) : nullptr;
+    return mesh != nullptr ? mesh->GetMaterialIndex(subShape) : 0u;
+}
+
 template <typename TImpl>
 AuraResultCode FillShapeOverlap(TImpl* impl, const JPH::Shape* shape, const JPH::RMat44& transform, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount)
 {
@@ -41,9 +59,13 @@ AuraResultCode FillShapeOverlap(TImpl* impl, const JPH::Shape* shape, const JPH:
     QueryLayerFilter layerFilter;
     layerFilter.mask = filter.layerMask;
     const JPH::IgnoreSingleBodyFilter bodyFilter(impl->IgnoredBody(filter));
+    AuraQueryShapeFilter shapeFilter;
+    ConfigureShapeFilter(shapeFilter, filter, impl->shapeFilterGroups, impl->shapeFilterMasks);
     JPH::CollideShapeSettings settings;
+    settings.mActiveEdgeMode = filter.activeEdgeMode == AURA_ACTIVE_EDGES_ALL ? JPH::EActiveEdgeMode::CollideWithAll : JPH::EActiveEdgeMode::CollideOnlyWithActive;
+    settings.mActiveEdgeMovementDirection = ToVec3(filter.activeEdgeMovementDirection);
     ShapeCollector collector;
-    impl->physics.GetNarrowPhaseQuery().CollideShape(shape, JPH::Vec3::sReplicate(1.0f), transform, settings, JPH::RVec3::sZero(), collector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter, JPH::ShapeFilter());
+    impl->physics.GetNarrowPhaseQuery().CollideShape(shape, JPH::Vec3::sReplicate(1.0f), transform, settings, JPH::RVec3::sZero(), collector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter, shapeFilter);
     *outCount = std::min(collector.count, capacity);
     for (uint32_t i = 0; i < *outCount; ++i)
     {
@@ -54,6 +76,8 @@ AuraResultCode FillShapeOverlap(TImpl* impl, const JPH::Shape* shape, const JPH:
         buffer[i].distance = result.mPenetrationDepth;
         buffer[i].point = ToAura(JPH::RVec3(result.mContactPointOn2));
         buffer[i].normal = ToAura(result.mPenetrationAxis.NormalizedOr(JPH::Vec3::sZero()));
+        const JPH::Body* body = impl->physics.GetBodyLockInterface().TryGetBody(result.mBodyID2);
+        buffer[i].materialIndex = body != nullptr ? MaterialIndex(*body, result.mSubShapeID2) : 0u;
     }
     return AURA_SUCCESS;
 }
@@ -95,12 +119,18 @@ bool JoltWorld::Raycast(const AuraRay& ray, float maxDistance, const AuraQueryFi
     QueryLayerFilter layerFilter;
     layerFilter.mask = filter.layerMask;
     const JPH::IgnoreSingleBodyFilter bodyFilter(impl_->IgnoredBody(filter));
+    AuraQueryShapeFilter shapeFilter;
+    ConfigureShapeFilter(shapeFilter, filter, impl_->shapeFilterGroups, impl_->shapeFilterMasks);
 
     const JPH::Vec3 direction = unit * maxDistance;
     JPH::RRayCast joltRay(ToRVec3(ray.origin), direction);
     JPH::RayCastResult result;
-    if (!impl_->physics.GetNarrowPhaseQuery().CastRay(joltRay, result, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter))
+    RayCollector rayCollector;
+    JPH::RayCastSettings raySettings;
+    impl_->physics.GetNarrowPhaseQuery().CastRay(joltRay, raySettings, rayCollector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter, shapeFilter);
+    if (rayCollector.count == 0)
         return false;
+    result = rayCollector.results[0];
 
     const float distance = result.mFraction * maxDistance;
 
@@ -113,6 +143,8 @@ bool JoltWorld::Raycast(const AuraRay& ray, float maxDistance, const AuraQueryFi
     outHit->distance = distance;
     outHit->point = ToAura(point);
     outHit->normal = ToAura(normal);
+    const JPH::Body* body = impl_->physics.GetBodyLockInterface().TryGetBody(result.mBodyID);
+    outHit->materialIndex = body != nullptr ? MaterialIndex(*body, result.mSubShapeID2) : 0u;
     return true;
 }
 
@@ -128,11 +160,13 @@ uint32_t JoltWorld::RaycastAll(const AuraRay& ray, float maxDistance, const Aura
     QueryLayerFilter layerFilter;
     layerFilter.mask = filter.layerMask;
     const JPH::IgnoreSingleBodyFilter bodyFilter(impl_->IgnoredBody(filter));
+    AuraQueryShapeFilter shapeFilter;
+    ConfigureShapeFilter(shapeFilter, filter, impl_->shapeFilterGroups, impl_->shapeFilterMasks);
 
     JPH::RRayCast joltRay(ToRVec3(ray.origin), unit * maxDistance);
     RayCollector collector;
     JPH::RayCastSettings settings;
-    impl_->physics.GetNarrowPhaseQuery().CastRay(joltRay, settings, collector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter);
+    impl_->physics.GetNarrowPhaseQuery().CastRay(joltRay, settings, collector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter, shapeFilter);
 
     uint32_t count = 0;
     for (uint32_t i = 0; i < collector.count && count < capacity; ++i)
@@ -147,6 +181,8 @@ uint32_t JoltWorld::RaycastAll(const AuraRay& ray, float maxDistance, const Aura
         buffer[count].distance = distance;
         buffer[count].point = ToAura(point);
         buffer[count].normal = ToAura(impl_->SurfaceNormal(result.mBodyID, result.mSubShapeID2, point));
+        const JPH::Body* body = impl_->physics.GetBodyLockInterface().TryGetBody(result.mBodyID);
+        buffer[count].materialIndex = body != nullptr ? MaterialIndex(*body, result.mSubShapeID2) : 0u;
         ++count;
     }
     return count;
@@ -160,13 +196,15 @@ uint32_t JoltWorld::OverlapSphere(const AuraVec3& center, float radius, const Au
     QueryLayerFilter layerFilter;
     layerFilter.mask = filter.layerMask;
     const JPH::IgnoreSingleBodyFilter bodyFilter(impl_->IgnoredBody(filter));
+    AuraQueryShapeFilter shapeFilter;
+    ConfigureShapeFilter(shapeFilter, filter, impl_->shapeFilterGroups, impl_->shapeFilterMasks);
 
     const JPH::SphereShape shape(radius);
     const JPH::RMat44 transform = JPH::RMat44::sTranslation(ToRVec3(center));
     JPH::CollideShapeSettings settings;
     settings.mMaxSeparationDistance = 0.0f;
     ShapeCollector collector;
-    impl_->physics.GetNarrowPhaseQuery().CollideShape(&shape, JPH::Vec3::sReplicate(1.0f), transform, settings, JPH::RVec3::sZero(), collector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter, JPH::ShapeFilter());
+    impl_->physics.GetNarrowPhaseQuery().CollideShape(&shape, JPH::Vec3::sReplicate(1.0f), transform, settings, JPH::RVec3::sZero(), collector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter, shapeFilter);
 
     uint32_t count = 0;
     for (uint32_t i = 0; i < collector.count && count < capacity; ++i)
@@ -178,6 +216,8 @@ uint32_t JoltWorld::OverlapSphere(const AuraVec3& center, float radius, const Au
         buffer[count].distance = result.mPenetrationDepth;
         buffer[count].point = ToAura(JPH::RVec3(result.mContactPointOn2));
         buffer[count].normal = ToAura(result.mPenetrationAxis.Normalized());
+        const JPH::Body* body = impl_->physics.GetBodyLockInterface().TryGetBody(result.mBodyID2);
+        buffer[count].materialIndex = body != nullptr ? MaterialIndex(*body, result.mSubShapeID2) : 0u;
         ++count;
     }
     return count;
@@ -200,12 +240,18 @@ AuraResultCode JoltWorld::ShapeCast(const AuraShapeDesc& desc, const AuraPose& p
     const JPH::Vec3 unit = ToVec3(direction).Normalized(); if (unit.LengthSq() <= 1e-12f) return AURA_SUCCESS;
     const JPH::RShapeCast cast = JPH::RShapeCast::sFromWorldTransform(shape.GetPtr(), JPH::Vec3::sReplicate(1.0f), ShapeTransform(pose, desc), unit * maxDistance);
     CastShapeCollector collector; JPH::ShapeCastSettings settings; QueryLayerFilter layerFilter; layerFilter.mask = filter.layerMask;
+    settings.mActiveEdgeMode = filter.activeEdgeMode == AURA_ACTIVE_EDGES_ALL ? JPH::EActiveEdgeMode::CollideWithAll : JPH::EActiveEdgeMode::CollideOnlyWithActive;
+    settings.mActiveEdgeMovementDirection = ToVec3(filter.activeEdgeMovementDirection);
     const JPH::IgnoreSingleBodyFilter bodyFilter(impl_->IgnoredBody(filter));
-    impl_->physics.GetNarrowPhaseQuery().CastShape(cast, settings, JPH::RVec3::sZero(), collector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter, JPH::ShapeFilter());
+    AuraQueryShapeFilter shapeFilter;
+    ConfigureShapeFilter(shapeFilter, filter, impl_->shapeFilterGroups, impl_->shapeFilterMasks);
+    impl_->physics.GetNarrowPhaseQuery().CastShape(cast, settings, JPH::RVec3::sZero(), collector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter, shapeFilter);
     if (!collector.hasHit) return AURA_SUCCESS;
     const JPH::ShapeCastResult& result = collector.result;
     outHit->entity = AuraEntityHandle{ 0, 0 }; outHit->body = impl_->HandleFromBodyId(result.mBodyID2); outHit->shape = result.mBodyID2.GetIndex();
     outHit->distance = result.mFraction * maxDistance; outHit->point = ToAura(JPH::RVec3(result.mContactPointOn2)); outHit->normal = ToAura(result.mPenetrationAxis.NormalizedOr(JPH::Vec3::sZero())); *outHasHit = true;
+    const JPH::Body* body = impl_->physics.GetBodyLockInterface().TryGetBody(result.mBodyID2);
+    outHit->materialIndex = body != nullptr ? MaterialIndex(*body, result.mSubShapeID2) : 0u;
     return AURA_SUCCESS;
 }
 

@@ -12,6 +12,7 @@ namespace AuraEngine.Physics.Native
         public float Distance;
         public NativeVector3 Point;
         public NativeVector3 Normal;
+        public uint MaterialIndex;
 
         public AuraPhysicsQueryHit ToManaged() =>
             new AuraPhysicsQueryHit(
@@ -20,6 +21,7 @@ namespace AuraEngine.Physics.Native
                 new PhysicsShapeId((int)Shape, 0),
                 Distance,
                 Point.ToManaged(),
-                Normal.ToManaged());
+                Normal.ToManaged(),
+                MaterialIndex);
     }
 }

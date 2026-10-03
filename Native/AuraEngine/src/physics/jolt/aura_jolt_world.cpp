@@ -166,7 +166,18 @@ AuraResultCode JoltWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* o
     slot.id = id;
     slot.body = body;
     slot.sensor = sensor;
+    slot.shapeFilterGroup = desc.shapeCount > 0 && desc.shapes[0].shapeFilterGroup != 0u ? desc.shapes[0].shapeFilterGroup : 1u;
+    slot.shapeFilterMask = desc.shapeCount > 0 && desc.shapes[0].shapeFilterMask != 0u ? desc.shapes[0].shapeFilterMask : ~0u;
     impl_->idToSlot[id.GetIndex()] = static_cast<uint32_t>(index);
+    impl_->shapeFilterGroups[id.GetIndex()] = slot.shapeFilterGroup;
+    impl_->shapeFilterMasks[id.GetIndex()] = slot.shapeFilterMask;
+    if (impl_->simShapeFilterGroups.size() <= id.GetIndex())
+    {
+        impl_->simShapeFilterGroups.resize(id.GetIndex() + 1, 1u);
+        impl_->simShapeFilterMasks.resize(id.GetIndex() + 1, ~0u);
+    }
+    impl_->simShapeFilterGroups[id.GetIndex()] = slot.shapeFilterGroup;
+    impl_->simShapeFilterMasks[id.GetIndex()] = slot.shapeFilterMask;
 
     *outBody = handle;
     return AURA_SUCCESS;
@@ -180,6 +191,8 @@ AuraResultCode JoltWorld::DestroyBody(AuraBodyHandle body)
 
     JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
     impl_->idToSlot.erase(slot->id.GetIndex());
+    impl_->shapeFilterGroups.erase(slot->id.GetIndex());
+    impl_->shapeFilterMasks.erase(slot->id.GetIndex());
 
     for (size_t index = 0; index < impl_->jointSlots.size(); ++index)
     {

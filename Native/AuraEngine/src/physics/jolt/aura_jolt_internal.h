@@ -43,6 +43,7 @@
 #include <Jolt/Physics/Collision/Shape/TaperedCylinderShape.h>
 #include <Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
 #include <Jolt/Physics/Collision/ShapeFilter.h>
+#include <Jolt/Physics/Collision/SimShapeFilter.h>
 #include <Jolt/Physics/Constraints/TwoBodyConstraint.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 
@@ -135,6 +136,55 @@ struct ShapeCollector final : public JPH::CollideShapeCollector
     }
 };
 
+inline bool ShapeFiltersCollide(uint32_t groupA, uint32_t maskA, uint32_t groupB, uint32_t maskB)
+{
+    return (groupA & maskB) != 0u && (groupB & maskA) != 0u;
+}
+
+class AuraSimShapeFilter final : public JPH::SimShapeFilter
+{
+public:
+    const std::vector<uint32_t>* groups = nullptr;
+    const std::vector<uint32_t>* masks = nullptr;
+
+    bool ShouldCollide(const JPH::Body& body1, const JPH::Shape*, const JPH::SubShapeID&,
+                       const JPH::Body& body2, const JPH::Shape*, const JPH::SubShapeID&) const override
+    {
+        const auto get = [this](const JPH::Body& body, uint32_t& group, uint32_t& mask)
+        {
+            const uint32_t index = static_cast<uint32_t>(body.GetUserData() >> 32);
+            if (groups == nullptr || masks == nullptr || index >= groups->size() || index >= masks->size())
+                return;
+            group = (*groups)[index];
+            mask = (*masks)[index];
+        };
+        uint32_t group1 = 1u, mask1 = ~0u, group2 = 1u, mask2 = ~0u;
+        get(body1, group1, mask1);
+        get(body2, group2, mask2);
+        return ShapeFiltersCollide(group1, mask1, group2, mask2);
+    }
+};
+
+class AuraQueryShapeFilter final : public JPH::ShapeFilter
+{
+public:
+    const std::unordered_map<uint32_t, uint32_t>* groups = nullptr;
+    const std::unordered_map<uint32_t, uint32_t>* masks = nullptr;
+    uint32_t group = 1u;
+    uint32_t mask = ~0u;
+
+    bool ShouldCollide(const JPH::Shape*, const JPH::SubShapeID&) const override
+    {
+        if (mBodyID2.IsInvalid() || groups == nullptr || masks == nullptr)
+            return true;
+        const uint32_t bodyIndex = mBodyID2.GetIndex();
+        const auto groupIt = groups->find(bodyIndex);
+        const auto maskIt = masks->find(bodyIndex);
+        return groupIt == groups->end() || maskIt == masks->end()
+            || ShapeFiltersCollide(group, mask, groupIt->second, maskIt->second);
+    }
+};
+
 /* Builds a single Jolt shape from an Aura shape description. Defined in
    aura_jolt_shapes.cpp so shape work stays in one feature unit. */
 JPH::RefConst<JPH::Shape> MakeShape(const AuraShapeDesc& shape, bool& sensor);
@@ -148,6 +198,8 @@ struct JoltWorld::Impl
         JPH::BodyID id;
         JPH::Body* body = nullptr;
         bool sensor = false;
+        uint32_t shapeFilterGroup = 1u;
+        uint32_t shapeFilterMask = ~0u;
     };
 
     struct JointSlot
@@ -179,6 +231,10 @@ struct JoltWorld::Impl
     std::unordered_map<uint64_t, AuraContact> contacts;
     std::unordered_map<uint32_t, AuraVec3> surfaceVelocities;
     std::unordered_set<uint32_t> wakeOnStep;
+    std::unordered_map<uint32_t, uint32_t> shapeFilterGroups;
+    std::unordered_map<uint32_t, uint32_t> shapeFilterMasks;
+    std::vector<uint32_t> simShapeFilterGroups;
+    std::vector<uint32_t> simShapeFilterMasks;
 
     /* Jolt calls contact callbacks from its worker threads, so the event buffer
        and the trigger bookkeeping must be synchronized. */
@@ -190,6 +246,7 @@ struct JoltWorld::Impl
     JPH::TempAllocatorImpl tempAllocator{ 64 * 1024 * 1024 };
     JPH::JobSystemThreadPool jobSystem{ JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, static_cast<int>(std::max(1u, std::thread::hardware_concurrency()) - 1u) };
     JPH::PhysicsSystem physics;
+    AuraSimShapeFilter simShapeFilter;
 
     AuraPhysicsMode mode = AURA_MODE_FULL_3D;
     AuraVec3 gravity{ 0.0f, -9.81f, 0.0f };
@@ -239,6 +296,9 @@ struct JoltWorld::Impl
         physics.Init(kMaxBodies, 0, 8192, 8192, broadPhase, objectVsBroadPhase, objectVsObject);
         physics.SetGravity(ToVec3(gravity));
         physics.SetContactListener(&listener);
+        simShapeFilter.groups = &simShapeFilterGroups;
+        simShapeFilter.masks = &simShapeFilterMasks;
+        physics.SetSimShapeFilter(&simShapeFilter);
 
         /* Smaller penetration slop so resting bodies do not visibly sink into
            the ground (Jolt default is 0.02). */

@@ -68,7 +68,25 @@ JPH::RefConst<JPH::Shape> MakeShape(const AuraShapeDesc& shape, bool& sensor)
 
             const auto* samples = reinterpret_cast<const float*>(shape.vertices);
             const JPH::Vec3 scale(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z);
-            JPH::HeightFieldShapeSettings settings(samples, JPH::Vec3::sZero(), scale, sampleCount);
+            std::vector<uint8_t> materialIndices;
+            const uint32_t squareCount = (sampleCount - 1) * (sampleCount - 1);
+            if (shape.materialIndices != nullptr && shape.materialIndexCount >= squareCount)
+            {
+                materialIndices.reserve(squareCount);
+                for (uint32_t i = 0; i < squareCount; ++i)
+                    materialIndices.push_back(static_cast<uint8_t>(std::min(shape.materialIndices[i], 255u)));
+            }
+            JPH::PhysicsMaterialList materials;
+            uint32_t maxMaterial = 0;
+            for (uint32_t i = 0; i < materialIndices.size(); ++i)
+                maxMaterial = std::max(maxMaterial, static_cast<uint32_t>(materialIndices[i]));
+            for (uint32_t i = 0; i <= maxMaterial; ++i)
+                materials.push_back(JPH::PhysicsMaterial::sDefault);
+            JPH::HeightFieldShapeSettings settings = materialIndices.empty()
+                ? JPH::HeightFieldShapeSettings(samples, JPH::Vec3::sZero(), scale, sampleCount)
+                : JPH::HeightFieldShapeSettings(samples, JPH::Vec3::sZero(), scale, sampleCount, materialIndices.data(), materials);
+            if (shape.activeEdgeCosThresholdAngle > 0.0f)
+                settings.mActiveEdgeCosThresholdAngle = shape.activeEdgeCosThresholdAngle;
             JPH::ShapeSettings::ShapeResult result = settings.Create();
             return result.IsValid() ? result.Get() : JPH::RefConst<JPH::Shape>();
         }
@@ -85,9 +103,22 @@ JPH::RefConst<JPH::Shape> MakeShape(const AuraShapeDesc& shape, bool& sensor)
             JPH::IndexedTriangleList triangles;
             triangles.reserve(shape.indexCount / 3);
             for (uint32_t i = 0; i + 2 < shape.indexCount; i += 3)
-                triangles.push_back(JPH::IndexedTriangle(shape.indices[i], shape.indices[i + 1], shape.indices[i + 2], 0));
+            {
+                const uint32_t triangle = i / 3;
+                const uint32_t material = shape.materialIndices != nullptr && triangle < shape.materialIndexCount
+                    ? shape.materialIndices[triangle] : 0u;
+                triangles.push_back(JPH::IndexedTriangle(shape.indices[i], shape.indices[i + 1], shape.indices[i + 2], material));
+            }
 
-            JPH::MeshShapeSettings settings(vertices, triangles);
+            JPH::PhysicsMaterialList materials;
+            uint32_t maxMaterial = 0;
+            for (const JPH::IndexedTriangle& triangle : triangles)
+                maxMaterial = std::max(maxMaterial, triangle.mMaterialIndex);
+            for (uint32_t i = 0; i <= maxMaterial; ++i)
+                materials.push_back(JPH::PhysicsMaterial::sDefault);
+            JPH::MeshShapeSettings settings(vertices, triangles, materials);
+            if (shape.activeEdgeCosThresholdAngle > 0.0f)
+                settings.mActiveEdgeCosThresholdAngle = shape.activeEdgeCosThresholdAngle;
             JPH::ShapeSettings::ShapeResult result = settings.Create();
             return result.IsValid() ? result.Get() : JPH::RefConst<JPH::Shape>();
         }

@@ -226,6 +226,7 @@ bool RunTriangleMesh()
         -5.0f, 0.0f,  5.0f,
     };
     const uint32_t indices[6] = { 1, 0, 2, 2, 0, 3 };
+    const uint32_t materialIndices[2] = { 7, 3 };
 
     AuraWorldDesc worldDesc{};
     worldDesc.mode = AURA_MODE_FULL_3D;
@@ -243,6 +244,8 @@ bool RunTriangleMesh()
     meshShape.vertexCount = 4;
     meshShape.indices = indices;
     meshShape.indexCount = 6;
+    meshShape.materialIndices = materialIndices;
+    meshShape.materialIndexCount = 2;
 
     AuraShapeDesc ballShape{};
     ballShape.type = AURA_SHAPE_SPHERE;
@@ -286,9 +289,20 @@ bool RunTriangleMesh()
     AuraBodyState state{};
     Aura_GetBodyState(world, ball, &state);
     const bool ok = std::fabs(state.pose.position.y - 0.5f) < 0.25f;
-    std::printf("[mesh] ball_y=%.4f ok=%u\n", state.pose.position.y, static_cast<unsigned>(ok));
+    AuraRay ray{};
+    ray.origin = AuraVec3{ 0.0f, 4.0f, 0.0f };
+    ray.direction = AuraVec3{ 0.0f, -1.0f, 0.0f };
+    AuraQueryFilter filter{};
+    filter.layerMask = ~0ull;
+    filter.flags = 4;
+    filter.ignoredBody = ball;
+    AuraQueryHit hit{};
+    uint8_t hasHit = 0;
+    Aura_Raycast(world, &ray, 10.0f, &filter, &hit, &hasHit);
+    const bool materialOk = hasHit != 0 && hit.materialIndex <= 7u;
+    std::printf("[mesh] ball_y=%.4f material=%u ok=%u\n", state.pose.position.y, hit.materialIndex, static_cast<unsigned>(ok && materialOk));
     Aura_DestroyWorld(world);
-    return ok;
+    return ok && materialOk;
 }
 
 bool RunHeightField()
@@ -387,6 +401,8 @@ bool RunQueryFilter()
     AuraShapeDesc platformShape{};
     platformShape.type = AURA_SHAPE_BOX;
     platformShape.halfExtents = AuraVec3{ 0.5f, 0.5f, 0.5f };
+    platformShape.shapeFilterGroup = 2u;
+    platformShape.shapeFilterMask = 2u;
 
     AuraBodyDesc groundDesc{};
     groundDesc.type = AURA_BODY_STATIC;
@@ -425,6 +441,8 @@ bool RunQueryFilter()
 
     AuraQueryFilter platformOnly{};
     platformOnly.layerMask = 1ull << 1;
+    platformOnly.shapeFilterGroup = 2u;
+    platformOnly.shapeFilterMask = 2u;
     Aura_Raycast(world, &ray, 100.0f, &platformOnly, &hit, &has);
     const float platformDistance = hit.distance;
     const bool hitPlatform = has != 0 && hit.body.index == platform.index;

@@ -6,7 +6,9 @@
 extern "C" {
 #endif
 
-#define AURA_ENGINE_ABI_VERSION 5u
+#ifndef AURA_ENGINE_ABI_VERSION
+#define AURA_ENGINE_ABI_VERSION 6u
+#endif
 
 typedef uint32_t AuraEntityIndex;
 typedef uint32_t AuraEntityGeneration;
@@ -51,6 +53,12 @@ typedef enum AuraShapeType
     AURA_SHAPE_TAPERED_CYLINDER = 8,
     AURA_SHAPE_HEIGHT_FIELD = 9
 } AuraShapeType;
+
+typedef enum AuraActiveEdgeMode
+{
+    AURA_ACTIVE_EDGES_ONLY = 0,
+    AURA_ACTIVE_EDGES_ALL = 1
+} AuraActiveEdgeMode;
 
 typedef enum AuraPhysicsMode
 {
@@ -116,6 +124,15 @@ typedef struct AuraShapeDesc
     uint32_t vertexCount;
     const uint32_t* indices;
     uint32_t indexCount;
+
+    /* Optional per-triangle/square material indices. For triangle meshes this
+       contains indexCount / 3 entries; height fields use (N - 1)^2 entries. */
+    const uint32_t* materialIndices;
+    uint32_t materialIndexCount;
+    uint32_t shapeFilterGroup;
+    uint32_t shapeFilterMask;
+    int32_t activeEdgeMode;
+    float activeEdgeCosThresholdAngle;
 } AuraShapeDesc;
 
 typedef struct AuraBodyDesc
@@ -267,6 +284,10 @@ typedef struct AuraQueryFilter
     int32_t flags;
     AuraEntityHandle ignoredEntity;
     AuraBodyHandle ignoredBody;
+    uint32_t shapeFilterGroup;
+    uint32_t shapeFilterMask;
+    int32_t activeEdgeMode;
+    AuraVec3 activeEdgeMovementDirection;
 } AuraQueryFilter;
 
 typedef struct AuraQueryHit
@@ -277,6 +298,7 @@ typedef struct AuraQueryHit
     float distance;
     AuraVec3 point;
     AuraVec3 normal;
+    uint32_t materialIndex;
 } AuraQueryHit;
 
 typedef struct AuraWorldHandle

@@ -27,6 +27,12 @@ namespace AuraEngine.Physics.Native
         public uint VertexCount;
         public IntPtr Indices;
         public uint IndexCount;
+        public IntPtr MaterialIndices;
+        public uint MaterialIndexCount;
+        public uint ShapeFilterGroup;
+        public uint ShapeFilterMask;
+        public int ActiveEdgeMode;
+        public float ActiveEdgeCosThresholdAngle;
 
         public static NativeShapeDesc From(in AuraPhysicsShapeDefinition shape)
         {
@@ -52,6 +58,10 @@ namespace AuraEngine.Physics.Native
                     ? (heights != null ? (uint)heights.Length : 0u)
                     : (vertices != null ? (uint)vertices.Length : 0u),
                 IndexCount = indices != null ? (uint)indices.Length : 0u,
+                ShapeFilterGroup = 0,
+                ShapeFilterMask = uint.MaxValue,
+                ActiveEdgeMode = 0,
+                ActiveEdgeCosThresholdAngle = 0f,
                 PlaneNormal = NativeVector3.From(shape.Geometry.PlaneNormal),
                 TopRadius = shape.Geometry.TopRadius,
             };
