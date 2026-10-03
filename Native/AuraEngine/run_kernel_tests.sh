@@ -14,18 +14,16 @@ if ! command -v "$DOTNET" >/dev/null 2>&1 && [ ! -x "$DOTNET" ]; then
     DOTNET=dotnet
 fi
 
-if [ ! -x "$ROOT/build/editor/libaura.dylib" ] && [ ! -x "$ROOT/build/editor/libaura.so" ]; then
-    "$ROOT/build_plugin.sh"
-fi
+"$ROOT/build_plugin.sh"
 
 "$DOTNET" build -c Release "$TESTS/ManagedKernelTests.csproj"
 OUT="$TESTS/bin/Release/net8.0"
 case "$(uname -s)" in
     Darwin)
-        cp "$ROOT/build/editor/libaura.dylib" "$OUT/libaura.dylib"
+        cp "$ROOT/build/plugin/libaura.dylib" "$OUT/libaura.dylib"
         ;;
     *)
-        cp "$ROOT/build/editor/libaura.so" "$OUT/libaura.so"
+        cp "$ROOT/build/plugin/libaura.so" "$OUT/libaura.so"
         ;;
 esac
 

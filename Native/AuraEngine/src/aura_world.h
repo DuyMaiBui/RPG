@@ -34,6 +34,15 @@ public:
     virtual uint32_t RaycastAll(const AuraRay& ray, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity) = 0;
     virtual uint32_t OverlapSphere(const AuraVec3& center, float radius, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity) = 0;
 
+    virtual AuraResultCode OverlapPoint(const AuraVec3&, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*) { return AURA_UNSUPPORTED_QUERY; }
+    virtual AuraResultCode OverlapBox(const AuraVec3&, const AuraVec3&, const AuraQuat&, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*) { return AURA_UNSUPPORTED_QUERY; }
+    virtual AuraResultCode OverlapCapsule(const AuraVec3&, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*) { return AURA_UNSUPPORTED_QUERY; }
+    virtual AuraResultCode OverlapShape(const AuraShapeDesc&, const AuraPose&, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*) { return AURA_UNSUPPORTED_QUERY; }
+    virtual AuraResultCode SphereCast(const AuraVec3&, float, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*) { return AURA_UNSUPPORTED_QUERY; }
+    virtual AuraResultCode CapsuleCast(const AuraVec3&, const AuraVec3&, float, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*) { return AURA_UNSUPPORTED_QUERY; }
+    virtual AuraResultCode BoxCast(const AuraVec3&, const AuraVec3&, const AuraQuat&, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*) { return AURA_UNSUPPORTED_QUERY; }
+    virtual AuraResultCode ShapeCast(const AuraShapeDesc&, const AuraPose&, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*) { return AURA_UNSUPPORTED_QUERY; }
+
     virtual uint64_t ComputeStateHash() const = 0;
     virtual AuraResultCode ApplyStates(const AuraBodyState* states, uint32_t count) = 0;
 

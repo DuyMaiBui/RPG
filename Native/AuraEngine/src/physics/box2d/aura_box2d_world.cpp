@@ -528,6 +528,17 @@ uint32_t Box2DWorld::OverlapSphere(const AuraVec3& center, float radius, const A
     return context.count;
 }
 
+#define AURA_UNSUPPORTED_QUERY_METHOD(name, signature) AuraResultCode Box2DWorld::name signature { return AURA_UNSUPPORTED_QUERY; }
+AURA_UNSUPPORTED_QUERY_METHOD(OverlapPoint, (const AuraVec3&, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*))
+AURA_UNSUPPORTED_QUERY_METHOD(OverlapBox, (const AuraVec3&, const AuraVec3&, const AuraQuat&, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*))
+AURA_UNSUPPORTED_QUERY_METHOD(OverlapCapsule, (const AuraVec3&, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*))
+AURA_UNSUPPORTED_QUERY_METHOD(OverlapShape, (const AuraShapeDesc&, const AuraPose&, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*))
+AURA_UNSUPPORTED_QUERY_METHOD(SphereCast, (const AuraVec3&, float, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*))
+AURA_UNSUPPORTED_QUERY_METHOD(CapsuleCast, (const AuraVec3&, const AuraVec3&, float, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*))
+AURA_UNSUPPORTED_QUERY_METHOD(BoxCast, (const AuraVec3&, const AuraVec3&, const AuraQuat&, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*))
+AURA_UNSUPPORTED_QUERY_METHOD(ShapeCast, (const AuraShapeDesc&, const AuraPose&, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*))
+#undef AURA_UNSUPPORTED_QUERY_METHOD
+
 uint64_t Box2DWorld::ComputeStateHash() const
 {
     uint64_t hash = 14695981039346656037ull;

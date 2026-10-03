@@ -29,6 +29,14 @@ public:
     bool Raycast(const AuraRay& ray, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit) override;
     uint32_t RaycastAll(const AuraRay& ray, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity) override;
     uint32_t OverlapSphere(const AuraVec3& center, float radius, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity) override;
+    AuraResultCode OverlapPoint(const AuraVec3& point, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount) override;
+    AuraResultCode OverlapBox(const AuraVec3& center, const AuraVec3& halfExtents, const AuraQuat& rotation, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount) override;
+    AuraResultCode OverlapCapsule(const AuraVec3& pointA, const AuraVec3& pointB, float radius, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount) override;
+    AuraResultCode OverlapShape(const AuraShapeDesc& shape, const AuraPose& pose, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount) override;
+    AuraResultCode SphereCast(const AuraVec3& origin, float radius, const AuraVec3& direction, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit, bool* outHasHit) override;
+    AuraResultCode CapsuleCast(const AuraVec3& pointA, const AuraVec3& pointB, float radius, const AuraVec3& direction, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit, bool* outHasHit) override;
+    AuraResultCode BoxCast(const AuraVec3& center, const AuraVec3& halfExtents, const AuraQuat& rotation, const AuraVec3& direction, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit, bool* outHasHit) override;
+    AuraResultCode ShapeCast(const AuraShapeDesc& shape, const AuraPose& pose, const AuraVec3& direction, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit, bool* outHasHit) override;
 
     uint64_t ComputeStateHash() const override;
     AuraResultCode ApplyStates(const AuraBodyState* states, uint32_t count) override;

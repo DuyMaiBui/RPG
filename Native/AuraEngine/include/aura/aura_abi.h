@@ -38,6 +38,14 @@ AuraResultCode Aura_CopyEvents(AuraWorldHandle world, AuraPhysicsEvent* buffer, 
 AuraResultCode Aura_Raycast(AuraWorldHandle world, const AuraRay* ray, float maxDistance, const AuraQueryFilter* filter, AuraQueryHit* outHit, uint8_t* outHasHit);
 AuraResultCode Aura_RaycastAll(AuraWorldHandle world, const AuraRay* ray, float maxDistance, const AuraQueryFilter* filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount);
 AuraResultCode Aura_OverlapSphere(AuraWorldHandle world, AuraVec3 center, float radius, const AuraQueryFilter* filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount);
+AuraResultCode Aura_OverlapPoint(AuraWorldHandle world, AuraVec3 point, const AuraQueryFilter* filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount);
+AuraResultCode Aura_OverlapBox(AuraWorldHandle world, AuraVec3 center, AuraVec3 halfExtents, AuraQuat rotation, const AuraQueryFilter* filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount);
+AuraResultCode Aura_OverlapCapsule(AuraWorldHandle world, AuraVec3 pointA, AuraVec3 pointB, float radius, const AuraQueryFilter* filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount);
+AuraResultCode Aura_OverlapShape(AuraWorldHandle world, const AuraShapeDesc* shape, const AuraPose* pose, const AuraQueryFilter* filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount);
+AuraResultCode Aura_SphereCast(AuraWorldHandle world, AuraVec3 origin, float radius, AuraVec3 direction, float maxDistance, const AuraQueryFilter* filter, AuraQueryHit* outHit, uint8_t* outHasHit);
+AuraResultCode Aura_CapsuleCast(AuraWorldHandle world, AuraVec3 pointA, AuraVec3 pointB, float radius, AuraVec3 direction, float maxDistance, const AuraQueryFilter* filter, AuraQueryHit* outHit, uint8_t* outHasHit);
+AuraResultCode Aura_BoxCast(AuraWorldHandle world, AuraVec3 center, AuraVec3 halfExtents, AuraQuat rotation, AuraVec3 direction, float maxDistance, const AuraQueryFilter* filter, AuraQueryHit* outHit, uint8_t* outHasHit);
+AuraResultCode Aura_ShapeCast(AuraWorldHandle world, const AuraShapeDesc* shape, const AuraPose* pose, AuraVec3 direction, float maxDistance, const AuraQueryFilter* filter, AuraQueryHit* outHit, uint8_t* outHasHit);
 
 AuraResultCode Aura_CreateJoint(AuraWorldHandle world, const AuraJointDesc* desc, uint64_t* outJoint);
 AuraResultCode Aura_DestroyJoint(AuraWorldHandle world, uint64_t joint);

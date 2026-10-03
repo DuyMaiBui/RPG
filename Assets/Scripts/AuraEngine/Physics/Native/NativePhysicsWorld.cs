@@ -423,37 +423,30 @@ namespace AuraEngine.Physics.Native
 
         bool IPhysicsQuery.SphereCast(AuraVector3 origin, float radius, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, out AuraPhysicsQueryHit hit)
         {
-            hit = default;
-            var normalized = direction.Normalized();
-            const int steps = 64;
-            for (var step = 0; step <= steps; step++)
-            {
-                var distance = maxDistance * (step / (float)steps);
-                var center = origin + normalized * distance;
-                if (OverlapSphereCount(center, radius, filter) > 0)
-                {
-                    hit = new AuraPhysicsQueryHit(SimulationEntityId.None, PhysicsBodyId.Invalid, PhysicsShapeId.Invalid, distance, center, -normalized);
-                    return true;
-                }
-            }
-
-            return false;
+            var nativeFilter = NativeQueryFilter.From(filter);
+            var result = (AuraResult)NativeMethods.Aura_SphereCast(_world, NativeVector3.From(origin), radius, NativeVector3.From(direction), maxDistance, ref nativeFilter, out var nativeHit, out var hasHit);
+            hit = result == AuraResult.Success && hasHit != 0 ? nativeHit.ToManaged() : default;
+            return result == AuraResult.Success && hasHit != 0;
         }
 
         int IPhysicsQuery.SphereCastAll(AuraVector3 origin, float radius, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
 
         bool IPhysicsQuery.CapsuleCast(AuraVector3 pointA, AuraVector3 pointB, float radius, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, out AuraPhysicsQueryHit hit)
         {
-            hit = default;
-            return false;
+            var nativeFilter = NativeQueryFilter.From(filter);
+            var result = (AuraResult)NativeMethods.Aura_CapsuleCast(_world, NativeVector3.From(pointA), NativeVector3.From(pointB), radius, NativeVector3.From(direction), maxDistance, ref nativeFilter, out var nativeHit, out var hasHit);
+            hit = result == AuraResult.Success && hasHit != 0 ? nativeHit.ToManaged() : default;
+            return result == AuraResult.Success && hasHit != 0;
         }
 
         int IPhysicsQuery.CapsuleCastAll(AuraVector3 pointA, AuraVector3 pointB, float radius, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
 
         bool IPhysicsQuery.BoxCast(AuraVector3 center, AuraVector3 halfExtents, AuraQuaternion rotation, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, out AuraPhysicsQueryHit hit)
         {
-            hit = default;
-            return false;
+            var nativeFilter = NativeQueryFilter.From(filter);
+            var result = (AuraResult)NativeMethods.Aura_BoxCast(_world, NativeVector3.From(center), NativeVector3.From(halfExtents), NativeQuaternion.From(rotation), NativeVector3.From(direction), maxDistance, ref nativeFilter, out var nativeHit, out var hasHit);
+            hit = result == AuraResult.Success && hasHit != 0 ? nativeHit.ToManaged() : default;
+            return result == AuraResult.Success && hasHit != 0;
         }
 
         int IPhysicsQuery.BoxCastAll(AuraVector3 center, AuraVector3 halfExtents, AuraQuaternion rotation, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
@@ -467,7 +460,7 @@ namespace AuraEngine.Physics.Native
         int IPhysicsQuery.ShapeCastAll(in AuraPhysicsShapeDefinition shape, AuraPose pose, AuraVector3 direction, float maxDistance, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
 
         int IPhysicsQuery.OverlapPoint(AuraVector3 point, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) =>
-            ((IPhysicsQuery)this).OverlapSphere(point, 0.0001f, filter, results);
+            CopyOverlapPoint(point, filter, results);
 
         int IPhysicsQuery.OverlapSphere(AuraVector3 center, float radius, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results)
         {
@@ -495,9 +488,11 @@ namespace AuraEngine.Physics.Native
             }
         }
 
-        int IPhysicsQuery.OverlapBox(AuraVector3 center, AuraVector3 halfExtents, AuraQuaternion rotation, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
+        int IPhysicsQuery.OverlapBox(AuraVector3 center, AuraVector3 halfExtents, AuraQuaternion rotation, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) =>
+            CopyOverlapBox(center, halfExtents, rotation, filter, results);
 
-        int IPhysicsQuery.OverlapCapsule(AuraVector3 pointA, AuraVector3 pointB, float radius, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
+        int IPhysicsQuery.OverlapCapsule(AuraVector3 pointA, AuraVector3 pointB, float radius, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) =>
+            CopyOverlapCapsule(pointA, pointB, radius, filter, results);
 
         int IPhysicsQuery.OverlapShape(in AuraPhysicsShapeDefinition shape, AuraPose pose, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results) => 0;
 
@@ -513,6 +508,57 @@ namespace AuraEngine.Physics.Native
                 Marshal.FreeHGlobal(_collisionMasks);
                 _collisionMasks = IntPtr.Zero;
             }
+        }
+
+        private int CopyOverlapPoint(AuraVector3 point, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results)
+        {
+            if (results.Length == 0)
+                return 0;
+            var raw = Marshal.AllocHGlobal(Marshal.SizeOf<NativeQueryHit>() * results.Length);
+            try
+            {
+                var nativeFilter = NativeQueryFilter.From(filter);
+                var result = (AuraResult)NativeMethods.Aura_OverlapPoint(_world, NativeVector3.From(point), ref nativeFilter, raw, (uint)results.Length, out var count);
+                return result == AuraResult.Success ? CopyHits(raw, count, results) : 0;
+            }
+            finally { Marshal.FreeHGlobal(raw); }
+        }
+
+        private int CopyOverlapBox(AuraVector3 center, AuraVector3 halfExtents, AuraQuaternion rotation, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results)
+        {
+            if (results.Length == 0)
+                return 0;
+            var raw = Marshal.AllocHGlobal(Marshal.SizeOf<NativeQueryHit>() * results.Length);
+            try
+            {
+                var nativeFilter = NativeQueryFilter.From(filter);
+                var result = (AuraResult)NativeMethods.Aura_OverlapBox(_world, NativeVector3.From(center), NativeVector3.From(halfExtents), NativeQuaternion.From(rotation), ref nativeFilter, raw, (uint)results.Length, out var count);
+                return result == AuraResult.Success ? CopyHits(raw, count, results) : 0;
+            }
+            finally { Marshal.FreeHGlobal(raw); }
+        }
+
+        private int CopyOverlapCapsule(AuraVector3 pointA, AuraVector3 pointB, float radius, in AuraPhysicsQueryFilter filter, Span<AuraPhysicsQueryHit> results)
+        {
+            if (results.Length == 0)
+                return 0;
+            var raw = Marshal.AllocHGlobal(Marshal.SizeOf<NativeQueryHit>() * results.Length);
+            try
+            {
+                var nativeFilter = NativeQueryFilter.From(filter);
+                var result = (AuraResult)NativeMethods.Aura_OverlapCapsule(_world, NativeVector3.From(pointA), NativeVector3.From(pointB), radius, ref nativeFilter, raw, (uint)results.Length, out var count);
+                return result == AuraResult.Success ? CopyHits(raw, count, results) : 0;
+            }
+            finally { Marshal.FreeHGlobal(raw); }
+        }
+
+        private static int CopyHits(IntPtr raw, uint count, Span<AuraPhysicsQueryHit> results)
+        {
+            var size = Marshal.SizeOf<NativeQueryHit>();
+            var limit = Math.Min((int)count, results.Length);
+            for (var index = 0; index < limit; index++)
+                results[index] = Marshal.PtrToStructure<NativeQueryHit>(raw + index * size).ToManaged();
+            return limit;
         }
 
         private int OverlapSphereCount(AuraVector3 center, float radius, in AuraPhysicsQueryFilter filter)

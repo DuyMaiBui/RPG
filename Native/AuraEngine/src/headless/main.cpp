@@ -462,6 +462,59 @@ bool RunQueryFilter()
     Aura_DestroyWorld(world);
     return ok;
 }
+
+bool RunNativeQueryFamilies()
+{
+    AuraWorldDesc desc{};
+    desc.mode = AURA_MODE_FULL_3D;
+    desc.gravity = AuraVec3{ 0.0f, 0.0f, 0.0f };
+    AuraWorldHandle world{};
+    if (Aura_CreateWorld(&desc, &world) != AURA_SUCCESS)
+        return false;
+
+    AuraShapeDesc boxShape{};
+    boxShape.type = AURA_SHAPE_BOX;
+    boxShape.halfExtents = AuraVec3{ 1.0f, 0.5f, 1.0f };
+    AuraBodyDesc bodyDesc{};
+    bodyDesc.type = AURA_BODY_STATIC;
+    bodyDesc.layer = 0;
+    bodyDesc.collisionMask = ~0ull;
+    bodyDesc.shapes = &boxShape;
+    bodyDesc.shapeCount = 1;
+    bodyDesc.initialPose.position = AuraVec3{ 0.0f, 0.0f, 0.0f };
+    bodyDesc.initialPose.rotation = AuraQuat{ 0.0f, 0.0f, 0.0f, 1.0f };
+
+    AuraEntityHandle entity{};
+    AuraBodyHandle body{};
+    Aura_CreateEntity(world, &entity);
+    if (Aura_AttachBody(world, entity, &bodyDesc, &body) != AURA_SUCCESS)
+    {
+        Aura_DestroyWorld(world);
+        return false;
+    }
+
+    AuraQueryFilter filter{};
+    filter.layerMask = ~0ull;
+    AuraQueryHit hits[8]{};
+    uint32_t pointCount = 0;
+    uint32_t boxCount = 0;
+    uint32_t capsuleCount = 0;
+    const AuraResultCode pointResult = Aura_OverlapPoint(world, AuraVec3{ 0.0f, 0.0f, 0.0f }, &filter, hits, 8, &pointCount);
+    const bool pointHandle = pointCount > 0 && hits[0].body.index == body.index;
+    const AuraResultCode boxResult = Aura_OverlapBox(world, AuraVec3{ 0.0f, 0.0f, 0.0f }, AuraVec3{ 0.25f, 0.25f, 0.25f }, AuraQuat{ 0.0f, 0.0f, 0.0f, 1.0f }, &filter, hits, 8, &boxCount);
+    const AuraResultCode capsuleResult = Aura_OverlapCapsule(world, AuraVec3{ 0.0f, -0.25f, 0.0f }, AuraVec3{ 0.0f, 0.25f, 0.0f }, 0.25f, &filter, hits, 8, &capsuleCount);
+    AuraQueryHit castHit{};
+    uint8_t hasCast = 0;
+    const AuraResultCode castResult = Aura_SphereCast(world, AuraVec3{ 0.0f, 5.0f, 0.0f }, 0.5f, AuraVec3{ 0.0f, -1.0f, 0.0f }, 10.0f, &filter, &castHit, &hasCast);
+    const bool ok = pointResult == AURA_SUCCESS && boxResult == AURA_SUCCESS && capsuleResult == AURA_SUCCESS && castResult == AURA_SUCCESS
+        && pointCount == 1 && boxCount == 1 && capsuleCount == 1 && hasCast != 0 && castHit.body.index == body.index && pointHandle;
+    std::printf("[queries] point=%d/%u box=%d/%u capsule=%d/%u sphere_cast=%d/%u distance=%.3f handles=%u\n",
+        static_cast<int>(pointResult), pointCount, static_cast<int>(boxResult), boxCount,
+        static_cast<int>(capsuleResult), capsuleCount, static_cast<int>(castResult), static_cast<unsigned>(hasCast),
+        castHit.distance, static_cast<unsigned>(pointHandle && castHit.body.index == body.index));
+    Aura_DestroyWorld(world);
+    return ok;
+}
 } // namespace
 
 int main()
@@ -577,6 +630,7 @@ int main()
     ok = ok && RunTriangleMesh();
     ok = ok && RunHeightField();
     ok = ok && RunQueryFilter();
+    ok = ok && RunNativeQueryFamilies();
     ok = ok && RunCharacter();
 
     std::printf(ok ? "AURA_HEADLESS_OK\n" : "AURA_HEADLESS_FAIL\n");

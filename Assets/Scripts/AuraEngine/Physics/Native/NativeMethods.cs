@@ -56,6 +56,24 @@ namespace AuraEngine.Physics.Native
         public static extern int Aura_OverlapSphere(NativeWorldHandle world, NativeVector3 center, float radius, ref NativeQueryFilter filter, IntPtr buffer, uint capacity, out uint outCount);
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_OverlapPoint(NativeWorldHandle world, NativeVector3 point, ref NativeQueryFilter filter, IntPtr buffer, uint capacity, out uint outCount);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_OverlapBox(NativeWorldHandle world, NativeVector3 center, NativeVector3 halfExtents, NativeQuaternion rotation, ref NativeQueryFilter filter, IntPtr buffer, uint capacity, out uint outCount);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_OverlapCapsule(NativeWorldHandle world, NativeVector3 pointA, NativeVector3 pointB, float radius, ref NativeQueryFilter filter, IntPtr buffer, uint capacity, out uint outCount);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_SphereCast(NativeWorldHandle world, NativeVector3 origin, float radius, NativeVector3 direction, float maxDistance, ref NativeQueryFilter filter, out NativeQueryHit outHit, out byte outHasHit);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_CapsuleCast(NativeWorldHandle world, NativeVector3 pointA, NativeVector3 pointB, float radius, NativeVector3 direction, float maxDistance, ref NativeQueryFilter filter, out NativeQueryHit outHit, out byte outHasHit);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_BoxCast(NativeWorldHandle world, NativeVector3 center, NativeVector3 halfExtents, NativeQuaternion rotation, NativeVector3 direction, float maxDistance, ref NativeQueryFilter filter, out NativeQueryHit outHit, out byte outHasHit);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         public static extern int Aura_CopyContacts(NativeWorldHandle world, IntPtr buffer, uint capacity, out uint outCount);
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]

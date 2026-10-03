@@ -1,6 +1,7 @@
 #include "aura_jolt_internal.h"
 
 #include <Jolt/Physics/Collision/ObjectLayer.h>
+#include <Jolt/Physics/Collision/ShapeCast.h>
 
 namespace aura
 {
@@ -18,6 +19,61 @@ public:
         return layer < 64 && ((mask >> layer) & 1ull) != 0ull;
     }
 };
+} // namespace
+
+namespace
+{
+struct CastShapeCollector final : public JPH::CastShapeCollector
+{
+    JPH::ShapeCastResult result;
+    bool hasHit = false;
+    void AddHit(const JPH::ShapeCastResult& hit) override
+    {
+        if (!hasHit || hit.GetEarlyOutFraction() < result.GetEarlyOutFraction()) { result = hit; hasHit = true; }
+    }
+};
+
+template <typename TImpl>
+AuraResultCode FillShapeOverlap(TImpl* impl, const JPH::Shape* shape, const JPH::RMat44& transform, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount)
+{
+    if (shape == nullptr || buffer == nullptr || outCount == nullptr || capacity == 0)
+        return AURA_INVALID_DEFINITION;
+    QueryLayerFilter layerFilter;
+    layerFilter.mask = filter.layerMask;
+    const JPH::IgnoreSingleBodyFilter bodyFilter(impl->IgnoredBody(filter));
+    JPH::CollideShapeSettings settings;
+    ShapeCollector collector;
+    impl->physics.GetNarrowPhaseQuery().CollideShape(shape, JPH::Vec3::sReplicate(1.0f), transform, settings, JPH::RVec3::sZero(), collector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter, JPH::ShapeFilter());
+    *outCount = std::min(collector.count, capacity);
+    for (uint32_t i = 0; i < *outCount; ++i)
+    {
+        const JPH::CollideShapeResult& result = collector.results[i];
+        buffer[i].entity = AuraEntityHandle{ 0, 0 };
+        buffer[i].body = impl->HandleFromBodyId(result.mBodyID2);
+        buffer[i].shape = result.mBodyID2.GetIndex();
+        buffer[i].distance = result.mPenetrationDepth;
+        buffer[i].point = ToAura(JPH::RVec3(result.mContactPointOn2));
+        buffer[i].normal = ToAura(result.mPenetrationAxis.NormalizedOr(JPH::Vec3::sZero()));
+    }
+    return AURA_SUCCESS;
+}
+
+JPH::RMat44 Transform(const AuraPose& pose)
+{
+    const float norm = pose.rotation.x * pose.rotation.x + pose.rotation.y * pose.rotation.y + pose.rotation.z * pose.rotation.z + pose.rotation.w * pose.rotation.w;
+    const AuraQuat rotation = norm > 1e-8f ? pose.rotation : AuraQuat{ 0.0f, 0.0f, 0.0f, 1.0f };
+    return JPH::RMat44::sRotationTranslation(ToQuat(rotation), ToRVec3(pose.position));
+}
+JPH::RMat44 ShapeTransform(const AuraPose& pose, const AuraShapeDesc& shape) { return Transform(pose) * Transform(shape.localPose); }
+
+AuraShapeDesc CapsuleDescription(const AuraVec3& pointA, const AuraVec3& pointB, float radius, AuraPose& pose)
+{
+    const JPH::Vec3 axis = ToVec3(AuraVec3{ pointB.x - pointA.x, pointB.y - pointA.y, pointB.z - pointA.z });
+    const float length = axis.Length();
+    pose.position = AuraVec3{ (pointA.x + pointB.x) * 0.5f, (pointA.y + pointB.y) * 0.5f, (pointA.z + pointB.z) * 0.5f };
+    pose.rotation = ToAura(length > 1e-6f ? JPH::Quat::sFromTo(JPH::Vec3::sAxisY(), axis / length) : JPH::Quat::sIdentity());
+    AuraShapeDesc desc{}; desc.type = AURA_SHAPE_CAPSULE; desc.radius = radius; desc.height = length + radius * 2.0f; return desc;
+}
 } // namespace
 
 /* Jolt query surface (raycast / overlap). New query families belong here. */
@@ -126,5 +182,38 @@ uint32_t JoltWorld::OverlapSphere(const AuraVec3& center, float radius, const Au
     }
     return count;
 }
+
+AuraResultCode JoltWorld::OverlapPoint(const AuraVec3& point, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount)
+{ const JPH::SphereShape shape(0.0001f); return FillShapeOverlap(impl_, &shape, JPH::RMat44::sTranslation(ToRVec3(point)), filter, buffer, capacity, outCount); }
+AuraResultCode JoltWorld::OverlapBox(const AuraVec3& center, const AuraVec3& halfExtents, const AuraQuat& rotation, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount)
+{ const JPH::BoxShape shape(ToVec3(halfExtents)); return FillShapeOverlap(impl_, &shape, Transform(AuraPose{ center, rotation }), filter, buffer, capacity, outCount); }
+AuraResultCode JoltWorld::OverlapCapsule(const AuraVec3& pointA, const AuraVec3& pointB, float radius, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount)
+{ AuraPose pose{}; const AuraShapeDesc desc = CapsuleDescription(pointA, pointB, radius, pose); bool sensor = false; const JPH::RefConst<JPH::Shape> shape = MakeShape(desc, sensor); return FillShapeOverlap(impl_, shape.GetPtr(), Transform(pose), filter, buffer, capacity, outCount); }
+AuraResultCode JoltWorld::OverlapShape(const AuraShapeDesc& desc, const AuraPose& pose, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity, uint32_t* outCount)
+{ bool sensor = false; const JPH::RefConst<JPH::Shape> shape = MakeShape(desc, sensor); return FillShapeOverlap(impl_, shape.GetPtr(), ShapeTransform(pose, desc), filter, buffer, capacity, outCount); }
+
+AuraResultCode JoltWorld::ShapeCast(const AuraShapeDesc& desc, const AuraPose& pose, const AuraVec3& direction, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit, bool* outHasHit)
+{
+    if (outHit == nullptr || outHasHit == nullptr || maxDistance <= 0.0f) return AURA_INVALID_DEFINITION;
+    *outHasHit = false; bool sensor = false; const JPH::RefConst<JPH::Shape> shape = MakeShape(desc, sensor);
+    if (shape == nullptr) return AURA_UNSUPPORTED_SHAPE;
+    const JPH::Vec3 unit = ToVec3(direction).Normalized(); if (unit.LengthSq() <= 1e-12f) return AURA_SUCCESS;
+    const JPH::RShapeCast cast = JPH::RShapeCast::sFromWorldTransform(shape.GetPtr(), JPH::Vec3::sReplicate(1.0f), ShapeTransform(pose, desc), unit * maxDistance);
+    CastShapeCollector collector; JPH::ShapeCastSettings settings; QueryLayerFilter layerFilter; layerFilter.mask = filter.layerMask;
+    const JPH::IgnoreSingleBodyFilter bodyFilter(impl_->IgnoredBody(filter));
+    impl_->physics.GetNarrowPhaseQuery().CastShape(cast, settings, JPH::RVec3::sZero(), collector, JPH::BroadPhaseLayerFilter(), layerFilter, bodyFilter, JPH::ShapeFilter());
+    if (!collector.hasHit) return AURA_SUCCESS;
+    const JPH::ShapeCastResult& result = collector.result;
+    outHit->entity = AuraEntityHandle{ 0, 0 }; outHit->body = impl_->HandleFromBodyId(result.mBodyID2); outHit->shape = result.mBodyID2.GetIndex();
+    outHit->distance = result.mFraction * maxDistance; outHit->point = ToAura(JPH::RVec3(result.mContactPointOn2)); outHit->normal = ToAura(result.mPenetrationAxis.NormalizedOr(JPH::Vec3::sZero())); *outHasHit = true;
+    return AURA_SUCCESS;
+}
+
+AuraResultCode JoltWorld::SphereCast(const AuraVec3& origin, float radius, const AuraVec3& direction, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit, bool* outHasHit)
+{ AuraShapeDesc desc{}; desc.type = AURA_SHAPE_SPHERE; desc.radius = radius; return ShapeCast(desc, AuraPose{ origin, AuraQuat{ 0, 0, 0, 1 } }, direction, maxDistance, filter, outHit, outHasHit); }
+AuraResultCode JoltWorld::CapsuleCast(const AuraVec3& pointA, const AuraVec3& pointB, float radius, const AuraVec3& direction, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit, bool* outHasHit)
+{ AuraPose pose{}; const AuraShapeDesc desc = CapsuleDescription(pointA, pointB, radius, pose); return ShapeCast(desc, pose, direction, maxDistance, filter, outHit, outHasHit); }
+AuraResultCode JoltWorld::BoxCast(const AuraVec3& center, const AuraVec3& halfExtents, const AuraQuat& rotation, const AuraVec3& direction, float maxDistance, const AuraQueryFilter& filter, AuraQueryHit* outHit, bool* outHasHit)
+{ AuraShapeDesc desc{}; desc.type = AURA_SHAPE_BOX; desc.halfExtents = halfExtents; return ShapeCast(desc, AuraPose{ center, rotation }, direction, maxDistance, filter, outHit, outHasHit); }
 
 } // namespace aura
