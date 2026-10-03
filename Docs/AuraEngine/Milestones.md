@@ -18,12 +18,12 @@ platform build that is not available here.
 | M9 C# Server Host | Done | `AuraEngine.Server` bounded-queue fixed-tick host |
 | M10 Unity Bridge | Done | `AuraSimulationInstance`, view registry, transform sync, event dispatcher |
 | M11 Unity Authoring | Done | Body + sphere/box/capsule/cylinder/convex/mesh collider authoring, materials, capability validation |
-| M12 Baking Pipeline | Partial | `AuraPhysicsMeshData` asset + `AuraMeshColliderBaker` menu bake mesh vertices/indices to a backend-independent asset with a stable asset id; material assets baked via `AuraPhysicsMaterialAsset`. Convex hull cooking and runtime mesh collision need native backends. |
+| M12 Baking Pipeline | Done | `AuraPhysicsMeshData` + `AuraMeshColliderBaker` bake mesh vertices/indices to a backend-independent asset; `AuraPhysicsMaterialAsset` bakes materials. Runtime triangle-mesh and height-field narrowphase now exist on the managed and Jolt backends; per-triangle materials remain open. |
 | M13 Unity Presentation | Done | `AuraPhysicsView` + sample HUD/ray probe/kinematic mover |
 | M14 Debug & Editor Tooling | Done | Collider gizmos + scene handles, `AuraPhysicsDebugDraw`, `AuraSimulationInstanceEditor` (runtime stats + inline collision matrix), layer dropdown |
 | M15 Serialization/Replay/Determinism | Done | Binary snapshot, sorted deterministic hashing, replay recorder/player, versioned replay file, initial-state validation |
-| M16 Cross-platform Build & CI | Partial | `.github/workflows/ci.yml` builds and runs the native ABI test on Linux/macOS and adds a `bench` job that builds and runs `aura_bench` (§28). The Unity EditMode job is documented but needs a licensed runner; the Jolt+Box2D plugin path is built locally, not in CI. Platform matrix (Android/iOS/ARM64) not built. |
-| M17 Production Server | Native/Partial | Headless C# host exists; native server runtime and load/soak testing pending. |
+| M16 Cross-platform Build & CI | Partial | `.github/workflows/ci.yml` builds the reference ABI (Linux/macOS/Windows), the Jolt+Box2D plugin and the benchmark, with uploaded artifacts; `build_android.sh`/`build_ios.sh` + toolchains + a mobile CI job cover Android/iOS. The Unity EditMode job still needs a licensed runner; mobile artifacts are lint-verified here, not built locally (no NDK/Xcode SDK). |
+| M17 Production Server | Partial | Headless C# host with a 5000-tick soak test (bounded queue, no fault) plus an idle-period guard. Real network serving over UDP/WebSocket exists in `AuraEngine.Networking`; native server runtime packaging and long-run profiling remain open. |
 | M18 Networking/Prediction | Partial | `AuraEngine.Networking`: input/snapshot/ack codec, `IAuraTransport` + in-memory loopback, `AuraLockstepBuffer`, authoritative `AuraNetServer`, predicting `AuraNetClient`/`AuraPredictedWorld` with re-simulation reconciliation, `UdpAuraTransport` + `WebSocketAuraTransport`, `AuraSnapshotDelta` and `AuraLagCompensator`. No per-entity rollback or UDP reliability layer yet. |
 
 ## Plan sections beyond the milestone list
@@ -35,16 +35,17 @@ platform build that is not available here.
 - §30 Error handling — managed `AuraResult`/`AuraException`; native returns `AuraResultCode`; no exceptions cross the ABI.
 - §31 Backend validation — authoring + inspectors report unsupported shapes and invalid definitions.
 - §32 AI-agent docs — `Architecture.md`, `Native-Abi.md`, `Demo.md`, `Status.md`, this file.
-- §33 `AuraEngine.MCP` — **missing** (planned last, after the API freezes).
+- §33 `AuraEngine.MCP` — minimal stdio JSON-RPC server implemented (`initialize`, `tools/list`, `tools/call`; tools `world_create`, `body_create_box`, `body_create_sphere`, `world_step`, `world_raycast`, `world_state`), verified end-to-end. Resources/prompts and non-stdio transport are open.
 - §34 Sample projects — 3D and 2D Unity scenes; no server-shared or replay sample scene yet.
 - §35 Major acceptance gate (same Domain on Unity + server) — partially: Unity and the headless host already run the same `AuraEngine.Simulation` + `ManagedPhysicsBackend`; a shared sample Domain and native-parity run are not yet demonstrated.
 - §36 Release strategy / §39 Definition of Done — tracked here and in `Status.md`.
 
 ## Highest-value remaining work
 
-1. Convex hull cooking + runtime triangle-mesh collision in the managed backend
-   (M12) once the managed solver supports them (Jolt already provides both).
-2. Platform build/CI matrix (M16): Windows/Linux/Android/iOS plugin builds and a
-   licensed Unity runner. The native ABI and benchmark jobs already run in CI.
-3. A real network transport + snapshot delta/lag compensation for M18; the
-   in-memory prediction/reconciliation core is already in place and tested.
+1. A licensed Unity CI runner to execute the EditMode/PlayMode suites in CI
+   (M16); the native/plugin/bench/mobile jobs already run.
+2. Per-entity rollback, UDP reliability layer (fragmentation/congestion) and
+   baseline negotiation for M18.
+3. MCP resources/prompts and a real MCP transport; mesh material indexing in
+   the baking pipeline.
+4. Native server runtime packaging and long-run profiling (M17).
