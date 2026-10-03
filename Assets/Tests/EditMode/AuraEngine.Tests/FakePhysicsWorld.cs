@@ -5,7 +5,7 @@ using AuraEngine.Physics;
 
 namespace AuraEngine.Tests
 {
-    public sealed class FakePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsContacts, IPhysicsSerialization
+    public sealed class FakePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly List<AuraPhysicsEvent> _events;
         private readonly List<FakePhysicsBody> _bodies = new List<FakePhysicsBody>();
@@ -122,6 +122,7 @@ namespace AuraEngine.Tests
         IPhysicsContacts IPhysicsWorld.Contacts => this;
 
         IPhysicsVehicles IPhysicsWorld.Vehicles => this;
+        IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;
 
         AuraVehicleId IPhysicsVehicles.CreateVehicle(in AuraVehicleDefinition definition) => AuraVehicleId.Invalid;
 
@@ -134,6 +135,10 @@ namespace AuraEngine.Tests
             state = default;
             return false;
         }
+
+        AuraSoftBodyId IPhysicsSoftBodies.CreateSoftBody(in AuraSoftBodyDefinition definition) => AuraSoftBodyId.Invalid;
+        AuraResult IPhysicsSoftBodies.DestroySoftBody(AuraSoftBodyId softBody) => AuraResult.InvalidHandle;
+        bool IPhysicsSoftBodies.TryGetState(AuraSoftBodyId softBody, out AuraSoftBodyState state) { state = default; return false; }
 
         IPhysicsSerialization IPhysicsWorld.Serialization => this;
 

@@ -55,6 +55,9 @@ public:
     uint32_t CharacterCount() const override;
     uint32_t CopyCharacterStates(AuraCharacterState* buffer, uint32_t capacity) const override;
     AuraResultCode ApplyCharacterStates(const AuraCharacterState* states, uint32_t count) override;
+    AuraResultCode CreateSoftBody(const AuraSoftBodyDesc&, AuraSoftBodyHandle*) override;
+    AuraResultCode DestroySoftBody(AuraSoftBodyHandle) override;
+    AuraResultCode GetSoftBodyState(AuraSoftBodyHandle, float*, uint32_t, AuraSoftBodyState*) const override;
 
 private:
     struct Impl;

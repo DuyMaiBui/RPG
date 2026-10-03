@@ -13,6 +13,7 @@
 #include "aura_world.h"
 #include "aura_jolt_world.h"
 #include "aura_jolt_vehicle.h"
+#include "aura_jolt_softbody.h"
 
 #include <Jolt/Jolt.h>
 
@@ -228,6 +229,13 @@ struct JoltWorld::Impl
         AuraBodyHandle chassis{};
     };
 
+    struct SoftBodySlot
+    {
+        bool occupied = false;
+        uint32_t generation = 0;
+        std::unique_ptr<aura::jolt_internal::AuraJoltSoftBodyOwner> softBody;
+    };
+
     std::vector<Slot> slots;
     std::vector<int> freeSlots;
     std::vector<JointSlot> jointSlots;
@@ -258,6 +266,8 @@ struct JoltWorld::Impl
     /* Declared after physics so vehicles are destroyed before the Jolt system. */
     std::vector<VehicleSlot> vehicleSlots;
     std::vector<int> freeVehicleSlots;
+    std::vector<SoftBodySlot> softBodySlots;
+    std::vector<int> freeSoftBodySlots;
     AuraSimShapeFilter simShapeFilter;
 
     AuraPhysicsMode mode = AURA_MODE_FULL_3D;
@@ -413,6 +423,29 @@ struct JoltWorld::Impl
         const uint32_t generation = static_cast<uint32_t>(handle.opaque >> 32);
         if (index < vehicleSlots.size() && vehicleSlots[index].occupied && vehicleSlots[index].generation == generation)
             return &vehicleSlots[index];
+        return nullptr;
+    }
+
+    static AuraSoftBodyHandle MakeSoftBodyHandle(const SoftBodySlot& slot, int index)
+    {
+        return AuraSoftBodyHandle{ (static_cast<uint64_t>(slot.generation) << 32) | static_cast<uint32_t>(index) };
+    }
+
+    SoftBodySlot* FindSoftBody(AuraSoftBodyHandle handle)
+    {
+        const uint32_t index = static_cast<uint32_t>(handle.opaque);
+        const uint32_t generation = static_cast<uint32_t>(handle.opaque >> 32);
+        if (index < softBodySlots.size() && softBodySlots[index].occupied && softBodySlots[index].generation == generation)
+            return &softBodySlots[index];
+        return nullptr;
+    }
+
+    const SoftBodySlot* FindSoftBody(AuraSoftBodyHandle handle) const
+    {
+        const uint32_t index = static_cast<uint32_t>(handle.opaque);
+        const uint32_t generation = static_cast<uint32_t>(handle.opaque >> 32);
+        if (index < softBodySlots.size() && softBodySlots[index].occupied && softBodySlots[index].generation == generation)
+            return &softBodySlots[index];
         return nullptr;
     }
 

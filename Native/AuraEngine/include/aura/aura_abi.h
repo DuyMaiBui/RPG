@@ -65,6 +65,10 @@ AuraResultCode Aura_DestroyVehicle(AuraWorldHandle world, AuraVehicleHandle vehi
 AuraResultCode Aura_SetVehicleInput(AuraWorldHandle world, AuraVehicleHandle vehicle, float forward, float steering, float brake, float handBrake);
 AuraResultCode Aura_GetVehicleWheelState(AuraWorldHandle world, AuraVehicleHandle vehicle, uint32_t wheelIndex, AuraVehicleWheelState* outState);
 
+AuraResultCode Aura_CreateSoftBody(AuraWorldHandle world, const AuraSoftBodyDesc* desc, AuraSoftBodyHandle* outSoftBody);
+AuraResultCode Aura_DestroySoftBody(AuraWorldHandle world, AuraSoftBodyHandle softBody);
+AuraResultCode Aura_GetSoftBodyState(AuraWorldHandle world, AuraSoftBodyHandle softBody, float* vertexPositions, uint32_t vertexCapacity, AuraSoftBodyState* outState);
+
 AuraResultCode Aura_ComputeStateHash(AuraWorldHandle world, uint64_t* outHash);
 
 AuraResultCode Aura_SerializeState(AuraWorldHandle world, uint8_t* buffer, uint32_t capacity, uint32_t* outSize);

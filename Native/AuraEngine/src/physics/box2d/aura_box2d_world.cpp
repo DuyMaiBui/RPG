@@ -826,4 +826,19 @@ AuraResultCode Box2DWorld::ApplyCharacterStates(const AuraCharacterState* states
     return AURA_UNSUPPORTED_QUERY;
 }
 
+AuraResultCode Box2DWorld::CreateSoftBody(const AuraSoftBodyDesc&, AuraSoftBodyHandle*)
+{
+    return AURA_UNSUPPORTED_SHAPE;
+}
+
+AuraResultCode Box2DWorld::DestroySoftBody(AuraSoftBodyHandle)
+{
+    return AURA_UNSUPPORTED_SHAPE;
+}
+
+AuraResultCode Box2DWorld::GetSoftBodyState(AuraSoftBodyHandle, float*, uint32_t, AuraSoftBodyState*) const
+{
+    return AURA_UNSUPPORTED_SHAPE;
+}
+
 } // namespace aura

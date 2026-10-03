@@ -2,15 +2,19 @@
 
 #include <cmath>
 #include <new>
+#include <Jolt/Physics/Body/BodyLock.h>
+#include <Jolt/Physics/SoftBody/SoftBodyMotionProperties.h>
 
 namespace aura::jolt_internal
 {
 
 AuraJoltSoftBodyOwner::AuraJoltSoftBodyOwner(JPH::BodyInterface& bodyInterface,
+                                             const JPH::BodyLockInterface& lockInterface,
                                              JPH::RVec3Arg position,
                                              JPH::QuatArg rotation,
                                              JPH::ObjectLayer objectLayer)
     : bodyInterface_(&bodyInterface),
+      lockInterface_(&lockInterface),
       position_(position),
       rotation_(rotation),
       objectLayer_(objectLayer)
@@ -83,6 +87,7 @@ bool AuraJoltSoftBodyOwner::Create(const float* vertexPositions,
 
         JPH::SoftBodySharedSettings::VertexAttributes attributes;
         shared->CreateConstraints(&attributes, 1, JPH::SoftBodySharedSettings::EBendType::Distance);
+        shared->Optimize();
         JPH::SoftBodyCreationSettings settings(shared.GetPtr(), position_, rotation_, objectLayer_);
         const JPH::BodyID id = bodyInterface_->CreateAndAddSoftBody(settings, JPH::EActivation::Activate);
         if (id.IsInvalid())
@@ -108,6 +113,37 @@ void AuraJoltSoftBodyOwner::Destroy()
     bodyInterface_->DestroyBody(bodyID_);
     bodyID_ = JPH::BodyID();
     created_ = false;
+}
+
+uint32_t AuraJoltSoftBodyOwner::VertexCount() const
+{
+    if (!created_ || lockInterface_ == nullptr)
+        return 0;
+    const JPH::BodyLockRead lock(*lockInterface_, bodyID_);
+    if (!lock.Succeeded())
+        return 0;
+    const auto* motion = static_cast<const JPH::SoftBodyMotionProperties*>(lock.GetBody().GetMotionProperties());
+    return motion == nullptr ? 0u : static_cast<uint32_t>(motion->GetVertices().size());
+}
+
+bool AuraJoltSoftBodyOwner::CopyVertexPositions(float* output, uint32_t capacity) const
+{
+    if (output == nullptr || !created_ || lockInterface_ == nullptr)
+        return false;
+    const JPH::BodyLockRead lock(*lockInterface_, bodyID_);
+    if (!lock.Succeeded())
+        return false;
+    const auto* motion = static_cast<const JPH::SoftBodyMotionProperties*>(lock.GetBody().GetMotionProperties());
+    if (motion == nullptr || capacity < motion->GetVertices().size())
+        return false;
+    for (uint32_t index = 0; index < motion->GetVertices().size(); ++index)
+    {
+        const JPH::Vec3 position = motion->GetVertices()[index].mPosition;
+        output[index * 3u] = position.GetX();
+        output[index * 3u + 1u] = position.GetY();
+        output[index * 3u + 2u] = position.GetZ();
+    }
+    return true;
 }
 
 } // namespace aura::jolt_internal

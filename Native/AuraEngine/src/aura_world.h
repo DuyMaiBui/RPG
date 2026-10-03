@@ -65,6 +65,9 @@ public:
     virtual AuraResultCode DestroyVehicle(AuraVehicleHandle) { return AURA_UNSUPPORTED_SHAPE; }
     virtual AuraResultCode SetVehicleInput(AuraVehicleHandle, float, float, float, float) { return AURA_UNSUPPORTED_SHAPE; }
     virtual AuraResultCode GetVehicleWheelState(AuraVehicleHandle, uint32_t, AuraVehicleWheelState*) const { return AURA_UNSUPPORTED_SHAPE; }
+    virtual AuraResultCode CreateSoftBody(const AuraSoftBodyDesc&, AuraSoftBodyHandle*) { return AURA_UNSUPPORTED_SHAPE; }
+    virtual AuraResultCode DestroySoftBody(AuraSoftBodyHandle) { return AURA_UNSUPPORTED_SHAPE; }
+    virtual AuraResultCode GetSoftBodyState(AuraSoftBodyHandle, float*, uint32_t, AuraSoftBodyState*) const { return AURA_UNSUPPORTED_SHAPE; }
 };
 
 IWorld* CreateWorldImpl(const AuraWorldDesc& desc);

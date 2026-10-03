@@ -4,7 +4,7 @@ using AuraEngine.Core;
 
 namespace AuraEngine.Physics
 {
-    public sealed class NullPhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsContacts, IPhysicsSerialization
+    public sealed class NullPhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly List<NullBodySlot> _slots;
         private readonly List<int> _freeSlots = new List<int>();
@@ -104,6 +104,7 @@ namespace AuraEngine.Physics
 
         IPhysicsCharacters IPhysicsWorld.Characters => this;
         IPhysicsVehicles IPhysicsWorld.Vehicles => this;
+        IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;
 
         IPhysicsContacts IPhysicsWorld.Contacts => this;
 
@@ -133,6 +134,9 @@ namespace AuraEngine.Physics
         AuraResult IPhysicsVehicles.DestroyVehicle(AuraVehicleId vehicle) => AuraResult.InvalidHandle;
         AuraResult IPhysicsVehicles.SetVehicleInput(AuraVehicleId vehicle, float forward, float steering, float brake, float handBrake) => AuraResult.InvalidHandle;
         bool IPhysicsVehicles.TryGetWheelState(AuraVehicleId vehicle, int wheelIndex, out AuraVehicleWheelState state) { state = default; return false; }
+        AuraSoftBodyId IPhysicsSoftBodies.CreateSoftBody(in AuraSoftBodyDefinition definition) => AuraSoftBodyId.Invalid;
+        AuraResult IPhysicsSoftBodies.DestroySoftBody(AuraSoftBodyId softBody) => AuraResult.InvalidHandle;
+        bool IPhysicsSoftBodies.TryGetState(AuraSoftBodyId softBody, out AuraSoftBodyState state) { state = default; return false; }
 
         int IPhysicsContacts.CopyContacts(Span<AuraContact> buffer) => 0;
 

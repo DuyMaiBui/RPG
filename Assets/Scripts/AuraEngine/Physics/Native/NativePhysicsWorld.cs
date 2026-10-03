@@ -5,7 +5,7 @@ using AuraEngine.Core;
 
 namespace AuraEngine.Physics.Native
 {
-    public sealed class NativePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsContacts, IPhysicsSerialization
+    public sealed class NativePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly NativeWorldHandle _world;
         private readonly AuraPhysicsMode _mode;
@@ -58,7 +58,8 @@ namespace AuraEngine.Physics.Native
                        AuraPhysicsCapabilities.ShapeTaperedCylinder |
                             AuraPhysicsCapabilities.ShapeHeightField |
                             AuraPhysicsCapabilities.Characters |
-                            AuraPhysicsCapabilities.Vehicles;
+                             AuraPhysicsCapabilities.Vehicles |
+                             AuraPhysicsCapabilities.SoftBodies;
             }
         }
 
@@ -173,6 +174,7 @@ namespace AuraEngine.Physics.Native
 
         IPhysicsCharacters IPhysicsWorld.Characters => this;
         IPhysicsVehicles IPhysicsWorld.Vehicles => this;
+        IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;
 
         IPhysicsContacts IPhysicsWorld.Contacts => this;
 
@@ -270,6 +272,76 @@ namespace AuraEngine.Physics.Native
                 return false;
             state = native.ToManaged();
             return true;
+        }
+
+        AuraSoftBodyId IPhysicsSoftBodies.CreateSoftBody(in AuraSoftBodyDefinition definition)
+        {
+            if (definition.Vertices == null || definition.Vertices.Length < 3 || definition.Faces == null || definition.Faces.Length == 0 || definition.Faces.Length % 3 != 0)
+                return AuraSoftBodyId.Invalid;
+            var vertices = new float[definition.Vertices.Length * 3];
+            for (var index = 0; index < definition.Vertices.Length; index++)
+            {
+                vertices[index * 3] = definition.Vertices[index].X;
+                vertices[index * 3 + 1] = definition.Vertices[index].Y;
+                vertices[index * 3 + 2] = definition.Vertices[index].Z;
+            }
+            var nativeDefinition = NativeSoftBodyDesc.From(definition);
+            var vertexHandle = GCHandle.Alloc(vertices, GCHandleType.Pinned);
+            var faceHandle = GCHandle.Alloc(definition.Faces, GCHandleType.Pinned);
+            GCHandle massHandle = default;
+            try
+            {
+                nativeDefinition.VertexPositions = vertexHandle.AddrOfPinnedObject();
+                nativeDefinition.FaceIndices = faceHandle.AddrOfPinnedObject();
+                if (definition.InverseMass != null)
+                {
+                    if (definition.InverseMass.Length != definition.Vertices.Length)
+                        return AuraSoftBodyId.Invalid;
+                    massHandle = GCHandle.Alloc(definition.InverseMass, GCHandleType.Pinned);
+                    nativeDefinition.InverseMass = massHandle.AddrOfPinnedObject();
+                }
+                var result = (AuraResult)NativeMethods.Aura_CreateSoftBody(_world, ref nativeDefinition, out var handle);
+                return result == AuraResult.Success ? handle.ToManaged() : AuraSoftBodyId.Invalid;
+            }
+            finally
+            {
+                if (massHandle.IsAllocated) massHandle.Free();
+                faceHandle.Free();
+                vertexHandle.Free();
+            }
+        }
+
+        AuraResult IPhysicsSoftBodies.DestroySoftBody(AuraSoftBodyId softBody) =>
+            softBody.IsValid ? (AuraResult)NativeMethods.Aura_DestroySoftBody(_world, NativeSoftBodyHandle.From(softBody)) : AuraResult.InvalidHandle;
+
+        bool IPhysicsSoftBodies.TryGetState(AuraSoftBodyId softBody, out AuraSoftBodyState state)
+        {
+            state = default;
+            if (!softBody.IsValid)
+                return false;
+            var capacity = 1024;
+            var raw = Marshal.AllocHGlobal(sizeof(float) * capacity * 3);
+            try
+            {
+                var result = (AuraResult)NativeMethods.Aura_GetSoftBodyState(_world, NativeSoftBodyHandle.From(softBody), raw, (uint)capacity, out var native);
+                if (result == AuraResult.CapacityExceeded)
+                {
+                    capacity = (int)native.VertexCount;
+                    Marshal.FreeHGlobal(raw);
+                    raw = Marshal.AllocHGlobal(sizeof(float) * capacity * 3);
+                    result = (AuraResult)NativeMethods.Aura_GetSoftBodyState(_world, NativeSoftBodyHandle.From(softBody), raw, (uint)capacity, out native);
+                }
+                if (result != AuraResult.Success)
+                    return false;
+                var vertices = new AuraVector3[native.VertexCount];
+                var values = new float[native.VertexCount * 3];
+                Marshal.Copy(raw, values, 0, values.Length);
+                for (var index = 0; index < vertices.Length; index++)
+                    vertices[index] = new AuraVector3(values[index * 3], values[index * 3 + 1], values[index * 3 + 2]);
+                state = new AuraSoftBodyState(native.SoftBody.ToManaged(), vertices);
+                return true;
+            }
+            finally { Marshal.FreeHGlobal(raw); }
         }
 
         private static ulong ToCharacterHandle(AuraCharacterId character) =>

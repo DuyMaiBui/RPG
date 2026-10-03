@@ -35,6 +35,7 @@ namespace AuraEngine.Core
         Characters = 1 << 19,
         ShapeHeightField = 1 << 20,
         Vehicles = 1 << 21,
+        SoftBodies = 1 << 22,
 
         All = ~0,
     }

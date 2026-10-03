@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 #ifndef AURA_ENGINE_ABI_VERSION
-#define AURA_ENGINE_ABI_VERSION 7u
+#define AURA_ENGINE_ABI_VERSION 8u
 #endif
 
 typedef uint32_t AuraEntityIndex;
@@ -340,6 +340,30 @@ typedef struct AuraVehicleWheelState
     float angularVelocity;
     AuraVec3 contactNormal;
 } AuraVehicleWheelState;
+
+/* Softbody ABI types are appended so the v7 vehicle layouts remain unchanged. */
+typedef struct AuraSoftBodyHandle
+{
+    uint64_t opaque;
+} AuraSoftBodyHandle;
+
+typedef struct AuraSoftBodyDesc
+{
+    AuraPose initialPose;
+    AuraLayer objectLayer;
+    uint32_t vertexCount;
+    const float* vertexPositions;
+    uint32_t faceCount;
+    const uint32_t* faceIndices;
+    const float* inverseMass;
+} AuraSoftBodyDesc;
+
+typedef struct AuraSoftBodyState
+{
+    AuraSoftBodyHandle softBody;
+    uint32_t vertexCount;
+    float* vertexPositions;
+} AuraSoftBodyState;
 
 #ifdef __cplusplus
 }

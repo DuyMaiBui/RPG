@@ -3,6 +3,7 @@
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Body/BodyID.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
+#include <Jolt/Physics/Body/BodyLockInterface.h>
 #include <Jolt/Physics/SoftBody/SoftBodySharedSettings.h>
 #include <Jolt/Physics/SoftBody/SoftBodyCreationSettings.h>
 
@@ -21,6 +22,7 @@ public:
     static constexpr uint32_t kMaxFaces = 1u << 20;
 
     AuraJoltSoftBodyOwner(JPH::BodyInterface& bodyInterface,
+                          const JPH::BodyLockInterface& lockInterface,
                           JPH::RVec3Arg position,
                           JPH::QuatArg rotation,
                           JPH::ObjectLayer objectLayer);
@@ -40,9 +42,12 @@ public:
 
     bool IsCreated() const { return created_; }
     JPH::BodyID GetBodyID() const { return bodyID_; }
+    uint32_t VertexCount() const;
+    bool CopyVertexPositions(float* output, uint32_t capacity) const;
 
 private:
     JPH::BodyInterface* bodyInterface_;
+    const JPH::BodyLockInterface* lockInterface_;
     JPH::RVec3 position_;
     JPH::Quat rotation_;
     JPH::ObjectLayer objectLayer_;

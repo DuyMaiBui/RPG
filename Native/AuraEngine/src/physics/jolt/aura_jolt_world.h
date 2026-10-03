@@ -60,6 +60,9 @@ public:
     AuraResultCode DestroyVehicle(AuraVehicleHandle vehicle) override;
     AuraResultCode SetVehicleInput(AuraVehicleHandle vehicle, float forward, float steering, float brake, float handBrake) override;
     AuraResultCode GetVehicleWheelState(AuraVehicleHandle vehicle, uint32_t wheelIndex, AuraVehicleWheelState* outState) const override;
+    AuraResultCode CreateSoftBody(const AuraSoftBodyDesc& desc, AuraSoftBodyHandle* outSoftBody) override;
+    AuraResultCode DestroySoftBody(AuraSoftBodyHandle softBody) override;
+    AuraResultCode GetSoftBodyState(AuraSoftBodyHandle softBody, float* vertexPositions, uint32_t vertexCapacity, AuraSoftBodyState* outState) const override;
 
 private:
     struct Impl;

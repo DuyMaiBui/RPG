@@ -611,6 +611,47 @@ bool RunVehicle()
     Aura_DestroyWorld(world);
     return wheelResult == AURA_SUCCESS && destroyed == AURA_SUCCESS && stale == AURA_INVALID_HANDLE;
 }
+
+bool RunSoftBody()
+{
+    AuraWorldDesc worldDesc{};
+    worldDesc.mode = AURA_MODE_FULL_3D;
+    worldDesc.gravity = AuraVec3{ 0.0f, -9.81f, 0.0f };
+    AuraWorldHandle world{};
+    if (Aura_CreateWorld(&worldDesc, &world) != AURA_SUCCESS)
+        return false;
+
+    const float vertices[] = { -0.5f, 2.0f, 0.0f, 0.5f, 2.0f, 0.0f, -0.5f, 1.0f, 0.0f, 0.5f, 1.0f, 0.0f };
+    const uint32_t faces[] = { 0, 1, 2, 1, 3, 2 };
+    AuraSoftBodyDesc desc{};
+    desc.initialPose.rotation.w = 1.0f;
+    desc.vertexPositions = vertices;
+    desc.vertexCount = 4;
+    desc.faceIndices = faces;
+    desc.faceCount = 2;
+    AuraSoftBodyHandle softBody{};
+    const AuraResultCode created = Aura_CreateSoftBody(world, &desc, &softBody);
+    if (created != AURA_SUCCESS)
+    {
+        std::printf("[softbody] create=%d\n", static_cast<int>(created));
+        Aura_DestroyWorld(world);
+        return false;
+    }
+    for (int tick = 0; tick < 30; ++tick)
+        Aura_Step(world, static_cast<AuraTick>(tick), 1.0f / 60.0f);
+
+    AuraSoftBodyState state{};
+    const AuraResultCode probe = Aura_GetSoftBodyState(world, softBody, nullptr, 0, &state);
+    std::vector<float> positions(state.vertexCount * 3u);
+    const AuraResultCode read = Aura_GetSoftBodyState(world, softBody, positions.data(), state.vertexCount, &state);
+    const AuraResultCode destroyed = Aura_DestroySoftBody(world, softBody);
+    const AuraResultCode stale = Aura_DestroySoftBody(world, softBody);
+    std::printf("[softbody] probe=%d read=%d vertices=%u y=%.3f destroy=%d stale=%d\n",
+        static_cast<int>(probe), static_cast<int>(read), state.vertexCount, positions.empty() ? 0.0f : positions[1],
+        static_cast<int>(destroyed), static_cast<int>(stale));
+    Aura_DestroyWorld(world);
+    return probe == AURA_CAPACITY_EXCEEDED && read == AURA_SUCCESS && state.vertexCount == 4 && destroyed == AURA_SUCCESS && stale == AURA_INVALID_HANDLE;
+}
 } // namespace
 
 int main()
@@ -729,6 +770,7 @@ int main()
     ok = ok && RunNativeQueryFamilies();
     ok = ok && RunCharacter();
     ok = ok && RunVehicle();
+    ok = ok && RunSoftBody();
 
     std::printf(ok ? "AURA_HEADLESS_OK\n" : "AURA_HEADLESS_FAIL\n");
     return ok ? 0 : 1;

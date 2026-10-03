@@ -104,6 +104,15 @@ namespace AuraEngine.Physics.Native
         public static extern int Aura_GetVehicleWheelState(NativeWorldHandle world, NativeVehicleHandle vehicle, uint wheelIndex, out NativeVehicleWheelState outState);
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_CreateSoftBody(NativeWorldHandle world, ref NativeSoftBodyDesc desc, out NativeSoftBodyHandle outSoftBody);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_DestroySoftBody(NativeWorldHandle world, NativeSoftBodyHandle softBody);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Aura_GetSoftBodyState(NativeWorldHandle world, NativeSoftBodyHandle softBody, IntPtr vertexPositions, uint vertexCapacity, out NativeSoftBodyState outState);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         public static extern int Aura_SerializeState(NativeWorldHandle world, IntPtr buffer, uint capacity, out uint outSize);
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
