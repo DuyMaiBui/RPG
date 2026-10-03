@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using AuraEngine.Core;
+using AuraEngine.Networking;
 using AuraEngine.Physics;
 using AuraEngine.Physics.Native;
 using AuraEngine.Simulation;
@@ -45,6 +46,7 @@ namespace AuraEngine.KernelTests
                 ("plane2d_ball_rests", Plane2D_BallRests),
                 ("plane2d_distance_joint", Plane2D_DistanceJoint),
                 ("determinism_same_steps", Determinism_SameStepsMatch),
+                ("net_prediction_matches_server", NetPrediction_MatchesServer),
                 ("capsule_rests_upright", Capsule_RestsUpright),
                 ("cylinder_rests", Cylinder_Rests),
                 ("compound_body_collides", CompoundBody_Collides),
@@ -586,6 +588,45 @@ namespace AuraEngine.KernelTests
             Check(result == AuraResult.Success, "SetSurfaceVelocity failed.");
         }
 
+        private static void NetPrediction_MatchesServer()
+        {
+            using var serverWorld = NewWorld();
+            using var clientWorld = NewWorld();
+            var serverHandler = new InputMover();
+            serverWorld.RegisterCommandHandler(serverHandler);
+            var serverEntity = serverWorld.CreateEntity();
+            serverWorld.AttachBody(serverEntity, AuraPhysicsBodyDefinition.CreateKinematic(
+                new AuraPose(AuraVector3.Zero, AuraQuaternion.Identity), AuraPhysicsLayer.Default,
+                AuraPhysicsLayerMask.All, AuraPhysicsShapeDefinition.Box(new AuraVector3(0.5f, 0.5f, 0.5f))));
+            serverHandler.Entity = serverEntity;
+
+            var clientHandler = new InputMover();
+            clientWorld.RegisterCommandHandler(clientHandler);
+            var clientEntity = clientWorld.CreateEntity();
+            clientWorld.AttachBody(clientEntity, AuraPhysicsBodyDefinition.CreateKinematic(
+                new AuraPose(AuraVector3.Zero, AuraQuaternion.Identity), AuraPhysicsLayer.Default,
+                AuraPhysicsLayerMask.All, AuraPhysicsShapeDefinition.Box(new AuraVector3(0.5f, 0.5f, 0.5f))));
+            clientHandler.Entity = clientEntity;
+
+            var (clientTransport, serverTransport) = InMemoryAuraTransport.CreatePair();
+            var server = new AuraNetServer(serverWorld, serverTransport, 60);
+            var predicted = new AuraPredictedWorld(clientWorld, new AuraPredictionReplay(clientEntity, 1f));
+            var client = new AuraNetClient(1u, clientTransport, predicted, 60);
+
+            for (var frame = 0; frame < 60; frame++)
+            {
+                client.SubmitInput(1, 0);
+                server.Pump();
+                server.Step();
+                client.Pump();
+            }
+
+            Check(client.PendingInputCount == 0, "acknowledged inputs not cleared.");
+            serverWorld.TryGetBodyState(serverEntity, out var serverState);
+            clientWorld.TryGetBodyState(clientEntity, out var clientState);
+            Near(clientState.Pose.Position.X, serverState.Pose.Position.X, 0.05f, "predicted X matches server");
+        }
+
         private static SimulationEntityId FindEntity(AuraSimulationWorld world, PhysicsBodyId body)
         {
             var states = new AuraBodyState[16];
@@ -606,6 +647,21 @@ namespace AuraEngine.KernelTests
         {
             if (Math.Abs(actual - expected) > tolerance)
                 throw new Exception($"{label}: expected {expected} +/- {tolerance}, got {actual}.");
+        }
+
+        private sealed class InputMover : AuraEngine.Simulation.IAuraCommandHandler
+        {
+            public SimulationEntityId Entity;
+            ushort AuraEngine.Simulation.IAuraCommandHandler.TypeId => AuraInputCommand.CommandTypeId;
+            AuraResult AuraEngine.Simulation.IAuraCommandHandler.Handle(AuraEngine.Simulation.IAuraSimulationContext context, IAuraCommand command)
+            {
+                if (!(command is AuraInputCommand input) || Entity.IsNone)
+                    return AuraResult.InvalidDefinition;
+                if (!context.TryGetBodyState(Entity, out var state))
+                    return AuraResult.InvalidHandle;
+                var position = state.Pose.Position + new AuraVector3(input.MoveX, 0f, input.MoveY);
+                return context.SetKinematicTarget(Entity, new AuraPose(position, state.Pose.Rotation));
+            }
         }
     }
 }

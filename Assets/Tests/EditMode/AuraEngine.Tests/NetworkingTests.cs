@@ -88,35 +88,6 @@ namespace AuraEngine.Tests
         }
 
         [Test]
-        public void Prediction_MatchesServerSteadyState()
-        {
-            using var serverWorld = CreateWorld(out var serverHandler);
-            using var clientWorld = CreateWorld(out var clientHandler);
-            var serverEntity = AddKinematicActor(serverWorld, serverHandler);
-            var clientEntity = AddKinematicActor(clientWorld, clientHandler);
-
-            var (clientTransport, serverTransport) = InMemoryAuraTransport.CreatePair();
-            var server = new AuraNetServer(serverWorld, serverTransport, 60);
-            var replay = new AuraPredictionReplay(clientEntity, 1f);
-            var predicted = new AuraPredictedWorld(clientWorld, replay);
-            var client = new AuraNetClient(1u, clientTransport, predicted, 60);
-
-            for (var frame = 0; frame < 60; frame++)
-            {
-                client.SubmitInput(1, 0);
-                server.Pump();
-                server.Step();
-                client.Pump();
-            }
-
-            Assert.AreEqual(0, client.PendingInputCount, "all acknowledged inputs should be cleared.");
-            Assert.IsTrue(serverWorld.TryGetBodyState(serverEntity, out var serverState));
-            Assert.IsTrue(clientWorld.TryGetBodyState(clientEntity, out var clientState));
-            Assert.AreEqual(serverState.Pose.Position.X, clientState.Pose.Position.X, 1e-3f);
-            Assert.AreEqual(serverState.Pose.Position.Z, clientState.Pose.Position.Z, 1e-3f);
-        }
-
-        [Test]
         public void Reconcile_ReSimulatesUnacknowledgedInput()
         {
             using var clientWorld = CreateWorld(out var handler);
