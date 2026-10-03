@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using AuraEngine.Core;
 using AuraEngine.Networking;
+using AuraEngine.Simulation;
 using NUnit.Framework;
 
 namespace AuraEngine.Tests
@@ -116,6 +117,20 @@ namespace AuraEngine.Tests
             Assert.IsTrue(negotiator.TrySelect(0u, 12u, out var baseline));
             Assert.AreEqual(12u, baseline.ServerTick);
             Assert.IsFalse(negotiator.TrySelect(1u, 10u, out _));
+        }
+
+        [Test]
+        public void RollbackBuffer_RestoresStateAndInputs()
+        {
+            using var world = new AuraSimulationWorld(new FakePhysicsBackend(), new AuraWorldDefinition(initialBodyCapacity: 4));
+            var buffer = new AuraRollbackBuffer(2);
+            var inputs = new List<AuraInputCommand> { new AuraInputCommand(1u, 3u, 1, 0) };
+            buffer.Record(12u, world, inputs);
+
+            Assert.IsTrue(buffer.TryGet(12u, out var state, out var replay));
+            Assert.IsNotNull(state);
+            Assert.AreEqual(1, replay.Count);
+            Assert.AreEqual(3u, replay[0].Sequence);
         }
     }
 }
