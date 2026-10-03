@@ -1,10 +1,16 @@
 # AuraEngine architecture
 
 AuraEngine is a shared simulation platform: the same simulation implementation
-is intended to run in Unity local play and in a headless C# server, with native
-Jolt (3D) / Box2D (2D) backends behind a backend-independent physics contract.
-It is not a Unity Physics replacement and gameplay code never references Unity
-physics types.
+runs in Unity local play and in a headless C# server.
+
+Physics simulation runs entirely in the **C++ kernel** (`AuraEngine.Native`,
+Jolt for 3D / Box2D for 2D) behind the backend-independent `IPhysicsWorld`
+contract, on every platform including the Editor. C# owns gameplay
+(state, systems, commands, domain events) and drives the kernel; there is no
+separate C# solver. It is not a Unity Physics replacement and gameplay code
+never references Unity physics types. Kernel changes are validated with
+`Native/AuraEngine/run_kernel_tests.sh` (the in-Editor native suite crashes
+mono's JIT at the P/Invoke boundary).
 
 ## Layers
 
@@ -13,9 +19,11 @@ Game.Domain (C# gameplay: state, systems, commands, domain events)
       |
 AuraEngine.Simulation  (engine-independent simulation kernel; managed API)
       |
-AuraEngine.Physics     (backend-independent abstraction)
+AuraEngine.Physics     (backend-independent abstraction; C++ kernel binding)
       |
 AuraEngine.Core        (identity, math, definitions, queries, events, state)
+      |
+AuraEngine.Native (C++)  -- Jolt 3D / Box2D 2D kernel behind the C ABI
 ```
 
 Host layers add capabilities without changing simulation authority:

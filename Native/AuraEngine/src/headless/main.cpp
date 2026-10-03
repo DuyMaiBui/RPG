@@ -217,6 +217,80 @@ bool RunCharacter()
 /* Height field: a flat 4x4 field at y = 1 must catch a falling box. Only the
    Jolt backend implements it; other backends report it unsupported and the
    check is skipped. */
+bool RunTriangleMesh()
+{
+    const float vertices[12] = {
+        -5.0f, 0.0f, -5.0f,
+         5.0f, 0.0f, -5.0f,
+         5.0f, 0.0f,  5.0f,
+        -5.0f, 0.0f,  5.0f,
+    };
+    const uint32_t indices[6] = { 1, 0, 2, 2, 0, 3 };
+
+    AuraWorldDesc worldDesc{};
+    worldDesc.mode = AURA_MODE_FULL_3D;
+    worldDesc.gravity = AuraVec3{ 0.0f, -9.81f, 0.0f };
+    worldDesc.initialBodyCapacity = 8;
+    worldDesc.fixedDeltaTime = 1.0f / 60.0f;
+
+    AuraWorldHandle world{};
+    if (Aura_CreateWorld(&worldDesc, &world) != AURA_SUCCESS)
+        return false;
+
+    AuraShapeDesc meshShape{};
+    meshShape.type = AURA_SHAPE_TRIANGLE_MESH;
+    meshShape.vertices = vertices;
+    meshShape.vertexCount = 4;
+    meshShape.indices = indices;
+    meshShape.indexCount = 6;
+
+    AuraShapeDesc ballShape{};
+    ballShape.type = AURA_SHAPE_SPHERE;
+    ballShape.radius = 0.5f;
+
+    AuraBodyDesc meshDesc{};
+    meshDesc.type = AURA_BODY_STATIC;
+    meshDesc.collisionMask = ~0ull;
+    meshDesc.shapes = &meshShape;
+    meshDesc.shapeCount = 1;
+    meshDesc.initialPose.rotation = AuraQuat{ 0.0f, 0.0f, 0.0f, 1.0f };
+
+    AuraBodyDesc ballDesc{};
+    ballDesc.type = AURA_BODY_DYNAMIC;
+    ballDesc.collisionMask = ~0ull;
+    ballDesc.mass = 1.0f;
+    ballDesc.gravityScale = 1.0f;
+    ballDesc.shapes = &ballShape;
+    ballDesc.shapeCount = 1;
+    ballDesc.initialPose.position = AuraVec3{ 0.0f, 4.0f, 0.0f };
+    ballDesc.initialPose.rotation = AuraQuat{ 0.0f, 0.0f, 0.0f, 1.0f };
+
+    AuraEntityHandle entity{};
+    AuraBodyHandle mesh{};
+    Aura_CreateEntity(world, &entity);
+    const AuraResultCode created = Aura_AttachBody(world, entity, &meshDesc, &mesh);
+    if (created != AURA_SUCCESS)
+    {
+        std::printf("[mesh] unsupported (code=%d) skipped\n", static_cast<int>(created));
+        Aura_DestroyWorld(world);
+        return true;
+    }
+
+    AuraBodyHandle ball{};
+    Aura_CreateEntity(world, &entity);
+    Aura_AttachBody(world, entity, &ballDesc, &ball);
+
+    for (int tick = 0; tick < 300; ++tick)
+        Aura_Step(world, static_cast<AuraTick>(tick), 1.0f / 60.0f);
+
+    AuraBodyState state{};
+    Aura_GetBodyState(world, ball, &state);
+    const bool ok = std::fabs(state.pose.position.y - 0.5f) < 0.25f;
+    std::printf("[mesh] ball_y=%.4f ok=%u\n", state.pose.position.y, static_cast<unsigned>(ok));
+    Aura_DestroyWorld(world);
+    return ok;
+}
+
 bool RunHeightField()
 {
     const uint32_t resolution = 4;
@@ -500,6 +574,7 @@ int main()
     Aura_DestroyWorld(world);
 
     ok = ok && RunPlane2D();
+    ok = ok && RunTriangleMesh();
     ok = ok && RunHeightField();
     ok = ok && RunQueryFilter();
     ok = ok && RunCharacter();

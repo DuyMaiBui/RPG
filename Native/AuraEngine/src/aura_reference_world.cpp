@@ -196,7 +196,7 @@ AuraResultCode ReferenceWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHand
     for (uint32_t i = 0; i < desc.shapeCount; ++i)
     {
         const AuraShapeDesc& s = desc.shapes[i];
-        if (s.type == AURA_SHAPE_HEIGHT_FIELD)
+        if (s.type == AURA_SHAPE_HEIGHT_FIELD || s.type == AURA_SHAPE_TRIANGLE_MESH || s.type == AURA_SHAPE_CONVEX_MESH)
             return AURA_UNSUPPORTED_SHAPE;
         Shape shape;
         shape.type = s.type;

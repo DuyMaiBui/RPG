@@ -10,6 +10,8 @@ Use dependency injection, UniTask for Unity-facing asynchronous work, and LitMot
 
 Gameplay core is plain C#: no MonoBehaviour inheritance, scene lookup, Unity lifecycle, Transform, GameObject, LitMotion or container resolution. Constructor injection expresses dependencies; consumer-owned interfaces are appropriate at real module/engine boundaries even with one current implementation. Keep VContainer registrations, entry points and LifetimeScope in the composition/integration layer. MonoBehaviours are thin bridges for serialized references, input/physics callbacks and rendering/lifecycle handoff. Do not remove engine components needed by Unity or create a manager MonoBehaviour for each service.
 
+Physics simulation runs in the C++ kernel (`Native/AuraEngine`, Jolt 3D / Box2D 2D) exposed through the versioned C ABI, on every platform including the Editor. C# owns gameplay orchestration, entity/command/system flow, authoring and views, and drives the kernel through `IPhysicsWorld`; there is no separate C# solver to duplicate kernel behaviour. Validate kernel changes with the standalone `Native/AuraEngine/run_kernel_tests.sh` suite (the equivalent in-Editor native suite crashes mono's JIT at the P/Invoke boundary); keep the C ABI structs and the managed `Native*` mirrors in lockstep.
+
 Gameplay views must be authored into prefabs and scenes. Serialized prefab and
 scene references are the source of truth for view hierarchy, components,
 materials, UI, anchors and required child objects. Runtime gameplay code must
