@@ -49,7 +49,9 @@ if(AURA_USE_JOLT)
         src/physics/jolt/aura_jolt_queries.cpp
         src/physics/jolt/aura_jolt_contacts.cpp
         src/physics/jolt/aura_jolt_joints.cpp
-        src/physics/jolt/aura_jolt_character.cpp)
+        src/physics/jolt/aura_jolt_character.cpp
+        src/physics/jolt/aura_jolt_vehicle.cpp
+        src/physics/jolt/aura_jolt_softbody.cpp)
 endif()
 
 if(AURA_USE_BOX2D)
