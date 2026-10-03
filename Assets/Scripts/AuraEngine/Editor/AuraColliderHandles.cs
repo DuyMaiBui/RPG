@@ -84,23 +84,24 @@ namespace AuraEngine.EditorTools
             if (MoveCenter(collider, serialized, centerProperty, transform, ref world, rotation))
                 return;
 
-            /* Front pass draws the wireframe and the handles in full color; the
-               occluded pass fades everything hidden behind geometry, handles
-               included, so a square behind a mesh is dimmer too. */
-            var occluded = OccludedColor;
-            occluded.r = color.r;
-            occluded.g = color.g;
-            occluded.b = color.b;
+            /* Two passes so the outline never vanishes behind other meshes while
+               still reading the depth order:
+                 - Always     : faded draw that is never clipped by geometry
+                 - LessEqual  : full-color draw where it is in front */
+            var faded = OccludedColor;
+            faded.r = color.r;
+            faded.g = color.g;
+            faded.b = color.b;
+
+            Handles.zTest = CompareFunction.Always;
+            Handles.color = faded;
+            DrawShapes(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation);
+            DrawHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation, true);
 
             Handles.zTest = CompareFunction.LessEqual;
             Handles.color = color;
             DrawShapes(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation);
             DrawHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation, false);
-
-            Handles.zTest = CompareFunction.Greater;
-            Handles.color = occluded;
-            DrawShapes(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation);
-            DrawHandles(collider, serialized, radiusProperty, topRadiusProperty, heightProperty, sizeProperty, normalProperty, world, rotation, true);
 
             Handles.zTest = CompareFunction.Always;
         }
