@@ -39,7 +39,7 @@ namespace AuraEngine.Tests
         [Test]
         public void UdpTransport_PredictionMatchesServerOverLoopback()
         {
-            var serverWorld = new AuraSimulationWorld(ManagedPhysicsBackend.Instance, new AuraWorldDefinition(initialBodyCapacity: 8));
+            var serverWorld = new AuraSimulationWorld(new FakePhysicsBackend(), new AuraWorldDefinition(initialBodyCapacity: 8));
             var serverHandler = new AuraInputCommandHandler(1f);
             serverWorld.RegisterCommandHandler(serverHandler);
 

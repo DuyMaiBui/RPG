@@ -17,7 +17,10 @@ namespace AuraEngine.MCP
             if (_world != null)
                 ((IDisposable)_world).Dispose();
 
-            _world = new AuraSimulationWorld(ManagedPhysicsBackend.Instance, new AuraWorldDefinition(initialBodyCapacity: 256));
+            if (!AuraEngine.Physics.Native.NativePhysicsBackend.IsAvailable())
+                throw new InvalidOperationException("The AuraEngine native physics plugin (libaura) is not available.");
+
+            _world = new AuraSimulationWorld(new AuraEngine.Physics.Native.NativePhysicsBackend(), new AuraWorldDefinition(initialBodyCapacity: 256));
             _tick = 0;
         }
 

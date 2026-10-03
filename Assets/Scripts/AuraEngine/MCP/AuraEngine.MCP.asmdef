@@ -4,6 +4,7 @@
   "references": [
     "AuraEngine.Core",
     "AuraEngine.Physics",
+    "AuraEngine.Physics.Native",
     "AuraEngine.Simulation",
     "AuraEngine.Serialization"
   ],

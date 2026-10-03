@@ -11,7 +11,7 @@ namespace AuraEngine.Tests
     {
         private static AuraSimulationWorld CreateWorld(out AuraInputCommandHandler handler)
         {
-            var world = new AuraSimulationWorld(ManagedPhysicsBackend.Instance, new AuraWorldDefinition(initialBodyCapacity: 8));
+            var world = new AuraSimulationWorld(new FakePhysicsBackend(), new AuraWorldDefinition(initialBodyCapacity: 8));
             handler = new AuraInputCommandHandler(1f);
             world.RegisterCommandHandler(handler);
             return world;

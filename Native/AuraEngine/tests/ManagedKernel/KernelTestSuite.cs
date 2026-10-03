@@ -45,6 +45,12 @@ namespace AuraEngine.KernelTests
                 ("plane2d_ball_rests", Plane2D_BallRests),
                 ("plane2d_distance_joint", Plane2D_DistanceJoint),
                 ("determinism_same_steps", Determinism_SameStepsMatch),
+                ("capsule_rests_upright", Capsule_RestsUpright),
+                ("cylinder_rests", Cylinder_Rests),
+                ("compound_body_collides", CompoundBody_Collides),
+                ("conveyor_drags_body", Conveyor_DragsBody),
+                ("sphere_cast_hits", SphereCast_Hits),
+                ("surface_velocity_roundtrip", SurfaceVelocity_RoundTrip),
             };
 
             foreach (var (name, body) in cases)
@@ -470,6 +476,114 @@ namespace AuraEngine.KernelTests
             Step(worldA, 120);
             Step(worldB, 120);
             Check(worldA.ComputeStateHash() == worldB.ComputeStateHash(), "two identical runs diverged.");
+        }
+
+        private static void Capsule_RestsUpright()
+        {
+            using var world = NewWorld();
+            Ground(world);
+            var body = world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateDynamic(
+                new AuraPose(new AuraVector3(0f, 5f, 0f), AuraQuaternion.Identity),
+                AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All,
+                new AuraPhysicsShapeDefinition(AuraShapeType.Capsule, AuraPose.Identity, false,
+                    AuraPhysicsMaterialDefinition.Default, AuraPhysicsLayer.Default,
+                    AuraShapeGeometry.Capsule(0.5f, 2f))));
+            Step(world, 400);
+            world.TryGetBodyState(body, out var state);
+            Near(state.Pose.Position.Y, 1f, 0.3f, "capsule rest height");
+        }
+
+        private static void Cylinder_Rests()
+        {
+            using var world = NewWorld();
+            Ground(world);
+            var body = world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateDynamic(
+                new AuraPose(new AuraVector3(0f, 5f, 0f), AuraQuaternion.Identity),
+                AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All,
+                new AuraPhysicsShapeDefinition(AuraShapeType.Cylinder, AuraPose.Identity, false,
+                    AuraPhysicsMaterialDefinition.Default, AuraPhysicsLayer.Default,
+                    AuraShapeGeometry.Cylinder(0.5f, 1f))));
+            Step(world, 400);
+            world.TryGetBodyState(body, out var state);
+            Check(state.Pose.Position.Y > 0f, "cylinder fell through.");
+            Near(state.Pose.Position.Y, 0.5f, 0.3f, "cylinder rest height");
+        }
+
+        private static void CompoundBody_Collides()
+        {
+            using var world = NewWorld();
+            Ground(world);
+            var compound = new AuraPhysicsShapeDefinition[]
+            {
+                AuraPhysicsShapeDefinition.Box(new AuraVector3(0.5f, 0.5f, 0.5f)),
+                AuraPhysicsShapeDefinition.Sphere(0.4f).WithLocalPose(new AuraPose(new AuraVector3(1f, 0f, 0f), AuraQuaternion.Identity)),
+            };
+            var body = world.AttachBody(world.CreateEntity(), new AuraPhysicsBodyDefinition(
+                AuraBodyType.Dynamic,
+                new AuraPose(new AuraVector3(0f, 4f, 0f), AuraQuaternion.Identity),
+                AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, compound));
+            Step(world, 400);
+            world.TryGetBodyState(body, out var state);
+            Near(state.Pose.Position.Y, 0.5f, 0.4f, "compound rest height");
+        }
+
+        private static void Conveyor_DragsBody()
+        {
+            using var world = NewWorld();
+            var surface = world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateStatic(
+                new AuraPose(new AuraVector3(0f, -0.5f, 0f), AuraQuaternion.Identity),
+                AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, AuraPhysicsShapeDefinition.Box(new AuraVector3(10f, 0.5f, 10f))));
+            var surfaceEntity = FindEntity(world, surface);
+            world.SetSurfaceVelocity(surfaceEntity, new AuraVector3(3f, 0f, 0f));
+            var box = world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateDynamic(
+                new AuraPose(new AuraVector3(0f, 0.5f, 0f), AuraQuaternion.Identity),
+                AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, AuraPhysicsShapeDefinition.Box(new AuraVector3(0.5f, 0.5f, 0.5f))));
+            Step(world, 400);
+            world.TryGetBodyState(box, out var state);
+            Check(state.Pose.Position.X > 1f, $"conveyor did not drag the body, x={state.Pose.Position.X}.");
+        }
+
+        private static void SphereCast_Hits()
+        {
+            using var world = NewWorld();
+            Ground(world);
+            var hit = world.Queries.SphereCast(
+                new AuraVector3(0f, 10f, 0f), 0.5f, new AuraVector3(0f, -1f, 0f), 100f,
+                AuraPhysicsQueryFilter.All, out var result);
+            Check(hit, "sphere cast missed the ground.");
+        }
+
+        private static void OverlapBox_Counts()
+        {
+            using var world = NewWorld();
+            Ball(world, 2f);
+            Ball(world, 2.5f);
+            var buffer = new AuraPhysicsQueryHit[8];
+            var count = world.Queries.OverlapBox(new AuraVector3(0f, 2.25f, 0f), new AuraVector3(2f, 2f, 2f), AuraQuaternion.Identity, AuraPhysicsQueryFilter.All, buffer);
+            Check(count >= 2, $"overlap box found {count}, expected >= 2.");
+        }
+
+        private static void CollisionMatrix_Filters()
+        {
+            using var world = NewWorld();
+            world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateStatic(
+                new AuraPose(new AuraVector3(0f, -0.5f, 0f), AuraQuaternion.Identity),
+                new AuraPhysicsLayer(1), new AuraPhysicsLayerMask(1UL << 0),
+                AuraPhysicsShapeDefinition.Box(new AuraVector3(10f, 0.5f, 10f))));
+            var ball = Ball(world, 3f);
+            Step(world, 300);
+            world.TryGetBodyState(ball, out var state);
+            Check(state.Pose.Position.Y < 0f, $"a non-colliding pair still interacted, y={state.Pose.Position.Y}.");
+        }
+
+        private static void SurfaceVelocity_RoundTrip()
+        {
+            using var world = NewWorld();
+            Ground(world);
+            var ball = Ball(world, 0.5f);
+            var entity = FindEntity(world, ball);
+            var result = world.SetSurfaceVelocity(entity, new AuraVector3(2f, 0f, 0f));
+            Check(result == AuraResult.Success, "SetSurfaceVelocity failed.");
         }
 
         private static SimulationEntityId FindEntity(AuraSimulationWorld world, PhysicsBodyId body)

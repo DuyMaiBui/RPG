@@ -30,7 +30,7 @@ namespace AuraEngine.Unity
         private bool _autoCreateOnStart = true;
 
         [SerializeField]
-        private AuraBackendKind _backendKind = AuraBackendKind.Managed;
+        private AuraBackendKind _backendKind = AuraBackendKind.Native;
 
         [SerializeField]
         private AuraPhysicsLayers _layers;
@@ -79,10 +79,14 @@ namespace AuraEngine.Unity
             IPhysicsBackend backend = _backend;
             if (backend == null)
             {
-                if (_backendKind == AuraBackendKind.Native && AuraEngine.Physics.Native.NativePhysicsBackend.IsAvailable())
-                    backend = new AuraEngine.Physics.Native.NativePhysicsBackend();
-                else
-                    backend = ManagedPhysicsBackend.Instance;
+                if (!AuraEngine.Physics.Native.NativePhysicsBackend.IsAvailable())
+                {
+                    throw new InvalidOperationException(
+                        "The AuraEngine native physics plugin (libaura) could not be loaded. " +
+                        "Build it with Native/AuraEngine/build_plugin.sh for this platform.");
+                }
+
+                backend = new AuraEngine.Physics.Native.NativePhysicsBackend();
             }
 
             _backendName = backend.Name;
