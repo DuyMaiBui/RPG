@@ -38,6 +38,14 @@ namespace AuraEngine.Unity
         [SerializeField]
         private float _gustFrequency = 0.5f;
 
+        [Tooltip("Optional world colliders (characters, floor, props) the cloth collides with. Leave empty for no collision.")]
+        [SerializeField]
+        private AuraVerletColliderSource _colliderSource;
+
+        [Tooltip("2D scenes: hold free particles on this object's Z plane so planar (XY) colliders work.")]
+        [SerializeField]
+        private bool _lockToPlane;
+
         private float _elapsed;
         private AuraClothSolver _solver;
         private Mesh _mesh;
@@ -64,6 +72,7 @@ namespace AuraEngine.Unity
             {
                 var definition = new AuraClothDefinition(_width, _height, _spacing, transform.ToAuraPose(), _damping, _gravityScale);
                 _solver = new AuraClothSolver(definition);
+                ((IVerletColliderConsumer)_solver).SetPlaneLock(_lockToPlane, transform.position.z);
             }
             catch (Exception exception)
             {
@@ -91,6 +100,8 @@ namespace AuraEngine.Unity
 
             _elapsed += Time.fixedDeltaTime;
             _solver.SetOrigin(transform.ToAuraPose());
+            if (_colliderSource != null)
+                ((IVerletColliderConsumer)_solver).SetColliders(_colliderSource.Refresh());
             _solver.Step(
                 Time.fixedDeltaTime,
                 _gravity.ToAura(),

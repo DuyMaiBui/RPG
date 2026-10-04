@@ -38,6 +38,14 @@ namespace AuraEngine.Unity
         [Range(0f, 1f)]
         private float _damping = 0.98f;
 
+        [Tooltip("Optional world colliders (characters, floor, props) the hair collides with. Leave empty for no collision.")]
+        [SerializeField]
+        private AuraVerletColliderSource _colliderSource;
+
+        [Tooltip("2D scenes: hold free particles on this object's Z plane so planar (XY) colliders work.")]
+        [SerializeField]
+        private bool _lockToPlane;
+
         private float _elapsed;
         private AuraHairStrandSolver _solver;
 
@@ -86,6 +94,7 @@ namespace AuraEngine.Unity
 
                 var definition = new AuraHairDefinition(transform.ToAuraPose(), roots, _pointsPerStrand, _segmentLength);
                 _solver = new AuraHairStrandSolver(definition, _damping);
+                ((IVerletColliderConsumer)_solver).SetPlaneLock(_lockToPlane, transform.position.z);
 
                 for (var index = 0; index < _strands.Length; index++)
                     _strands[index].positionCount = _pointsPerStrand;
@@ -107,6 +116,8 @@ namespace AuraEngine.Unity
 
             _elapsed += Time.fixedDeltaTime;
             _solver.SetRootPose(transform.ToAuraPose());
+            if (_colliderSource != null)
+                ((IVerletColliderConsumer)_solver).SetColliders(_colliderSource.Refresh());
             _solver.Step(
                 Time.fixedDeltaTime,
                 _gravity.ToAura(),

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace AuraEngine.Core
 {
-    public sealed class AuraHairStrandSolver
+    public sealed class AuraHairStrandSolver : IVerletColliderConsumer
     {
         public const float DefaultDamping = 0.98f;
         public const int DefaultConstraintIterations = 3;
@@ -87,5 +87,11 @@ namespace AuraEngine.Core
 
             return _particles.Positions[strandIndex * PointsPerStrand + pointIndex];
         }
+
+        void IVerletColliderConsumer.SetColliders(IReadOnlyList<AuraVerletCollider> colliders) =>
+            ((IVerletColliderConsumer)_particles).SetColliders(colliders);
+
+        void IVerletColliderConsumer.SetPlaneLock(bool enabled, float z) =>
+            ((IVerletColliderConsumer)_particles).SetPlaneLock(enabled, z);
     }
 }

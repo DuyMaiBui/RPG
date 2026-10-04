@@ -10,8 +10,18 @@ namespace AuraEngine.Core
     /// MathF only, no RNG, fixed iteration counts, explicit delta time.
     /// Holds no static state.
     /// </summary>
-    public sealed class AuraVerletParticles : IVerletSolverBackend
+    public sealed class AuraVerletParticles : IVerletSolverBackend, IVerletColliderConsumer
     {
+        /// <summary>Upper bound on colliders consulted per step (bounds the collision cost).</summary>
+        public const int MaxColliders = 32;
+
+        private const float ContactMargin = 1e-5f;
+
+        private readonly float[] _contactDepth;
+        private IReadOnlyList<AuraVerletCollider> _colliders;
+        private bool _lockPlane;
+        private float _planeZ;
+
         public AuraVerletParticles(int count)
         {
             if (count <= 0)
@@ -21,6 +31,7 @@ namespace AuraEngine.Core
             Positions = new AuraVector3[count];
             PreviousPositions = new AuraVector3[count];
             InverseMass = new float[count];
+            _contactDepth = new float[count];
             for (var index = 0; index < count; index++)
                 InverseMass[index] = 1f;
         }
@@ -80,12 +91,24 @@ namespace AuraEngine.Core
                 Positions[index] = current + velocity + scaledAcceleration;
             }
 
-            if (constraints != null)
+            LockToPlane();
+
+            var hasColliders = _colliders != null && _colliders.Count > 0;
+            if (hasColliders)
+                Array.Clear(_contactDepth, 0, _contactDepth.Length);
+            if (constraints != null || hasColliders)
             {
                 for (var iteration = 0; iteration < constraintIterations; iteration++)
                 {
-                    for (var index = 0; index < constraints.Count; index++)
-                        Relax(constraints[index]);
+                    if (constraints != null)
+                    {
+                        for (var index = 0; index < constraints.Count; index++)
+                            Relax(constraints[index]);
+                    }
+
+                    LockToPlane();
+                    if (hasColliders)
+                        Collide(deltaTime, iteration == constraintIterations - 1);
                 }
             }
 
@@ -106,6 +129,88 @@ namespace AuraEngine.Core
             IReadOnlyList<AuraVerletConstraint> constraints,
             float groundPlaneY) =>
             Step(deltaTime, gravity, wind, damping, constraintIterations, constraints, groundPlaneY);
+
+        void IVerletColliderConsumer.SetColliders(IReadOnlyList<AuraVerletCollider> colliders) => _colliders = colliders;
+
+        void IVerletColliderConsumer.SetPlaneLock(bool enabled, float z)
+        {
+            _lockPlane = enabled;
+            _planeZ = z;
+        }
+
+        private void LockToPlane()
+        {
+            if (!_lockPlane)
+                return;
+
+            for (var index = 0; index < Count; index++)
+            {
+                if (InverseMass[index] <= 0f)
+                    continue;
+
+                var position = Positions[index];
+                var previous = PreviousPositions[index];
+                Positions[index] = new AuraVector3(position.X, position.Y, _planeZ);
+                PreviousPositions[index] = new AuraVector3(previous.X, previous.Y, _planeZ);
+            }
+        }
+
+        /// <summary>
+        /// Projects free particles out of every collider's skin shell. Pinned particles never move.
+        /// On the final pass the contact velocity is also resolved: velocity into the surface is
+        /// removed (no bounce) and the tangential velocity relative to the collider is limited by its
+        /// Coulomb friction, so moving colliders carry the particles.
+        /// </summary>
+        private void Collide(float deltaTime, bool resolveVelocity)
+        {
+            var colliders = _colliders;
+            var count = colliders.Count < MaxColliders ? colliders.Count : MaxColliders;
+            for (var index = 0; index < Count; index++)
+            {
+                if (InverseMass[index] <= 0f)
+                    continue;
+
+                for (var c = 0; c < count; c++)
+                {
+                    var collider = colliders[c];
+                    AuraVerletCollisions.Query(collider, Positions[index], out var normal, out var depth);
+                    if (depth <= -ContactMargin)
+                        continue;
+
+                    var position = Positions[index];
+                    if (depth > 0f)
+                    {
+                        position += normal * depth;
+                        Positions[index] = position;
+                        _contactDepth[index] += depth;
+                    }
+
+                    if (!resolveVelocity)
+                        continue;
+
+                    var previous = PreviousPositions[index];
+                    var relative = (position - previous) - collider.Velocity * deltaTime;
+                    var normalPart = AuraVector3.Dot(relative, normal);
+                    if (normalPart < 0f)
+                    {
+                        previous += normal * normalPart;
+                        relative -= normal * normalPart;
+                        normalPart = 0f;
+                    }
+
+                    // Coulomb friction: the stick/slide limit is friction times this step's push-out
+                    // (the normal impulse), so resting particles hold on slopes up to atan(friction)
+                    // and sliding particles lose at most that much tangential displacement per step.
+                    var tangent = relative - normal * normalPart;
+                    var tangentLength = tangent.Length;
+                    var limit = collider.Friction * _contactDepth[index];
+                    if (tangentLength > 1e-9f)
+                        PreviousPositions[index] = previous + tangent * (tangentLength <= limit ? 1f : limit / tangentLength);
+                    else
+                        PreviousPositions[index] = previous;
+                }
+            }
+        }
 
         private void Relax(AuraVerletConstraint constraint)
         {

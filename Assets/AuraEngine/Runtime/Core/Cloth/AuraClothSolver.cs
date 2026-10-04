@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace AuraEngine.Core
 {
-    public sealed class AuraClothSolver
+    public sealed class AuraClothSolver : IVerletColliderConsumer
     {
         public const int DefaultConstraintIterations = 3;
         public const float DefaultGroundPlaneY = float.NegativeInfinity;
@@ -100,5 +100,11 @@ namespace AuraEngine.Core
             Array.Copy(_particles.Positions, copy, ParticleCount);
             return copy;
         }
+
+        void IVerletColliderConsumer.SetColliders(IReadOnlyList<AuraVerletCollider> colliders) =>
+            ((IVerletColliderConsumer)_particles).SetColliders(colliders);
+
+        void IVerletColliderConsumer.SetPlaneLock(bool enabled, float z) =>
+            ((IVerletColliderConsumer)_particles).SetPlaneLock(enabled, z);
     }
 }
