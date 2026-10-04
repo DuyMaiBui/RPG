@@ -36,8 +36,11 @@ namespace AuraEngine.Unity
         private AuraPhysicsLayers _layers;
 
         private readonly List<AuraPhysicsBodyAuthoring> _authoring = new List<AuraPhysicsBodyAuthoring>();
+        private readonly List<AuraPhysicsBody2DAuthoring> _authoring2D = new List<AuraPhysicsBody2DAuthoring>();
         private readonly List<AuraJointAuthoring> _jointAuthoring = new List<AuraJointAuthoring>();
+        private readonly List<AuraJoint2DAuthoring> _joint2DAuthoring = new List<AuraJoint2DAuthoring>();
         private readonly List<AuraRagdollChainAuthoring> _chainAuthoring = new List<AuraRagdollChainAuthoring>();
+        private readonly List<AuraRagdollChain2DAuthoring> _chain2DAuthoring = new List<AuraRagdollChain2DAuthoring>();
         private readonly List<AuraCharacterAuthoring> _characterAuthoring = new List<AuraCharacterAuthoring>();
         private readonly List<AuraVehicleAuthoring> _vehicleAuthoring = new List<AuraVehicleAuthoring>();
         private readonly List<AuraSoftBodyAuthoring> _softBodyAuthoring = new List<AuraSoftBodyAuthoring>();
@@ -101,8 +104,17 @@ namespace AuraEngine.Unity
             for (var index = 0; index < _authoring.Count; index++)
                 _authoring[index].BuildInto(this);
 
+            for (var index = 0; index < _authoring2D.Count; index++)
+                _authoring2D[index].BuildInto(this);
+
             if ((_world.Capabilities & AuraPhysicsCapabilities.Joints) != 0)
             {
+                for (var index = 0; index < _joint2DAuthoring.Count; index++)
+                    _joint2DAuthoring[index].BuildInto(this);
+
+                for (var index = 0; index < _chain2DAuthoring.Count; index++)
+                    _chain2DAuthoring[index].BuildInto(this);
+
                 for (var index = 0; index < _jointAuthoring.Count; index++)
                     _jointAuthoring[index].BuildInto(this);
 
@@ -164,6 +176,68 @@ namespace AuraEngine.Unity
                 return;
 
             _authoring.Remove(authoring);
+            authoring.ReleaseFrom(this);
+        }
+
+        public void Register(AuraPhysicsBody2DAuthoring authoring)
+        {
+            if (authoring == null)
+                throw new ArgumentNullException(nameof(authoring));
+
+            if (_authoring2D.Contains(authoring))
+                return;
+
+            _authoring2D.Add(authoring);
+            if (_world != null)
+                authoring.BuildInto(this);
+        }
+
+        public void Unregister(AuraPhysicsBody2DAuthoring authoring)
+        {
+            if (authoring == null)
+                return;
+
+            _authoring2D.Remove(authoring);
+            authoring.ReleaseFrom(this);
+        }
+
+        public void Register(AuraJoint2DAuthoring authoring)
+        {
+            if (authoring == null)
+                throw new ArgumentNullException(nameof(authoring));
+            if (_joint2DAuthoring.Contains(authoring))
+                return;
+
+            _joint2DAuthoring.Add(authoring);
+            if (_world != null && (_world.Capabilities & AuraPhysicsCapabilities.Joints) != 0)
+                authoring.BuildInto(this);
+        }
+
+        public void Unregister(AuraJoint2DAuthoring authoring)
+        {
+            if (authoring == null)
+                return;
+            _joint2DAuthoring.Remove(authoring);
+            authoring.ReleaseFrom(this);
+        }
+
+        public void Register(AuraRagdollChain2DAuthoring authoring)
+        {
+            if (authoring == null)
+                throw new ArgumentNullException(nameof(authoring));
+            if (_chain2DAuthoring.Contains(authoring))
+                return;
+
+            _chain2DAuthoring.Add(authoring);
+            if (_world != null && (_world.Capabilities & AuraPhysicsCapabilities.Joints) != 0)
+                authoring.BuildInto(this);
+        }
+
+        public void Unregister(AuraRagdollChain2DAuthoring authoring)
+        {
+            if (authoring == null)
+                return;
+            _chain2DAuthoring.Remove(authoring);
             authoring.ReleaseFrom(this);
         }
 

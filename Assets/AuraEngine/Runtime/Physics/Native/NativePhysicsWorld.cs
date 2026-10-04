@@ -45,7 +45,8 @@ namespace AuraEngine.Physics.Native
                            AuraPhysicsCapabilities.Joints;
 
                 if (_mode == AuraPhysicsMode.Plane2D)
-                    return body | AuraPhysicsCapabilities.ShapeBox | AuraPhysicsCapabilities.ShapeSphere | AuraPhysicsCapabilities.Joints;
+                    return body | AuraPhysicsCapabilities.ShapeBox | AuraPhysicsCapabilities.ShapeSphere |
+                           AuraPhysicsCapabilities.ShapeCapsule | AuraPhysicsCapabilities.Joints;
 
                 return body | AuraPhysicsCapabilities.ShapeBox |
                        AuraPhysicsCapabilities.ShapeSphere |
