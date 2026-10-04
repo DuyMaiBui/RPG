@@ -240,6 +240,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 0.5, y: 5}
@@ -495,9 +496,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 937758524}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: 0}
-  m_LocalScale: {x: 0.9, y: 1, z: 0.4}
+  m_LocalRotation: {x: -0.7071068, y: -0, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0.5, z: -0.2}
+  m_LocalScale: {x: 0.9, y: 1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1984304707}
@@ -727,6 +728,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 12, y: 1}
@@ -842,6 +844,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 11400000, guid: 2010a491a931547e48ea518ddedd146a, type: 2}
   _layer: 0
   _radius: 0.5
@@ -968,6 +971,7 @@ MonoBehaviour:
   _mode: 1
   _gravity: {x: 0, y: -9.81, z: 0}
   _autoCreateOnStart: 1
+  _timeScale: 1
   _backendKind: 1
   _layers: {fileID: 11400000, guid: 13f5abed9718c4caf851ad87ef0a773f, type: 2}
 --- !u!1 &2009528954
@@ -1091,6 +1095,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 0.5, y: 5}
