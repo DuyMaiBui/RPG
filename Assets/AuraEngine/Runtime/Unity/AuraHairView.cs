@@ -27,10 +27,18 @@ namespace AuraEngine.Unity
         [SerializeField]
         private Vector3 _wind = Vector3.zero;
 
+        [Tooltip("Peak acceleration of a sinusoidal gust added to Wind. Keeps hanging hair in motion; set to zero for still air.")]
+        [SerializeField]
+        private Vector3 _gustAmplitude = new Vector3(3f, 0f, 0f);
+
+        [SerializeField]
+        private float _gustFrequency = 0.5f;
+
         [SerializeField]
         [Range(0f, 1f)]
         private float _damping = 0.98f;
 
+        private float _elapsed;
         private AuraHairStrandSolver _solver;
 
         private void Awake()
@@ -97,7 +105,12 @@ namespace AuraEngine.Unity
             if (_solver == null)
                 return;
 
-            _solver.Step(Time.fixedDeltaTime, _gravity.ToAura(), _wind.ToAura());
+            _elapsed += Time.fixedDeltaTime;
+            _solver.SetRootPose(transform.ToAuraPose());
+            _solver.Step(
+                Time.fixedDeltaTime,
+                _gravity.ToAura(),
+                AuraVerletWind.Sample(_wind.ToAura(), _gustAmplitude.ToAura(), _gustFrequency, _elapsed));
             PushToRenderers();
         }
 

@@ -31,6 +31,14 @@ namespace AuraEngine.Unity
         [SerializeField]
         private Vector3 _wind = Vector3.zero;
 
+        [Tooltip("Peak acceleration of a sinusoidal gust added to Wind. Keeps hanging cloth in motion; set to zero for still air.")]
+        [SerializeField]
+        private Vector3 _gustAmplitude = new Vector3(2f, 0f, 3f);
+
+        [SerializeField]
+        private float _gustFrequency = 0.5f;
+
+        private float _elapsed;
         private AuraClothSolver _solver;
         private Mesh _mesh;
         private Vector3[] _scratch;
@@ -50,10 +58,11 @@ namespace AuraEngine.Unity
                 return;
             }
 
-            // Simulation runs in the view's local space; the transform places the result.
+            // Simulation runs in world space (so the pinned row follows the transform and the
+            // cloth trails it); vertices are written back in the mesh's local space.
             try
             {
-                var definition = new AuraClothDefinition(_width, _height, _spacing, AuraPose.Identity, _damping, _gravityScale);
+                var definition = new AuraClothDefinition(_width, _height, _spacing, transform.ToAuraPose(), _damping, _gravityScale);
                 _solver = new AuraClothSolver(definition);
             }
             catch (Exception exception)
@@ -80,7 +89,12 @@ namespace AuraEngine.Unity
             if (_solver == null || _mesh == null)
                 return;
 
-            _solver.Step(Time.fixedDeltaTime, _gravity.ToAura(), _wind.ToAura());
+            _elapsed += Time.fixedDeltaTime;
+            _solver.SetOrigin(transform.ToAuraPose());
+            _solver.Step(
+                Time.fixedDeltaTime,
+                _gravity.ToAura(),
+                AuraVerletWind.Sample(_wind.ToAura(), _gustAmplitude.ToAura(), _gustFrequency, _elapsed));
 
             if (_scratch == null || _scratch.Length != _solver.ParticleCount)
                 _scratch = new Vector3[_solver.ParticleCount];
@@ -98,7 +112,7 @@ namespace AuraEngine.Unity
                 for (var x = 0; x < _solver.Width; x++)
                 {
                     var position = _solver.GetPosition(x, y);
-                    destination[y * _solver.Width + x] = new Vector3(position.X, position.Y, position.Z);
+                    destination[y * _solver.Width + x] = transform.InverseTransformPoint(position.ToUnity());
                 }
             }
         }
@@ -127,12 +141,14 @@ namespace AuraEngine.Unity
                     var b = a + 1;
                     var c = a + width;
                     var d = c + 1;
+                    // Unity front faces are clockwise as seen by the viewer, so this
+                    // winding faces -Z (toward a camera looking along +Z).
                     triangles[cursor++] = a;
-                    triangles[cursor++] = c;
-                    triangles[cursor++] = b;
                     triangles[cursor++] = b;
                     triangles[cursor++] = c;
+                    triangles[cursor++] = b;
                     triangles[cursor++] = d;
+                    triangles[cursor++] = c;
                 }
             }
 

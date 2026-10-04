@@ -64,6 +64,16 @@ namespace AuraEngine.Core
         public int Height { get; }
         public int ParticleCount => Width * Height;
 
+        /// <summary>
+        /// Moves the pinned top row to a new origin pose so hanging cloth follows its owner.
+        /// Free particles are left to the solver, so the cloth trails the motion.
+        /// </summary>
+        public void SetOrigin(AuraPose origin)
+        {
+            for (var x = 0; x < Width; x++)
+                _particles.MovePinned(x, origin.TransformPoint(new AuraVector3(x * _definition.Spacing, 0f, 0f)));
+        }
+
         public void Step(float deltaTime, AuraVector3 gravity, AuraVector3 wind) =>
             _particles.Step(
                 deltaTime,

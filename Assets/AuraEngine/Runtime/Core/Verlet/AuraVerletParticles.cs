@@ -39,6 +39,21 @@ namespace AuraEngine.Core
             PreviousPositions[index] = Positions[index];
         }
 
+        /// <summary>
+        /// Teleports a pinned particle (kinematic anchor) so it follows a moving owner.
+        /// Previous position is reset so the anchor carries no stored velocity.
+        /// </summary>
+        public void MovePinned(int index, AuraVector3 position)
+        {
+            if (index < 0 || index >= Count)
+                throw new ArgumentOutOfRangeException(nameof(index), index, "Particle index out of range.");
+            if (InverseMass[index] > 0f)
+                throw new InvalidOperationException("Only pinned particles can be moved kinematically.");
+
+            Positions[index] = position;
+            PreviousPositions[index] = position;
+        }
+
         public void Step(
             float deltaTime,
             AuraVector3 gravity,

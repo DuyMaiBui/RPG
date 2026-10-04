@@ -10,6 +10,7 @@ namespace AuraEngine.Core
 
         private readonly AuraVerletParticles _particles;
         private readonly List<AuraVerletConstraint> _constraints;
+        private readonly AuraVector3[] _strandRoots;
         private readonly float _damping;
         private readonly int _constraintIterations;
         private readonly float _groundPlaneY;
@@ -33,6 +34,7 @@ namespace AuraEngine.Core
 
             StrandCount = definition.StrandRoots.Length;
             PointsPerStrand = definition.PointsPerStrand;
+            _strandRoots = (AuraVector3[])definition.StrandRoots.Clone();
             _damping = damping;
             _constraintIterations = constraintIterations;
             _groundPlaneY = groundPlaneY;
@@ -63,6 +65,15 @@ namespace AuraEngine.Core
 
         public int StrandCount { get; }
         public int PointsPerStrand { get; }
+
+        /// <summary>
+        /// Moves every pinned strand root to the given pose so hair follows its owner.
+        /// </summary>
+        public void SetRootPose(AuraPose pose)
+        {
+            for (var strand = 0; strand < StrandCount; strand++)
+                _particles.MovePinned(strand * PointsPerStrand, pose.TransformPoint(_strandRoots[strand]));
+        }
 
         public void Step(float deltaTime, AuraVector3 gravity, AuraVector3 wind) =>
             _particles.Step(deltaTime, gravity, wind, _damping, _constraintIterations, _constraints, _groundPlaneY);
