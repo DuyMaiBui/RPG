@@ -5,7 +5,7 @@ using AuraEngine.Physics;
 
 namespace AuraEngine.Tests
 {
-    public sealed class FakePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsHair, IPhysicsContacts, IPhysicsSerialization
+    public sealed class FakePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsHair, IPhysicsWater, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly List<AuraPhysicsEvent> _events;
         private readonly List<FakePhysicsBody> _bodies = new List<FakePhysicsBody>();
@@ -125,6 +125,7 @@ namespace AuraEngine.Tests
         IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;
         IPhysicsRagdolls IPhysicsWorld.Ragdolls => this;
         IPhysicsHair IPhysicsWorld.Hair => this;
+        IPhysicsWater IPhysicsWorld.Water => this;
 
         AuraHairId IPhysicsHair.CreateHair(in AuraHairDefinition definition) => AuraHairId.Invalid;
         AuraResult IPhysicsHair.DestroyHair(AuraHairId hair) => AuraResult.InvalidHandle;

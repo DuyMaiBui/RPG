@@ -3,7 +3,7 @@ using AuraEngine.Core;
 
 namespace AuraEngine.Physics
 {
-    public interface IPhysicsWorld : IDisposable, IPhysicsQuery, IPhysicsEventSource
+    public interface IPhysicsWorld : IDisposable, IPhysicsQuery, IPhysicsEventSource, IPhysicsWater
     {
         AuraPhysicsMode Mode { get; }
 
@@ -18,6 +18,7 @@ namespace AuraEngine.Physics
         IPhysicsSoftBodies SoftBodies { get; }
         IPhysicsRagdolls Ragdolls { get; }
         IPhysicsHair Hair { get; }
+        IPhysicsWater Water { get; }
 
         IPhysicsContacts Contacts { get; }
 

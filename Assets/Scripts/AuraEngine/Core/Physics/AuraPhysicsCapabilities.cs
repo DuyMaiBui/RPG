@@ -37,6 +37,8 @@ namespace AuraEngine.Core
         Vehicles = 1 << 21,
         SoftBodies = 1 << 22,
         Hair = 1 << 23,
+        Ragdolls = 1 << 24,
+        Water = 1 << 25,
 
         All = ~0,
     }

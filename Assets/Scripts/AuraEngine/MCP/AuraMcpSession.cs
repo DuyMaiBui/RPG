@@ -44,6 +44,16 @@ namespace AuraEngine.MCP
             _world.AttachBody(_world.CreateEntity(), definition);
         }
 
+        public void AddTriangleMesh(AuraVector3 position, AuraVector3[] vertices, int[] indices, AuraPhysicsMaterialDefinition material, bool dynamic)
+        {
+            EnsureWorld();
+            var shape = AuraPhysicsShapeDefinition.TriangleMesh(vertices, indices);
+            var definition = dynamic
+                ? AuraPhysicsBodyDefinition.CreateDynamic(new AuraPose(position, AuraQuaternion.Identity), AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, shape.WithMaterial(material))
+                : AuraPhysicsBodyDefinition.CreateStatic(new AuraPose(position, AuraQuaternion.Identity), AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, shape.WithMaterial(material));
+            _world.AttachBody(_world.CreateEntity(), definition);
+        }
+
         public void Step(int count)
         {
             EnsureWorld();

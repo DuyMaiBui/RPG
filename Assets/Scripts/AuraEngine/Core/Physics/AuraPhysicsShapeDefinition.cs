@@ -63,6 +63,9 @@ namespace AuraEngine.Core
         public AuraPhysicsShapeDefinition WithLayer(AuraPhysicsLayer layer) =>
             new AuraPhysicsShapeDefinition(Type, LocalPose, IsTrigger, Material, layer, Geometry);
 
+        public AuraPhysicsShapeDefinition WithMaterial(AuraPhysicsMaterialDefinition material) =>
+            new AuraPhysicsShapeDefinition(Type, LocalPose, IsTrigger, material, Layer, Geometry);
+
         public AuraResult Validate()
         {
             if (Geometry.Validate(Type) != AuraResult.Success)

@@ -4,7 +4,7 @@ using AuraEngine.Core;
 
 namespace AuraEngine.Physics
 {
-    public sealed class NullPhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsHair, IPhysicsContacts, IPhysicsSerialization
+    public sealed class NullPhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsHair, IPhysicsWater, IPhysicsContacts, IPhysicsSerialization
     {
         private readonly List<NullBodySlot> _slots;
         private readonly List<int> _freeSlots = new List<int>();
@@ -107,6 +107,7 @@ namespace AuraEngine.Physics
         IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;
         IPhysicsRagdolls IPhysicsWorld.Ragdolls => this;
         IPhysicsHair IPhysicsWorld.Hair => this;
+        IPhysicsWater IPhysicsWorld.Water => this;
 
         IPhysicsContacts IPhysicsWorld.Contacts => this;
 
@@ -203,6 +204,11 @@ namespace AuraEngine.Physics
         void IPhysicsWorld.Step(float deltaTime)
         {
         }
+
+        AuraWaterId IPhysicsWater.CreateWater(in AuraWaterDefinition definition) => definition.Density > 0f ? new AuraWaterId(1) : AuraWaterId.Invalid;
+        AuraResult IPhysicsWater.DestroyWater(AuraWaterId water) => water.IsValid ? AuraResult.Success : AuraResult.InvalidHandle;
+        AuraResult IPhysicsWater.SetWaterParameters(AuraWaterId water, in AuraWaterDefinition definition) => water.IsValid && definition.Density > 0f ? AuraResult.Success : AuraResult.InvalidHandle;
+        AuraResult IPhysicsWater.ApplyWaterStep(AuraWaterId water, float deltaTime) => water.IsValid && deltaTime >= 0f ? AuraResult.Success : AuraResult.InvalidHandle;
 
         AuraWaterId IPhysicsWorld.CreateWater(in AuraWaterDefinition definition) => definition.Density > 0f ? new AuraWaterId(1) : AuraWaterId.Invalid;
         AuraResult IPhysicsWorld.DestroyWater(AuraWaterId water) => water.IsValid ? AuraResult.Success : AuraResult.InvalidHandle;
