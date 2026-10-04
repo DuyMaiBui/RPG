@@ -74,4 +74,24 @@ AuraResultCode Aura_GetJointFeedback(AuraWorldHandle world, uint64_t joint, Aura
     return instance->GetJointFeedback(joint, outFeedback);
 }
 
+AuraResultCode Aura_SetJointAxisLimits(AuraWorldHandle world, uint64_t joint, uint32_t axis, const AuraJointAxisLimit* limit)
+{
+    auto* instance = aura::ToWorld(world);
+    if (instance == nullptr)
+        return AURA_INVALID_WORLD;
+    if (limit == nullptr)
+        return AURA_INVALID_DEFINITION;
+    return instance->SetJointAxisLimits(joint, axis, *limit);
+}
+
+AuraResultCode Aura_SetJointAxisMotor(AuraWorldHandle world, uint64_t joint, uint32_t axis, const AuraJointMotorDesc* motor)
+{
+    auto* instance = aura::ToWorld(world);
+    if (instance == nullptr)
+        return AURA_INVALID_WORLD;
+    if (motor == nullptr)
+        return AURA_INVALID_DEFINITION;
+    return instance->SetJointAxisMotor(joint, axis, *motor);
+}
+
 } // extern "C"

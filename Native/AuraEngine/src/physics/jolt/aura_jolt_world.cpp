@@ -233,12 +233,7 @@ AuraResultCode JoltWorld::DestroyBody(AuraBodyHandle body)
         const bool touchesB = joint.bodyB.index == body.index && joint.bodyB.generation == body.generation;
         if (!touchesA && !touchesB)
             continue;
-        if (joint.constraint != nullptr)
-        {
-            /* The constraint manager owns the only reference, so RemoveConstraint frees it. */
-            impl_->physics.RemoveConstraint(joint.constraint);
-            joint.constraint = nullptr;
-        }
+        impl_->RemoveJointConstraint(index);
         joint.occupied = false;
         joint.generation += 1;
         impl_->freeJointSlots.push_back(static_cast<int>(index));
@@ -331,6 +326,7 @@ void JoltWorld::Step(float deltaTime)
         }
     }
 
+    impl_->ApplyForceFields(deltaTime);
     impl_->physics.Update(deltaTime, 1, &impl_->tempAllocator, &impl_->jobSystem);
     impl_->ProcessJointBreaks();
 }

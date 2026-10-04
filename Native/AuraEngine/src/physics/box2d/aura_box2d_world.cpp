@@ -1,6 +1,4 @@
-#include "aura_box2d_world.h"
-
-#include <box2d/box2d.h>
+#include "aura_box2d_internal.h"
 
 #include <algorithm>
 #include <cmath>
@@ -9,48 +7,6 @@
 
 namespace aura
 {
-namespace
-{
-constexpr uint32_t kMaxLayers = 64;
-
-float AngleFromQuat(const AuraQuat& q) { return 2.0f * std::atan2(q.z, q.w); }
-
-AuraQuat QuatFromAngle(float angle)
-{
-    AuraQuat q{};
-    q.z = std::sin(angle * 0.5f);
-    q.w = std::cos(angle * 0.5f);
-    return q;
-}
-
-b2Vec2 ToVec2(const AuraVec3& v) { return b2Vec2{ v.x, v.y }; }
-AuraVec3 ToAura(const b2Vec2& v) { return AuraVec3{ v.x, v.y, 0.0f }; }
-AuraQuat ToQuat(const b2Rot& rot) { return QuatFromAngle(b2Rot_GetAngle(rot)); }
-
-uint64_t UserDataFromHandleValue(AuraBodyHandle handle)
-{
-    return (static_cast<uint64_t>(handle.index) << 32) | handle.generation;
-}
-
-void* Encode(AuraBodyHandle handle)
-{
-    return reinterpret_cast<void*>(UserDataFromHandleValue(handle));
-}
-
-AuraBodyHandle Decode(void* userData)
-{
-    const uint64_t value = reinterpret_cast<uint64_t>(userData);
-    return AuraBodyHandle{ static_cast<uint32_t>(value >> 32), static_cast<uint32_t>(value & 0xFFFFFFFFu) };
-}
-} // namespace
-
-struct OverlapContext
-{
-    AuraQueryHit* buffer = nullptr;
-    uint32_t capacity = 0;
-    uint32_t count = 0;
-    bool ignoreTriggers = false;
-};
 
 struct RayContext
 {
@@ -60,211 +16,9 @@ struct RayContext
     float maxDistance = 0.0f;
 };
 
-struct Box2DWorld::Impl
-{
-    struct Slot
-    {
-        bool occupied = false;
-        uint32_t generation = 0;
-        b2BodyId body = b2_nullBodyId;
-    };
-
-    struct JointSlot
-    {
-        bool occupied = false;
-        uint32_t generation = 0;
-        b2JointId joint = b2_nullJointId;
-        AuraBodyHandle bodyA{};
-        AuraBodyHandle bodyB{};
-        AuraJointType type = AURA_JOINT_FIXED;
-        b2Vec2 localAxisA{ 1.0f, 0.0f };
-        float breakForce = 0.0f;
-        float breakTorque = 0.0f;
-        bool broken = false;
-        float lastForce = 0.0f;
-        float lastTorque = 0.0f;
-    };
-
-    b2WorldId world = b2_nullWorldId;
-    std::vector<Slot> slots;
-    std::vector<int> freeSlots;
-    std::vector<JointSlot> jointSlots;
-    std::vector<int> freeJointSlots;
-    std::vector<AuraPhysicsEvent> events;
-    uint64_t matrix[kMaxLayers];
-    float lastDelta = 1.0f / 60.0f;
-    AuraVec3 gravity{ 0.0f, -9.81f, 0.0f };
-    AuraWaterDesc water{};
-    bool waterActive = false;
-
-    static uint64_t MakeJointHandle(const JointSlot& slot, int index)
-    {
-        return (static_cast<uint64_t>(slot.generation) << 32) | static_cast<uint32_t>(index);
-    }
-
-    JointSlot* FindJoint(uint64_t handle)
-    {
-        const uint32_t index = static_cast<uint32_t>(handle & 0xFFFFFFFFull);
-        const uint32_t generation = static_cast<uint32_t>(handle >> 32);
-        if (index < jointSlots.size() && jointSlots[index].occupied && jointSlots[index].generation == generation)
-            return &jointSlots[index];
-        return nullptr;
-    }
-
-    const JointSlot* FindJoint(uint64_t handle) const
-    {
-        const uint32_t index = static_cast<uint32_t>(handle & 0xFFFFFFFFull);
-        const uint32_t generation = static_cast<uint32_t>(handle >> 32);
-        if (index < jointSlots.size() && jointSlots[index].occupied && jointSlots[index].generation == generation)
-            return &jointSlots[index];
-        return nullptr;
-    }
-
-    explicit Impl(const AuraWorldDesc& desc)
-    {
-        for (uint32_t i = 0; i < kMaxLayers; ++i)
-            matrix[i] = ~0ull;
-        if (desc.collisionMasks != nullptr)
-        {
-            for (uint32_t i = 0; i < desc.collisionMaskCount && i < kMaxLayers; ++i)
-                matrix[i] = desc.collisionMasks[i];
-        }
-
-        b2WorldDef worldDef = b2DefaultWorldDef();
-        worldDef.gravity = b2Vec2{ desc.gravity.x, desc.gravity.y };
-        gravity = desc.gravity;
-        world = b2CreateWorld(&worldDef);
-    }
-
-    Slot* Find(AuraBodyHandle handle)
-    {
-        if (handle.index < slots.size())
-        {
-            Slot& slot = slots[handle.index];
-            if (slot.occupied && slot.generation == handle.generation)
-                return &slot;
-        }
-        return nullptr;
-    }
-
-    const Slot* Find(AuraBodyHandle handle) const
-    {
-        if (handle.index < slots.size())
-        {
-            const Slot& slot = slots[handle.index];
-            if (slot.occupied && slot.generation == handle.generation)
-                return &slot;
-        }
-        return nullptr;
-    }
-
-    static AuraBodyHandle HandleFromShape(b2ShapeId shape)
-    {
-        if (!b2Shape_IsValid(shape))
-            return AuraBodyHandle{ 0xFFFFFFFFu, 0xFFFFFFFFu };
-        const b2BodyId body = b2Shape_GetBody(shape);
-        return Decode(b2Body_GetUserData(body));
-    }
-
-    void FillState(AuraBodyHandle handle, const Slot& slot, AuraBodyState& state) const
-    {
-        state.body = handle;
-        state.entity = AuraEntityHandle{ 0, 0 };
-        const b2Vec2 position = b2Body_GetPosition(slot.body);
-        state.pose.position = ToAura(position);
-        state.pose.rotation = ToQuat(b2Body_GetRotation(slot.body));
-        state.linearVelocity = ToAura(b2Body_GetLinearVelocity(slot.body));
-        const float angular = b2Body_GetAngularVelocity(slot.body);
-        state.angularVelocity = AuraVec3{ 0.0f, 0.0f, angular };
-        state.isAwake = b2Body_IsAwake(slot.body) ? 1 : 0;
-        state.flags = b2Body_IsEnabled(slot.body) ? 0u : AURA_BODY_FLAG_DISABLED;
-    }
-
-    /* Joint loads of the last step (aura_box2d_world.cpp, joint control section). */
-    bool JointLoads(const JointSlot& joint, float& force, float& torque, float& motorLoad) const;
-    void ProcessJointBreaks();
-
-    void GatherEvents()
-    {
-        events.clear();
-
-        const b2ContactEvents contacts = b2World_GetContactEvents(world);
-        for (int i = 0; i < contacts.beginCount; ++i)
-        {
-            const AuraBodyHandle a = HandleFromShape(contacts.beginEvents[i].shapeIdA);
-            const AuraBodyHandle b = HandleFromShape(contacts.beginEvents[i].shapeIdB);
-            if (a.index == 0xFFFFFFFFu || b.index == 0xFFFFFFFFu)
-                continue;
-            AuraPhysicsEvent event{};
-            event.type = 0;
-            event.bodyA = a;
-            event.bodyB = b;
-            events.push_back(event);
-        }
-        for (int i = 0; i < contacts.endCount; ++i)
-        {
-            const AuraBodyHandle a = HandleFromShape(contacts.endEvents[i].shapeIdA);
-            const AuraBodyHandle b = HandleFromShape(contacts.endEvents[i].shapeIdB);
-            if (a.index == 0xFFFFFFFFu || b.index == 0xFFFFFFFFu)
-                continue;
-            AuraPhysicsEvent event{};
-            event.type = 1;
-            event.bodyA = a;
-            event.bodyB = b;
-            events.push_back(event);
-        }
-
-        const b2SensorEvents sensors = b2World_GetSensorEvents(world);
-        for (int i = 0; i < sensors.beginCount; ++i)
-        {
-            const AuraBodyHandle sensor = HandleFromShape(sensors.beginEvents[i].sensorShapeId);
-            const AuraBodyHandle visitor = HandleFromShape(sensors.beginEvents[i].visitorShapeId);
-            if (sensor.index == 0xFFFFFFFFu || visitor.index == 0xFFFFFFFFu)
-                continue;
-            AuraPhysicsEvent event{};
-            event.type = 2;
-            event.bodyA = sensor;
-            event.bodyB = visitor;
-            events.push_back(event);
-        }
-        for (int i = 0; i < sensors.endCount; ++i)
-        {
-            const AuraBodyHandle sensor = HandleFromShape(sensors.endEvents[i].sensorShapeId);
-            const AuraBodyHandle visitor = HandleFromShape(sensors.endEvents[i].visitorShapeId);
-            if (sensor.index == 0xFFFFFFFFu || visitor.index == 0xFFFFFFFFu)
-                continue;
-            AuraPhysicsEvent event{};
-            event.type = 3;
-            event.bodyA = sensor;
-            event.bodyB = visitor;
-            events.push_back(event);
-        }
-    }
-};
 
 namespace
 {
-bool OverlapCallback(b2ShapeId shapeId, void* context)
-{
-    auto* ctx = static_cast<OverlapContext*>(context);
-    if (ctx->count >= ctx->capacity)
-        return false;
-
-    const b2BodyId body = b2Shape_GetBody(shapeId);
-    const AuraBodyHandle handle = Decode(b2Body_GetUserData(body));
-    if (handle.index == 0xFFFFFFFFu)
-        return true;
-
-    ctx->buffer[ctx->count].entity = AuraEntityHandle{ 0, 0 };
-    ctx->buffer[ctx->count].body = handle;
-    ctx->buffer[ctx->count].shape = 0;
-    ctx->buffer[ctx->count].distance = 0.0f;
-    ctx->buffer[ctx->count].point = ToAura(b2Shape_GetClosestPoint(shapeId, b2Body_GetPosition(body)));
-    ctx->buffer[ctx->count].normal = AuraVec3{ 0.0f, 0.0f, 0.0f };
-    ctx->count++;
-    return true;
-}
-
 float RayCallback(b2ShapeId shapeId, b2Vec2 point, b2Vec2 normal, float fraction, void* context)
 {
     auto* ctx = static_cast<RayContext*>(context);
@@ -330,6 +84,7 @@ AuraResultCode Box2DWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* 
     bodyDef.position = ToVec2(desc.initialPose.position);
     bodyDef.rotation = b2MakeRot(AngleFromQuat(desc.initialPose.rotation));
     bodyDef.gravityScale = desc.gravityScale;
+    bodyDef.isBullet = desc.collisionDetection == 1;
     bodyDef.userData = Encode(handle);
 
     const b2BodyId body = b2CreateBody(impl_->world, &bodyDef);
@@ -351,6 +106,11 @@ AuraResultCode Box2DWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* 
         shapeDef.filter.maskBits = effectiveMask;
         shapeDef.filter.groupIndex = desc.groupIndex;
         shapeDef.isSensor = source.isTrigger != 0;
+        if (source.isOneWay != 0)
+        {
+            shapeDef.enablePreSolveEvents = true;
+            shapeDef.userData = oneway::EncodeUserData(AngleFromQuat(source.localPose.rotation));
+        }
 
         switch (source.type)
         {
@@ -475,6 +235,7 @@ uint32_t Box2DWorld::BodyCount() const
 void Box2DWorld::Step(float deltaTime)
 {
     impl_->lastDelta = deltaTime;
+    impl_->ApplyForceFields(deltaTime);
     b2World_Step(impl_->world, deltaTime, 4);
     impl_->GatherEvents();
     impl_->ProcessJointBreaks();
@@ -575,35 +336,6 @@ uint32_t Box2DWorld::RaycastAll(const AuraRay& ray, float maxDistance, const Aur
     b2World_CastRay(impl_->world, ToVec2(ray.origin), b2Vec2{ direction.x * maxDistance, direction.y * maxDistance }, queryFilter, &RayCallback, &context);
     return context.count;
 }
-
-uint32_t Box2DWorld::OverlapSphere(const AuraVec3& center, float radius, const AuraQueryFilter& filter, AuraQueryHit* buffer, uint32_t capacity)
-{
-    if (buffer == nullptr || capacity == 0 || radius <= 0.0f)
-        return 0;
-
-    b2QueryFilter queryFilter = b2DefaultQueryFilter();
-    queryFilter.maskBits = filter.layerMask;
-    const b2Vec2 point{ 0.0f, 0.0f };
-    const b2ShapeProxy proxy = b2MakeOffsetProxy(&point, 1, radius, b2Vec2{ center.x, center.y }, b2MakeRot(0.0f));
-
-    OverlapContext context;
-    context.buffer = buffer;
-    context.capacity = capacity;
-    context.count = 0;
-    b2World_OverlapShape(impl_->world, &proxy, queryFilter, &OverlapCallback, &context);
-    return context.count;
-}
-
-#define AURA_UNSUPPORTED_QUERY_METHOD(name, signature) AuraResultCode Box2DWorld::name signature { return AURA_UNSUPPORTED_QUERY; }
-AURA_UNSUPPORTED_QUERY_METHOD(OverlapPoint, (const AuraVec3&, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*))
-AURA_UNSUPPORTED_QUERY_METHOD(OverlapBox, (const AuraVec3&, const AuraVec3&, const AuraQuat&, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*))
-AURA_UNSUPPORTED_QUERY_METHOD(OverlapCapsule, (const AuraVec3&, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*))
-AURA_UNSUPPORTED_QUERY_METHOD(OverlapShape, (const AuraShapeDesc&, const AuraPose&, const AuraQueryFilter&, AuraQueryHit*, uint32_t, uint32_t*))
-AURA_UNSUPPORTED_QUERY_METHOD(SphereCast, (const AuraVec3&, float, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*))
-AURA_UNSUPPORTED_QUERY_METHOD(CapsuleCast, (const AuraVec3&, const AuraVec3&, float, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*))
-AURA_UNSUPPORTED_QUERY_METHOD(BoxCast, (const AuraVec3&, const AuraVec3&, const AuraQuat&, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*))
-AURA_UNSUPPORTED_QUERY_METHOD(ShapeCast, (const AuraShapeDesc&, const AuraPose&, const AuraVec3&, float, const AuraQueryFilter&, AuraQueryHit*, bool*))
-#undef AURA_UNSUPPORTED_QUERY_METHOD
 
 uint64_t Box2DWorld::ComputeStateHash() const
 {
@@ -707,205 +439,39 @@ AuraResultCode Box2DWorld::SetSurfaceVelocity(AuraBodyHandle body, const AuraVec
     return AURA_SUCCESS;
 }
 
-AuraResultCode Box2DWorld::CreateJoint(const AuraJointDesc& desc, uint64_t* outJoint)
-{
-    if (outJoint == nullptr)
-        return AURA_INVALID_HANDLE;
-
-    Impl::Slot* slotA = impl_->Find(desc.bodyA);
-    Impl::Slot* slotB = impl_->Find(desc.bodyB);
-    if (slotA == nullptr || slotB == nullptr)
-        return AURA_INVALID_HANDLE;
-    if (slotA == slotB)
-        return AURA_INVALID_DEFINITION;
-
-    const b2Vec2 anchorA = ToVec2(desc.anchorA);
-    const b2Vec2 anchorB = ToVec2(desc.anchorB);
-
-    b2JointId joint = b2_nullJointId;
-    b2Vec2 localAxis{ 1.0f, 0.0f };
-    switch (static_cast<AuraJointType>(desc.type))
-    {
-    case AURA_JOINT_DISTANCE:
-    case AURA_JOINT_SPRING:
-    {
-        b2DistanceJointDef def = b2DefaultDistanceJointDef();
-        def.bodyIdA = slotA->body;
-        def.bodyIdB = slotB->body;
-        def.localAnchorA = b2Body_GetLocalPoint(slotA->body, anchorA);
-        def.localAnchorB = b2Body_GetLocalPoint(slotB->body, anchorB);
-        def.length = desc.distance;
-        if (desc.type == AURA_JOINT_SPRING)
-        {
-            def.enableSpring = true;
-            def.hertz = desc.springFrequency > 0.0f ? desc.springFrequency : 1.0f;
-            def.dampingRatio = desc.springDamping > 0.0f ? desc.springDamping : 1.0f;
-        }
-        joint = b2CreateDistanceJoint(impl_->world, &def);
-        break;
-    }
-    case AURA_JOINT_POINT:
-    case AURA_JOINT_HINGE:
-    {
-        b2RevoluteJointDef def = b2DefaultRevoluteJointDef();
-        def.bodyIdA = slotA->body;
-        def.bodyIdB = slotB->body;
-        def.localAnchorA = b2Body_GetLocalPoint(slotA->body, anchorA);
-        def.localAnchorB = b2Body_GetLocalPoint(slotB->body, anchorB);
-        if (desc.type == AURA_JOINT_HINGE)
-        {
-            if (desc.enableLimit != 0)
-            {
-                def.enableLimit = true;
-                def.lowerAngle = desc.minLimit;
-                def.upperAngle = desc.maxLimit;
-            }
-            if (desc.motorEnabled != 0)
-            {
-                def.enableMotor = true;
-                def.motorSpeed = desc.motorTargetVelocity;
-                def.maxMotorTorque = desc.maxMotorForce;
-            }
-        }
-        joint = b2CreateRevoluteJoint(impl_->world, &def);
-        break;
-    }
-    case AURA_JOINT_FIXED:
-    {
-        b2WeldJointDef def = b2DefaultWeldJointDef();
-        def.bodyIdA = slotA->body;
-        def.bodyIdB = slotB->body;
-        def.localAnchorA = b2Body_GetLocalPoint(slotA->body, anchorA);
-        def.localAnchorB = b2Body_GetLocalPoint(slotB->body, anchorB);
-        joint = b2CreateWeldJoint(impl_->world, &def);
-        break;
-    }
-    case AURA_JOINT_SLIDER:
-    {
-        b2PrismaticJointDef def = b2DefaultPrismaticJointDef();
-        def.bodyIdA = slotA->body;
-        def.bodyIdB = slotB->body;
-        def.localAnchorA = b2Body_GetLocalPoint(slotA->body, anchorA);
-        def.localAnchorB = b2Body_GetLocalPoint(slotB->body, anchorB);
-        const b2Vec2 axis = b2Body_GetLocalVector(slotA->body, ToVec2(desc.axisA));
-        def.localAxisA = b2Normalize(axis);
-        localAxis = def.localAxisA;
-        if (desc.enableLimit != 0)
-        {
-            def.enableLimit = true;
-            def.lowerTranslation = desc.minLimit;
-            def.upperTranslation = desc.maxLimit;
-        }
-        if (desc.motorEnabled != 0)
-        {
-            def.enableMotor = true;
-            def.motorSpeed = desc.motorTargetVelocity;
-            def.maxMotorForce = desc.maxMotorForce;
-        }
-        joint = b2CreatePrismaticJoint(impl_->world, &def);
-        break;
-    }
-    default:
-        return AURA_UNSUPPORTED_QUERY;
-    }
-
-    if (!b2Joint_IsValid(joint))
-        return AURA_OUT_OF_MEMORY;
-
-    int index;
-    if (!impl_->freeJointSlots.empty())
-    {
-        index = impl_->freeJointSlots.back();
-        impl_->freeJointSlots.pop_back();
-    }
-    else
-    {
-        index = static_cast<int>(impl_->jointSlots.size());
-        impl_->jointSlots.emplace_back();
-    }
-
-    Impl::JointSlot& slot = impl_->jointSlots[index];
-    slot.occupied = true;
-    slot.joint = joint;
-    slot.bodyA = desc.bodyA;
-    slot.bodyB = desc.bodyB;
-    slot.type = static_cast<AuraJointType>(desc.type);
-    slot.localAxisA = localAxis;
-    slot.breakForce = 0.0f;
-    slot.breakTorque = 0.0f;
-    slot.broken = false;
-    slot.lastForce = 0.0f;
-    slot.lastTorque = 0.0f;
-    *outJoint = Impl::MakeJointHandle(slot, index);
-    return AURA_SUCCESS;
-}
-
-AuraResultCode Box2DWorld::DestroyJoint(uint64_t joint)
-{
-    Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr)
-        return AURA_INVALID_HANDLE;
-
-    if (b2Joint_IsValid(slot->joint))
-        b2DestroyJoint(slot->joint);
-    slot->joint = b2_nullJointId;
-    slot->occupied = false;
-    slot->generation += 1;
-    impl_->freeJointSlots.push_back(static_cast<int>(joint & 0xFFFFFFFFull));
-    return AURA_SUCCESS;
-}
-
-bool Box2DWorld::HasJoint(uint64_t joint) const
-{
-    const Impl::JointSlot* slot = impl_->FindJoint(joint);
-    return slot != nullptr && !slot->broken;
-}
-
 AuraResultCode Box2DWorld::CreateCharacter(const AuraCharacterDesc& desc, uint64_t* outCharacter)
 {
-    (void)desc;
-    (void)outCharacter;
-    return AURA_UNSUPPORTED_QUERY;
+    return impl_->characters.Create(impl_->matrix, desc, outCharacter);
 }
 
 AuraResultCode Box2DWorld::DestroyCharacter(uint64_t character)
 {
-    (void)character;
-    return AURA_INVALID_HANDLE;
+    return impl_->characters.Destroy(character);
 }
 
 AuraResultCode Box2DWorld::GetCharacterState(uint64_t character, AuraCharacterState* outState) const
 {
-    (void)character;
-    (void)outState;
-    return AURA_INVALID_HANDLE;
+    return impl_->characters.GetState(character, outState);
 }
 
 AuraResultCode Box2DWorld::MoveCharacter(uint64_t character, const AuraVec3& desiredTranslation, float deltaTime)
 {
-    (void)character;
-    (void)desiredTranslation;
-    (void)deltaTime;
-    return AURA_INVALID_HANDLE;
+    return impl_->characters.Move(impl_->world, ToVec2(impl_->gravity), impl_->lastDelta, character, desiredTranslation, deltaTime);
 }
 
 uint32_t Box2DWorld::CharacterCount() const
 {
-    return 0;
+    return impl_->characters.Count();
 }
 
 uint32_t Box2DWorld::CopyCharacterStates(AuraCharacterState* buffer, uint32_t capacity) const
 {
-    (void)buffer;
-    (void)capacity;
-    return 0;
+    return impl_->characters.CopyStates(buffer, capacity);
 }
 
 AuraResultCode Box2DWorld::ApplyCharacterStates(const AuraCharacterState* states, uint32_t count)
 {
-    (void)states;
-    (void)count;
-    return AURA_UNSUPPORTED_QUERY;
+    return impl_->characters.ApplyStates(states, count);
 }
 
 AuraResultCode Box2DWorld::CreateSoftBody(const AuraSoftBodyDesc&, AuraSoftBodyHandle*)
@@ -927,14 +493,6 @@ AuraResultCode Box2DWorld::GetSoftBodyState(AuraSoftBodyHandle, float*, uint32_t
 
 namespace aura
 {
-namespace
-{
-constexpr float kPi = 3.14159265358979323846f;
-
-bool IsFinite(float value) { return std::isfinite(value); }
-bool IsFinite(const AuraVec3& v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
-float Length(b2Vec2 v) { return std::sqrt(v.x * v.x + v.y * v.y); }
-} // namespace
 
 /* ---- v10 body control. 2D ignores z of linear vectors and x/y of angular vectors. ---- */
 
@@ -946,16 +504,6 @@ enum : uint32_t
     kNeedMovable = 2u,
     kNeedDynamic = 4u
 };
-} // namespace
-
-namespace
-{
-/* Resting bodies sleep through property changes, so wake them (not static bodies, not disabled ones). */
-void Wake(b2BodyId body)
-{
-    if (b2Body_IsEnabled(body) && b2Body_GetType(body) != b2_staticBody)
-        b2Body_SetAwake(body, true);
-}
 } // namespace
 
 #define AURA_B2_RESOLVE(handle, requirements)                                                           \
@@ -1126,245 +674,5 @@ AuraResultCode Box2DWorld::IsBodyEnabled(AuraBodyHandle body, bool* outEnabled) 
 }
 
 #undef AURA_B2_RESOLVE
-
-/* ---- v10 joint control. Box2D has no position motor: AURA_JOINT_MOTOR_POSITION is unsupported. ---- */
-
-bool Box2DWorld::Impl::JointLoads(const JointSlot& joint, float& force, float& torque, float& motorLoad) const
-{
-    force = 0.0f;
-    torque = 0.0f;
-    motorLoad = 0.0f;
-    if (joint.broken || !b2Joint_IsValid(joint.joint))
-        return false;
-
-    /* Sleeping joints keep the impulses of the step they fell asleep in, which is the load they still carry. */
-    const Slot* a = Find(joint.bodyA);
-    const Slot* b = Find(joint.bodyB);
-    if (a == nullptr || b == nullptr)
-        return false;
-
-    const b2Vec2 constraintForce = b2Joint_GetConstraintForce(joint.joint);
-    const float constraintTorque = b2Joint_GetConstraintTorque(joint.joint);
-    switch (joint.type)
-    {
-    case AURA_JOINT_FIXED:
-        force = Length(constraintForce);
-        torque = std::abs(constraintTorque);
-        return true;
-    case AURA_JOINT_DISTANCE:
-    case AURA_JOINT_SPRING:
-        force = Length(constraintForce);
-        return true;
-    case AURA_JOINT_POINT:
-        force = Length(constraintForce);
-        return true;
-    case AURA_JOINT_HINGE:
-    {
-        const float motor = b2RevoluteJoint_GetMotorTorque(joint.joint);
-        force = Length(constraintForce);
-        torque = std::abs(constraintTorque - motor);
-        motorLoad = std::abs(motor);
-        return true;
-    }
-    case AURA_JOINT_SLIDER:
-    {
-        const float motor = b2PrismaticJoint_GetMotorForce(joint.joint);
-        const b2Vec2 axis = b2RotateVector(b2Body_GetRotation(a->body), joint.localAxisA);
-        force = Length(b2Vec2{ constraintForce.x - axis.x * motor, constraintForce.y - axis.y * motor });
-        torque = std::abs(constraintTorque);
-        motorLoad = std::abs(motor);
-        return true;
-    }
-    default:
-        return false;
-    }
-}
-
-void Box2DWorld::Impl::ProcessJointBreaks()
-{
-    for (JointSlot& joint : jointSlots)
-    {
-        if (!joint.occupied || joint.broken)
-            continue;
-        if (joint.breakForce <= 0.0f && joint.breakTorque <= 0.0f)
-            continue;
-
-        float force, torque, motor;
-        JointLoads(joint, force, torque, motor);
-        const bool overForce = joint.breakForce > 0.0f && force > joint.breakForce;
-        const bool overTorque = joint.breakTorque > 0.0f && torque > joint.breakTorque;
-        if (!overForce && !overTorque)
-            continue;
-
-        joint.lastForce = force;
-        joint.lastTorque = torque;
-        joint.broken = true;
-        if (b2Joint_IsValid(joint.joint))
-            b2DestroyJoint(joint.joint);
-        joint.joint = b2_nullJointId;
-
-        for (const AuraBodyHandle handle : { joint.bodyA, joint.bodyB })
-        {
-            const Slot* body = Find(handle);
-            if (body != nullptr && b2Body_IsEnabled(body->body))
-                b2Body_SetAwake(body->body, true);
-        }
-    }
-}
-
-AuraResultCode Box2DWorld::SetJointMotor(uint64_t joint, const AuraJointMotorDesc& motor)
-{
-    Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr || slot->broken)
-        return AURA_INVALID_HANDLE;
-    if (slot->type != AURA_JOINT_HINGE && slot->type != AURA_JOINT_SLIDER)
-        return AURA_UNSUPPORTED_OPERATION;
-    if (motor.mode < AURA_JOINT_MOTOR_OFF || motor.mode > AURA_JOINT_MOTOR_POSITION
-        || !IsFinite(motor.target) || !IsFinite(motor.maxForce) || !IsFinite(motor.springFrequency)
-        || !IsFinite(motor.springDamping) || motor.springFrequency < 0.0f || motor.springDamping < 0.0f)
-        return AURA_INVALID_DEFINITION;
-    if (motor.mode == AURA_JOINT_MOTOR_POSITION)
-        return AURA_UNSUPPORTED_OPERATION;
-    if (motor.mode != AURA_JOINT_MOTOR_OFF && motor.maxForce <= 0.0f)
-        return AURA_INVALID_DEFINITION;
-
-    const bool on = motor.mode == AURA_JOINT_MOTOR_VELOCITY;
-    if (slot->type == AURA_JOINT_HINGE)
-    {
-        if (on)
-        {
-            b2RevoluteJoint_SetMotorSpeed(slot->joint, motor.target);
-            b2RevoluteJoint_SetMaxMotorTorque(slot->joint, motor.maxForce);
-        }
-        b2RevoluteJoint_EnableMotor(slot->joint, on);
-    }
-    else
-    {
-        if (on)
-        {
-            b2PrismaticJoint_SetMotorSpeed(slot->joint, motor.target);
-            b2PrismaticJoint_SetMaxMotorForce(slot->joint, motor.maxForce);
-        }
-        b2PrismaticJoint_EnableMotor(slot->joint, on);
-    }
-
-    for (const AuraBodyHandle handle : { slot->bodyA, slot->bodyB })
-    {
-        const Impl::Slot* body = impl_->Find(handle);
-        if (body != nullptr && b2Body_IsEnabled(body->body))
-            b2Body_SetAwake(body->body, true);
-    }
-    return AURA_SUCCESS;
-}
-
-AuraResultCode Box2DWorld::SetJointLimits(uint64_t joint, bool enabled, float minLimit, float maxLimit)
-{
-    Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr || slot->broken)
-        return AURA_INVALID_HANDLE;
-    if (slot->type != AURA_JOINT_HINGE && slot->type != AURA_JOINT_SLIDER)
-        return AURA_UNSUPPORTED_OPERATION;
-
-    const bool hinge = slot->type == AURA_JOINT_HINGE;
-    if (enabled)
-    {
-        if (!IsFinite(minLimit) || !IsFinite(maxLimit) || minLimit > 0.0f || maxLimit < 0.0f)
-            return AURA_INVALID_DEFINITION;
-        if (hinge && (minLimit < -kPi || maxLimit > kPi))
-            return AURA_INVALID_DEFINITION;
-    }
-
-    if (hinge)
-    {
-        if (enabled)
-            b2RevoluteJoint_SetLimits(slot->joint, minLimit, maxLimit);
-        b2RevoluteJoint_EnableLimit(slot->joint, enabled);
-    }
-    else
-    {
-        if (enabled)
-            b2PrismaticJoint_SetLimits(slot->joint, minLimit, maxLimit);
-        b2PrismaticJoint_EnableLimit(slot->joint, enabled);
-    }
-
-    /* A resting body would otherwise sleep through the changed limits. */
-    for (const AuraBodyHandle handle : { slot->bodyA, slot->bodyB })
-    {
-        const Impl::Slot* body = impl_->Find(handle);
-        if (body != nullptr)
-            Wake(body->body);
-    }
-    return AURA_SUCCESS;
-}
-
-AuraResultCode Box2DWorld::SetJointBreakThreshold(uint64_t joint, float maxForce, float maxTorque)
-{
-    Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr || slot->broken)
-        return AURA_INVALID_HANDLE;
-
-    bool hasTorque = false;
-    switch (slot->type)
-    {
-    case AURA_JOINT_FIXED:
-    case AURA_JOINT_HINGE:
-    case AURA_JOINT_SLIDER:
-        hasTorque = true;
-        break;
-    case AURA_JOINT_POINT:
-    case AURA_JOINT_DISTANCE:
-    case AURA_JOINT_SPRING:
-        break;
-    default:
-        return AURA_UNSUPPORTED_OPERATION;
-    }
-
-    if (!IsFinite(maxForce) || !IsFinite(maxTorque) || maxForce < 0.0f || maxTorque < 0.0f)
-        return AURA_INVALID_DEFINITION;
-    if (!hasTorque && maxTorque > 0.0f)
-        return AURA_INVALID_DEFINITION;
-
-    slot->breakForce = maxForce;
-    slot->breakTorque = maxTorque;
-    return AURA_SUCCESS;
-}
-
-AuraResultCode Box2DWorld::IsJointBroken(uint64_t joint, bool* outBroken) const
-{
-    const Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr || outBroken == nullptr)
-        return AURA_INVALID_HANDLE;
-    *outBroken = slot->broken;
-    return AURA_SUCCESS;
-}
-
-AuraResultCode Box2DWorld::GetJointFeedback(uint64_t joint, AuraJointFeedback* outFeedback) const
-{
-    const Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr || outFeedback == nullptr)
-        return AURA_INVALID_HANDLE;
-
-    *outFeedback = AuraJointFeedback{};
-    outFeedback->isBroken = slot->broken ? 1 : 0;
-    if (slot->broken)
-    {
-        outFeedback->force = slot->lastForce;
-        outFeedback->torque = slot->lastTorque;
-        return AURA_SUCCESS;
-    }
-
-    impl_->JointLoads(*slot, outFeedback->force, outFeedback->torque, outFeedback->motorLoad);
-    if (slot->type == AURA_JOINT_HINGE)
-    {
-        outFeedback->position = b2RevoluteJoint_GetAngle(slot->joint);
-        outFeedback->motorMode = b2RevoluteJoint_IsMotorEnabled(slot->joint) ? AURA_JOINT_MOTOR_VELOCITY : AURA_JOINT_MOTOR_OFF;
-    }
-    else if (slot->type == AURA_JOINT_SLIDER)
-    {
-        outFeedback->position = b2PrismaticJoint_GetTranslation(slot->joint);
-        outFeedback->motorMode = b2PrismaticJoint_IsMotorEnabled(slot->joint) ? AURA_JOINT_MOTOR_VELOCITY : AURA_JOINT_MOTOR_OFF;
-    }
-    return AURA_SUCCESS;
-}
 
 } // namespace aura

@@ -13,12 +13,15 @@ option(AURA_USE_BOX2D "Use the Box2D backend (2D)" OFF)
 set(AURA_SOURCES
     src/aura_reference_world.cpp
     src/aura_backend_select.cpp
+    src/aura_force_fields.cpp
     src/capi/aura_capi.cpp
     src/capi/aura_capi_events.cpp
     src/capi/aura_capi_queries.cpp
     src/capi/aura_capi_contacts.cpp
     src/capi/aura_capi_joints.cpp
+    src/capi/aura_capi_joint_target.cpp
     src/capi/aura_capi_body_control.cpp
+    src/capi/aura_capi_force_fields.cpp
     src/capi/aura_capi_character.cpp
     src/capi/aura_capi_vehicle.cpp
     src/capi/aura_capi_softbody.cpp
@@ -55,6 +58,7 @@ if(AURA_USE_JOLT)
         src/physics/jolt/aura_jolt_contacts.cpp
         src/physics/jolt/aura_jolt_joints.cpp
         src/physics/jolt/aura_jolt_body_control.cpp
+        src/physics/jolt/aura_jolt_fields.cpp
         src/physics/jolt/aura_jolt_joint_control.cpp
         src/physics/jolt/aura_jolt_character.cpp
         src/physics/jolt/aura_jolt_vehicle.cpp
@@ -78,12 +82,18 @@ if(AURA_USE_BOX2D)
     set(BOX2D_VALIDATE OFF CACHE BOOL "" FORCE)
 
     add_subdirectory("${BOX2D_DIR}" "${CMAKE_BINARY_DIR}/box2d")
-    list(APPEND AURA_SOURCES src/physics/box2d/aura_box2d_world.cpp)
+    list(APPEND AURA_SOURCES
+        src/physics/box2d/aura_box2d_world.cpp
+        src/physics/box2d/aura_box2d_fields.cpp
+        src/physics/box2d/aura_box2d_queries.cpp
+        src/physics/box2d/aura_box2d_joints.cpp
+        src/physics/box2d/aura_box2d_character.cpp
+        src/physics/box2d/aura_box2d_oneway.cpp)
 endif()
 
 add_library(aura_native STATIC ${AURA_SOURCES})
 target_include_directories(aura_native PUBLIC include PRIVATE src)
-target_compile_definitions(aura_native PUBLIC AURA_ENGINE_ABI_VERSION=10)
+target_compile_definitions(aura_native PUBLIC AURA_ENGINE_ABI_VERSION=11)
 set_target_properties(aura_native PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(AURA_USE_JOLT)
@@ -99,7 +109,7 @@ endif()
 if(AURA_BUILD_PLUGIN)
     add_library(aura_shared SHARED ${AURA_SOURCES})
     target_include_directories(aura_shared PUBLIC include PRIVATE src)
-    target_compile_definitions(aura_shared PUBLIC AURA_ENGINE_ABI_VERSION=10)
+    target_compile_definitions(aura_shared PUBLIC AURA_ENGINE_ABI_VERSION=11)
     set_target_properties(aura_shared PROPERTIES OUTPUT_NAME aura)
     if(AURA_USE_JOLT)
         target_compile_definitions(aura_shared PRIVATE AURA_USE_JOLT=1 JPH_ENABLE_ASSERTS=1)

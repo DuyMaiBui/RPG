@@ -7,6 +7,8 @@
 namespace aura
 {
 
+class ForceFieldRegistry;
+
 /* Internal native world contract shared by the reference world and the Jolt
    backend. The C ABI in aura_capi.cpp only talks to this interface, so the
    backend can be swapped at build time (AURA_USE_JOLT). */
@@ -75,6 +77,15 @@ public:
     virtual AuraResultCode SetJointBreakThreshold(uint64_t, float, float) { return AURA_UNSUPPORTED_OPERATION; }
     virtual AuraResultCode IsJointBroken(uint64_t, bool*) const { return AURA_UNSUPPORTED_OPERATION; }
     virtual AuraResultCode GetJointFeedback(uint64_t, AuraJointFeedback*) const { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetJointAxisLimits(uint64_t, uint32_t, const AuraJointAxisLimit&) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetJointAxisMotor(uint64_t, uint32_t, const AuraJointMotorDesc&) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetJointTarget(uint64_t, const AuraVec3&) { return AURA_UNSUPPORTED_OPERATION; }
+
+    /* Package E: world gravity, runtime collision detection and force fields (aura_force_fields.h). */
+    virtual AuraResultCode SetWorldGravity(const AuraVec3&) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode GetWorldGravity(AuraVec3*) const { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetBodyCollisionDetection(AuraBodyHandle, int32_t) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual ForceFieldRegistry* ForceFields() { return nullptr; }
 
     virtual AuraResultCode CreateCharacter(const AuraCharacterDesc& desc, uint64_t* outCharacter) = 0;
     virtual AuraResultCode DestroyCharacter(uint64_t character) = 0;

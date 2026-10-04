@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 #ifndef AURA_ENGINE_ABI_VERSION
-#define AURA_ENGINE_ABI_VERSION 10u
+#define AURA_ENGINE_ABI_VERSION 11u
 #endif
 
 typedef uint32_t AuraEntityIndex;
@@ -108,7 +108,10 @@ typedef struct AuraShapeDesc
     AuraShapeType type;
     AuraPose localPose;
     uint8_t isTrigger;
-    uint8_t _pad0[3];
+    /* Plane2D (Box2D) only: solid only against bodies approaching from the shape's
+       local +Y side (rotated by localPose); Jolt ignores it. Reuses a former pad byte. */
+    uint8_t isOneWay;
+    uint8_t _pad0[2];
     float friction;
     float restitution;
     float density;
@@ -181,8 +184,47 @@ typedef enum AuraJointType
     AURA_JOINT_SWING_TWIST = 6,
     AURA_JOINT_PULLEY = 7,
     AURA_JOINT_SPRING = 8,
-    AURA_JOINT_SIX_DOF = 9
+    AURA_JOINT_SIX_DOF = 9,
+    /* Box2D (Plane2D) only; Jolt returns AURA_UNSUPPORTED_QUERY from Aura_CreateJoint.
+       WHEEL: bodyA chassis, bodyB wheel, axisA = suspension axis, spring* = suspension, min/maxLimit = travel,
+       motor* = wheel spin (rad/s, max torque). MOUSE: bodyB is dragged toward the world point anchorB; bodyA may be
+       an invalid handle (internal static anchor); springFrequency/springDamping = stiffness, maxMotorForce = max force.
+       ROPE: distance = max length, optional min length through enableLimit + minLimit; no push, no spring. */
+    AURA_JOINT_WHEEL = 10,
+    AURA_JOINT_MOUSE = 11,
+    AURA_JOINT_ROPE = 12,
+    /* Jolt 3D only. Gear/RackAndPinion couple two existing joints (jointRefA/B), see AuraJointDesc. */
+    AURA_JOINT_GEAR = 13,
+    AURA_JOINT_RACK_AND_PINION = 14,
+    /* Reserved: Jolt path constraints are not implemented; CreateJoint returns AURA_UNSUPPORTED_OPERATION. */
+    AURA_JOINT_PATH = 15
 } AuraJointType;
+
+/* Handle of an existing joint (the two halves of the uint64 joint handle). */
+typedef struct AuraJointRef
+{
+    uint32_t index;
+    uint32_t generation;
+} AuraJointRef;
+
+/* SixDof per-axis mode. Axis order: 0..2 translation X/Y/Z, 3..5 rotation X/Y/Z (constraint frame). */
+typedef enum AuraJointAxisMode
+{
+    AURA_JOINT_AXIS_LOCKED = 0,
+    AURA_JOINT_AXIS_FREE = 1,
+    AURA_JOINT_AXIS_LIMITED = 2
+} AuraJointAxisMode;
+
+typedef struct AuraJointAxisLimit
+{
+    uint8_t mode;
+    uint8_t _pad0[3];
+    /* LIMITED range in m (translation) or rad (rotation). Rotation Y/Z with a cone swing use maxLimit as the half angle. */
+    float minLimit;
+    float maxLimit;
+    /* Max friction force (N) or torque (N*m) while not motor driven. 0 = none. */
+    float maxFriction;
+} AuraJointAxisLimit;
 
 typedef struct AuraJointDesc
 {
@@ -207,6 +249,25 @@ typedef struct AuraJointDesc
     uint8_t enableLimit;
     uint8_t motorEnabled;
     uint8_t _pad0[2];
+    /* ---- v11 appendix (Jolt 3D constraint set; a zeroed appendix keeps the pre-v11 meaning) ----
+       Pulley: fixedPoint/fixedPointB are the two world rope anchors, ratio (0 = 1) scales segment B, the rope length is
+       distance (0 = current length) or, with enableLimit, minLimit..maxLimit.
+       Cone: half angle = maxLimit or swingLimit.
+       SwingTwist: swingLimit = normal half cone, planeSwingLimit (0 = swingLimit) = plane half cone, minLimit/maxLimit =
+       twist range, maxFriction = friction torque, pyramidSwing selects the pyramid swing shape.
+       SixDof: axes[6] (axisA/normalAxisA = frame X/Y on body A, axisB/normalAxisB on body B), pyramidSwing.
+       Gear: axisA/axisB = hinge axes in world space, ratio = teeth ratio (A rotation = -ratio * B rotation),
+       jointRefA/B = the hinge joints of body A / body B. RackAndPinion: axisA = pinion hinge axis, axisB = rack slider
+       axis, ratio = pinion radians per rack metre, jointRefA = pinion hinge, jointRefB = rack slider. */
+    AuraVec3 fixedPointB;
+    float ratio;
+    float planeSwingLimit;
+    float maxFriction;
+    AuraJointRef jointRefA;
+    AuraJointRef jointRefB;
+    AuraJointAxisLimit axes[6];
+    uint8_t pyramidSwing;
+    uint8_t _pad1[3];
 } AuraJointDesc;
 
 /* v10 runtime joint control. Motor modes: OFF, drive to a target relative
@@ -266,6 +327,9 @@ typedef struct AuraCharacterDesc
     AuraLayer layer;
     uint32_t _pad0;
     uint64_t collisionMask;
+    /* Appended: largest ledge the Box2D (Plane2D) mover steps up while walking; 0 disables. Jolt ignores it. */
+    float stepHeight;
+    uint32_t _pad1;
 } AuraCharacterDesc;
 
 typedef struct AuraCharacterState
@@ -433,6 +497,58 @@ typedef struct AuraRagdollDesc
     uint32_t collisionGroup;
 } AuraRagdollDesc;
 typedef struct AuraRagdollHandle { uint64_t opaque; } AuraRagdollHandle;
+
+/* Package E: force fields (zones). Appended after v10; existing layouts are unchanged. */
+typedef struct AuraForceFieldHandle { uint64_t opaque; } AuraForceFieldHandle;
+
+typedef enum AuraForceFieldShape
+{
+    AURA_FIELD_SHAPE_SPHERE = 0, /* circle in 2D worlds */
+    AURA_FIELD_SHAPE_BOX = 1
+} AuraForceFieldShape;
+
+typedef enum AuraForceFieldKind
+{
+    /* Constant vector (acceleration or force). */
+    AURA_FIELD_DIRECTIONAL = 0,
+    /* Toward the field centre for strength > 0, away for strength < 0. */
+    AURA_FIELD_RADIAL = 1,
+    /* Linear drag toward the wind velocity in `vector`; strength is the drag rate. */
+    AURA_FIELD_DRAG = 2
+} AuraForceFieldKind;
+
+typedef enum AuraForceFieldMode
+{
+    /* Acceleration: scaled by the body gravity scale, independent of mass (drag: strength is 1/s). */
+    AURA_FIELD_MODE_ACCELERATION = 0,
+    /* Force: divided by the body mass, ignores the gravity scale (drag: strength is N per m/s). */
+    AURA_FIELD_MODE_FORCE = 1
+} AuraForceFieldMode;
+
+typedef enum AuraForceFieldFalloff
+{
+    AURA_FIELD_FALLOFF_NONE = 0,
+    AURA_FIELD_FALLOFF_LINEAR = 1,
+    AURA_FIELD_FALLOFF_INVERSE_SQUARE = 2
+} AuraForceFieldFalloff;
+
+typedef struct AuraForceFieldDesc
+{
+    int32_t shape;
+    int32_t kind;
+    int32_t mode;
+    int32_t falloff;
+    AuraPose pose;        /* zone centre and orientation (2D: position x/y and rotation about z) */
+    AuraVec3 halfExtents; /* box shape */
+    float radius;         /* sphere shape */
+    AuraVec3 vector;      /* directional acceleration/force, or drag wind velocity */
+    float strength;       /* radial strength (magnitude at distance 1 for inverse-square) or drag rate */
+    float minRadius;      /* radial: distances below are clamped to this (softening) */
+    float maxRadius;      /* radial: no effect beyond (0 = shape extent) */
+    uint64_t layerMask;   /* bit i set = affects bodies on layer i (all bits = every layer) */
+    uint8_t enabled;
+    uint8_t _pad0[7];
+} AuraForceFieldDesc;
 
 #ifdef __cplusplus
 }

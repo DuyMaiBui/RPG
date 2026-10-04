@@ -95,6 +95,24 @@ AuraResultCode Aura_SetJointBreakThreshold(AuraWorldHandle world, uint64_t joint
 AuraResultCode Aura_IsJointBroken(AuraWorldHandle world, uint64_t joint, uint8_t* outBroken);
 AuraResultCode Aura_GetJointFeedback(AuraWorldHandle world, uint64_t joint, AuraJointFeedback* outFeedback);
 
+/* Jolt 3D constraint set (SixDof, SwingTwist, Cone, Pulley, Gear, RackAndPinion). Support matrix, everything else
+   returns AURA_UNSUPPORTED_OPERATION:
+     SetJointMotor:      hinge, slider only (use the axis calls below for SixDof and SwingTwist)
+     SetJointLimits:     hinge, slider (position), SwingTwist (twist min/max, rad, -pi..pi), Pulley (rope length min..max, 0 <= min <= max)
+     SetJointAxisLimits: SixDof axes 0..5; SwingTwist axis 0 = twist (min/max), 1 = normal swing half cone, 2 = plane swing
+                         half cone (max only, mode LIMITED)
+     SetJointAxisMotor:  SixDof axes 0..5 (velocity: m/s or rad/s; position: translation axes and rotation X),
+                         SwingTwist axis 0 = twist (velocity, position), 1/2 = swing about constraint Y/Z (velocity)
+     break thresholds:   adds SixDof, Cone, SwingTwist, Pulley (force only), Gear, RackAndPinion (torque only)
+     feedback:           Pulley reports the current rope length in position.
+   Gear and RackAndPinion depend on their referenced joints: destroying or breaking either one removes the dependent
+   constraint from the simulation and flags it broken (its handle stays valid until Aura_DestroyJoint). */
+AuraResultCode Aura_SetJointAxisLimits(AuraWorldHandle world, uint64_t joint, uint32_t axis, const AuraJointAxisLimit* limit);
+AuraResultCode Aura_SetJointAxisMotor(AuraWorldHandle world, uint64_t joint, uint32_t axis, const AuraJointMotorDesc* motor);
+/* Package B: moves the target of a mouse joint (world space, z ignored in 2D). AURA_UNSUPPORTED_OPERATION for other
+   joint types and for Jolt. */
+AuraResultCode Aura_SetJointTarget(AuraWorldHandle world, uint64_t joint, AuraVec3 target);
+
 AuraResultCode Aura_CopyContacts(AuraWorldHandle world, AuraContact* buffer, uint32_t capacity, uint32_t* outCount);
 
 AuraResultCode Aura_SetSurfaceVelocity(AuraWorldHandle world, AuraBodyHandle body, AuraVec3 velocity);
@@ -116,6 +134,18 @@ AuraResultCode Aura_CreateRagdoll(AuraWorldHandle world, const AuraRagdollDesc* 
 AuraResultCode Aura_DestroyRagdoll(AuraWorldHandle world, AuraRagdollHandle ragdoll);
 AuraResultCode Aura_GetRagdollPose(AuraWorldHandle world, AuraRagdollHandle ragdoll, AuraPose* buffer, uint32_t capacity, uint32_t* outCount);
 AuraResultCode Aura_SetRagdollPose(AuraWorldHandle world, AuraRagdollHandle ragdoll, const AuraPose* poses, uint32_t poseCount);
+
+/* Package E: world gravity, runtime collision detection mode and force fields.
+   Aura_SetWorldGravity wakes sleeping bodies; 2D worlds ignore z. collisionDetection: 0 discrete, 1 continuous
+   (Jolt LinearCast, Box2D bullet). Force fields apply to dynamic enabled bodies whose centre of mass lies inside the
+   zone, once per Aura_Step before integration, in ascending body then field order. Stale field handles return
+   AURA_INVALID_HANDLE. Fields are configuration: they are not part of snapshots or the state hash. */
+AuraResultCode Aura_SetWorldGravity(AuraWorldHandle world, AuraVec3 gravity);
+AuraResultCode Aura_GetWorldGravity(AuraWorldHandle world, AuraVec3* outGravity);
+AuraResultCode Aura_SetBodyCollisionDetection(AuraWorldHandle world, AuraBodyHandle body, int32_t collisionDetection);
+AuraResultCode Aura_CreateForceField(AuraWorldHandle world, const AuraForceFieldDesc* desc, AuraForceFieldHandle* outField);
+AuraResultCode Aura_UpdateForceField(AuraWorldHandle world, AuraForceFieldHandle field, const AuraForceFieldDesc* desc);
+AuraResultCode Aura_DestroyForceField(AuraWorldHandle world, AuraForceFieldHandle field);
 
 AuraResultCode Aura_ComputeStateHash(AuraWorldHandle world, uint64_t* outHash);
 

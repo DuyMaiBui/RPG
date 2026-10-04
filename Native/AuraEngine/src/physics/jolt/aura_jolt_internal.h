@@ -12,6 +12,7 @@
 #include "aura/aura_types.h"
 #include "aura_world.h"
 #include "aura_jolt_world.h"
+#include "aura_force_fields.h"
 #include "aura_jolt_vehicle.h"
 #include "aura_jolt_softbody.h"
 
@@ -241,6 +242,9 @@ struct JoltWorld::Impl
         /* Loads sampled the step the joint broke, reported by feedback afterwards. */
         float lastForce = 0.0f;
         float lastTorque = 0.0f;
+        /* Gear / RackAndPinion: handles of the two joints this constraint reads (0 = none). */
+        uint64_t refA = 0;
+        uint64_t refB = 0;
     };
 
     struct CharacterSlot
@@ -316,6 +320,7 @@ struct JoltWorld::Impl
     float lastDelta = 1.0f / 60.0f;
     AuraWaterDesc water{};
     bool waterActive = false;
+    ForceFieldRegistry fields; /* package E: zones applied before every step (aura_jolt_fields.cpp) */
 
     class Listener final : public JPH::ContactListener
     {
@@ -592,7 +597,10 @@ struct JoltWorld::Impl
     void SetEnabledInternal(Slot& slot, AuraBodyHandle handle, bool enabled);
     void RefreshJointsFor(AuraBodyHandle handle);
     void ProcessJointBreaks();
+    /* Removes a joint's constraint from the simulation, first removing every Gear/RackAndPinion that reads it. */
+    void RemoveJointConstraint(size_t index);
     bool JointLoads(const JointSlot& joint, float& force, float& torque, float& motorLoad) const;
+    void ApplyForceFields(float deltaTime); /* aura_jolt_fields.cpp */
 };
 
 } // namespace aura

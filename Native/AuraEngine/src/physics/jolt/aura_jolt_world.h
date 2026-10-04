@@ -70,6 +70,13 @@ public:
     AuraResultCode SetJointBreakThreshold(uint64_t joint, float maxForce, float maxTorque) override;
     AuraResultCode IsJointBroken(uint64_t joint, bool* outBroken) const override;
     AuraResultCode GetJointFeedback(uint64_t joint, AuraJointFeedback* outFeedback) const override;
+    AuraResultCode SetJointAxisLimits(uint64_t joint, uint32_t axis, const AuraJointAxisLimit& limit) override;
+    AuraResultCode SetJointAxisMotor(uint64_t joint, uint32_t axis, const AuraJointMotorDesc& motor) override;
+
+    AuraResultCode SetWorldGravity(const AuraVec3& gravity) override;
+    AuraResultCode GetWorldGravity(AuraVec3* outGravity) const override;
+    AuraResultCode SetBodyCollisionDetection(AuraBodyHandle body, int32_t collisionDetection) override;
+    ForceFieldRegistry* ForceFields() override;
 
     AuraResultCode CreateCharacter(const AuraCharacterDesc& desc, uint64_t* outCharacter) override;
     AuraResultCode DestroyCharacter(uint64_t character) override;

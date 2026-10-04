@@ -1,11 +1,17 @@
 #include "aura_jolt_internal.h"
 
+#include <Jolt/Physics/Constraints/ConeConstraint.h>
 #include <Jolt/Physics/Constraints/DistanceConstraint.h>
 #include <Jolt/Physics/Constraints/FixedConstraint.h>
+#include <Jolt/Physics/Constraints/GearConstraint.h>
 #include <Jolt/Physics/Constraints/HingeConstraint.h>
 #include <Jolt/Physics/Constraints/MotorSettings.h>
 #include <Jolt/Physics/Constraints/PointConstraint.h>
+#include <Jolt/Physics/Constraints/PulleyConstraint.h>
+#include <Jolt/Physics/Constraints/RackAndPinionConstraint.h>
+#include <Jolt/Physics/Constraints/SixDOFConstraint.h>
 #include <Jolt/Physics/Constraints/SliderConstraint.h>
+#include <Jolt/Physics/Constraints/SwingTwistConstraint.h>
 
 #include <cfloat>
 #include <cmath>
@@ -113,6 +119,38 @@ bool JoltWorld::Impl::JointLoads(const JointSlot& joint, float& force, float& to
         motorLoad = std::abs(c->GetTotalLambdaMotor()) * inv;
         return true;
     }
+    case AURA_JOINT_SIX_DOF:
+    {
+        const auto* c = static_cast<const JPH::SixDOFConstraint*>(joint.constraint);
+        force = c->GetTotalLambdaPosition().Length() * inv;
+        torque = c->GetTotalLambdaRotation().Length() * inv;
+        motorLoad = (c->GetTotalLambdaMotorTranslation().Length() + c->GetTotalLambdaMotorRotation().Length()) * inv;
+        return true;
+    }
+    case AURA_JOINT_CONE:
+    {
+        const auto* c = static_cast<const JPH::ConeConstraint*>(joint.constraint);
+        force = c->GetTotalLambdaPosition().Length() * inv;
+        torque = std::abs(c->GetTotalLambdaRotation()) * inv;
+        return true;
+    }
+    case AURA_JOINT_SWING_TWIST:
+    {
+        const auto* c = static_cast<const JPH::SwingTwistConstraint*>(joint.constraint);
+        force = c->GetTotalLambdaPosition().Length() * inv;
+        torque = Length3(c->GetTotalLambdaTwist(), c->GetTotalLambdaSwingY(), c->GetTotalLambdaSwingZ()) * inv;
+        motorLoad = c->GetTotalLambdaMotor().Length() * inv;
+        return true;
+    }
+    case AURA_JOINT_PULLEY:
+        force = std::abs(static_cast<const JPH::PulleyConstraint*>(joint.constraint)->GetTotalLambdaPosition()) * inv;
+        return true;
+    case AURA_JOINT_GEAR:
+        torque = std::abs(static_cast<const JPH::GearConstraint*>(joint.constraint)->GetTotalLambda()) * inv;
+        return true;
+    case AURA_JOINT_RACK_AND_PINION:
+        torque = std::abs(static_cast<const JPH::RackAndPinionConstraint*>(joint.constraint)->GetTotalLambda()) * inv;
+        return true;
     default:
         return false;
     }
@@ -138,9 +176,7 @@ void JoltWorld::Impl::ProcessJointBreaks()
         joint.lastForce = force;
         joint.lastTorque = torque;
         joint.broken = true;
-        /* The constraint manager owns the only reference, so RemoveConstraint frees it. */
-        physics.RemoveConstraint(joint.constraint);
-        joint.constraint = nullptr;
+        RemoveJointConstraint(index);
 
         JPH::BodyInterface& bi = physics.GetBodyInterface();
         const Slot* a = Find(joint.bodyA);
@@ -216,19 +252,49 @@ AuraResultCode JoltWorld::SetJointLimits(uint64_t joint, bool enabled, float min
     Impl::JointSlot* slot = impl_->FindJoint(joint);
     if (slot == nullptr || slot->broken || slot->constraint == nullptr)
         return AURA_INVALID_HANDLE;
-    if (slot->type != AURA_JOINT_HINGE && slot->type != AURA_JOINT_SLIDER)
+    if (slot->type != AURA_JOINT_HINGE && slot->type != AURA_JOINT_SLIDER
+        && slot->type != AURA_JOINT_PULLEY && slot->type != AURA_JOINT_SWING_TWIST)
         return AURA_UNSUPPORTED_OPERATION;
 
     const bool hinge = slot->type == AURA_JOINT_HINGE;
+    const bool pulley = slot->type == AURA_JOINT_PULLEY;
+    const bool twist = slot->type == AURA_JOINT_SWING_TWIST;
     if (enabled)
     {
-        if (!IsFinite(minLimit) || !IsFinite(maxLimit) || minLimit > 0.0f || maxLimit < 0.0f)
+        if (!IsFinite(minLimit) || !IsFinite(maxLimit))
+            return AURA_INVALID_DEFINITION;
+        if (pulley)
+        {
+            if (minLimit < 0.0f || minLimit > maxLimit)
+                return AURA_INVALID_DEFINITION;
+        }
+        else if (twist)
+        {
+            if (minLimit > maxLimit || minLimit < -kPi || maxLimit > kPi)
+                return AURA_INVALID_DEFINITION;
+        }
+        else if (minLimit > 0.0f || maxLimit < 0.0f)
             return AURA_INVALID_DEFINITION;
         if (hinge && (minLimit < -kPi || maxLimit > kPi))
             return AURA_INVALID_DEFINITION;
     }
+    else if (pulley)
+    {
+        /* A pulley has no "unlimited" rope; disabling would leave it slack and unsupported. */
+        return AURA_INVALID_DEFINITION;
+    }
 
-    if (hinge)
+    if (pulley)
+    {
+        static_cast<JPH::PulleyConstraint*>(slot->constraint)->SetLength(minLimit, maxLimit);
+    }
+    else if (twist)
+    {
+        auto* c = static_cast<JPH::SwingTwistConstraint*>(slot->constraint);
+        c->SetTwistMinAngle(enabled ? minLimit : -kPi);
+        c->SetTwistMaxAngle(enabled ? maxLimit : kPi);
+    }
+    else if (hinge)
     {
         if (enabled)
             AsHinge(slot->constraint)->SetLimits(minLimit, maxLimit);
@@ -266,11 +332,17 @@ AuraResultCode JoltWorld::SetJointBreakThreshold(uint64_t joint, float maxForce,
     case AURA_JOINT_FIXED:
     case AURA_JOINT_HINGE:
     case AURA_JOINT_SLIDER:
+    case AURA_JOINT_SIX_DOF:
+    case AURA_JOINT_CONE:
+    case AURA_JOINT_SWING_TWIST:
+    case AURA_JOINT_GEAR:
+    case AURA_JOINT_RACK_AND_PINION:
         hasTorque = true;
         break;
     case AURA_JOINT_POINT:
     case AURA_JOINT_DISTANCE:
     case AURA_JOINT_SPRING:
+    case AURA_JOINT_PULLEY:
         break;
     default:
         return AURA_UNSUPPORTED_OPERATION;
@@ -323,6 +395,206 @@ AuraResultCode JoltWorld::GetJointFeedback(uint64_t joint, AuraJointFeedback* ou
         outFeedback->position = c->GetCurrentPosition();
         outFeedback->motorMode = ToMode(c->GetMotorState());
     }
+    else if (slot->type == AURA_JOINT_PULLEY)
+    {
+        outFeedback->position = static_cast<const JPH::PulleyConstraint*>(slot->constraint)->GetCurrentLength();
+    }
+    return AURA_SUCCESS;
+}
+
+AuraResultCode JoltWorld::SetJointAxisLimits(uint64_t joint, uint32_t axis, const AuraJointAxisLimit& limit)
+{
+    Impl::JointSlot* slot = impl_->FindJoint(joint);
+    if (slot == nullptr || slot->broken || slot->constraint == nullptr)
+        return AURA_INVALID_HANDLE;
+    if (slot->type != AURA_JOINT_SIX_DOF && slot->type != AURA_JOINT_SWING_TWIST)
+        return AURA_UNSUPPORTED_OPERATION;
+    if (axis > 5 || limit.mode > AURA_JOINT_AXIS_LIMITED || !IsFinite(limit.maxFriction) || limit.maxFriction < 0.0f)
+        return AURA_INVALID_DEFINITION;
+    if (limit.mode == AURA_JOINT_AXIS_LIMITED && (!IsFinite(limit.minLimit) || !IsFinite(limit.maxLimit) || limit.minLimit > limit.maxLimit))
+        return AURA_INVALID_DEFINITION;
+
+    if (slot->type == AURA_JOINT_SWING_TWIST)
+    {
+        if (axis > 2 || limit.mode != AURA_JOINT_AXIS_LIMITED)
+            return AURA_UNSUPPORTED_OPERATION;
+        auto* c = static_cast<JPH::SwingTwistConstraint*>(slot->constraint);
+        if (axis == 0)
+        {
+            if (limit.minLimit < -kPi || limit.maxLimit > kPi)
+                return AURA_INVALID_DEFINITION;
+            c->SetTwistMinAngle(limit.minLimit);
+            c->SetTwistMaxAngle(limit.maxLimit);
+            c->SetMaxFrictionTorque(limit.maxFriction);
+        }
+        else
+        {
+            if (limit.maxLimit < 0.0f || limit.maxLimit > kPi)
+                return AURA_INVALID_DEFINITION;
+            if (axis == 1)
+                c->SetNormalHalfConeAngle(limit.maxLimit);
+            else
+                c->SetPlaneHalfConeAngle(limit.maxLimit);
+        }
+    }
+    else
+    {
+        auto* c = static_cast<JPH::SixDOFConstraint*>(slot->constraint);
+        const auto a = static_cast<JPH::SixDOFConstraint::EAxis>(axis);
+        float lo = -FLT_MAX;
+        float hi = FLT_MAX;
+        if (limit.mode == AURA_JOINT_AXIS_LOCKED)
+        {
+            lo = FLT_MAX;
+            hi = -FLT_MAX;
+        }
+        else if (limit.mode == AURA_JOINT_AXIS_LIMITED)
+        {
+            lo = limit.minLimit;
+            hi = limit.maxLimit;
+            if (axis == 3 && (lo < -kPi || hi > kPi))
+                return AURA_INVALID_DEFINITION;
+            if (axis >= 4)
+            {
+                /* The swing shape (cone/pyramid) is fixed at creation; a symmetric range is valid for both. */
+                if (hi < 0.0f || hi > kPi)
+                    return AURA_INVALID_DEFINITION;
+                lo = -hi;
+            }
+        }
+
+        /* Update only the touched axis; SetTranslation/RotationLimits take all three at once. */
+        if (axis < 3)
+        {
+            JPH::Vec3 mn = c->GetTranslationLimitsMin();
+            JPH::Vec3 mx = c->GetTranslationLimitsMax();
+            mn.SetComponent(axis, lo);
+            mx.SetComponent(axis, hi);
+            c->SetTranslationLimits(mn, mx);
+        }
+        else
+        {
+            JPH::Vec3 mn = c->GetRotationLimitsMin();
+            JPH::Vec3 mx = c->GetRotationLimitsMax();
+            mn.SetComponent(axis - 3, lo);
+            mx.SetComponent(axis - 3, hi);
+            c->SetRotationLimits(mn, mx);
+        }
+        c->SetMaxFriction(a, limit.maxFriction);
+    }
+
+    JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
+    const Impl::Slot* a = impl_->Find(slot->bodyA);
+    const Impl::Slot* b = impl_->Find(slot->bodyB);
+    if (a != nullptr && a->enabled)
+        bi.ActivateBody(a->id);
+    if (b != nullptr && b->enabled)
+        bi.ActivateBody(b->id);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode JoltWorld::SetJointAxisMotor(uint64_t joint, uint32_t axis, const AuraJointMotorDesc& motor)
+{
+    Impl::JointSlot* slot = impl_->FindJoint(joint);
+    if (slot == nullptr || slot->broken || slot->constraint == nullptr)
+        return AURA_INVALID_HANDLE;
+    if (slot->type != AURA_JOINT_SIX_DOF && slot->type != AURA_JOINT_SWING_TWIST)
+        return AURA_UNSUPPORTED_OPERATION;
+    if (axis > 5 || motor.mode < AURA_JOINT_MOTOR_OFF || motor.mode > AURA_JOINT_MOTOR_POSITION
+        || !IsFinite(motor.target) || !IsFinite(motor.maxForce) || !IsFinite(motor.springFrequency)
+        || !IsFinite(motor.springDamping) || motor.springFrequency < 0.0f || motor.springDamping < 0.0f)
+        return AURA_INVALID_DEFINITION;
+    if (motor.mode != AURA_JOINT_MOTOR_OFF && motor.maxForce <= 0.0f)
+        return AURA_INVALID_DEFINITION;
+
+    const bool velocity = motor.mode == AURA_JOINT_MOTOR_VELOCITY;
+    const bool position = motor.mode == AURA_JOINT_MOTOR_POSITION;
+    JPH::EMotorState state = JPH::EMotorState::Off;
+    if (velocity)
+        state = JPH::EMotorState::Velocity;
+    else if (position)
+        state = JPH::EMotorState::Position;
+
+    auto tune = [&](JPH::MotorSettings& settings, bool rotation)
+    {
+        if (motor.mode == AURA_JOINT_MOTOR_OFF)
+            return;
+        if (rotation)
+            settings.SetTorqueLimit(motor.maxForce);
+        else
+            settings.SetForceLimit(motor.maxForce);
+        if (motor.springFrequency > 0.0f)
+            settings.mSpringSettings.mFrequency = motor.springFrequency;
+        if (motor.springDamping > 0.0f)
+            settings.mSpringSettings.mDamping = motor.springDamping;
+    };
+
+    if (slot->type == AURA_JOINT_SWING_TWIST)
+    {
+        if (axis > 2 || (position && axis != 0))
+            return AURA_UNSUPPORTED_OPERATION;
+        auto* c = static_cast<JPH::SwingTwistConstraint*>(slot->constraint);
+        if (axis == 0)
+        {
+            tune(c->GetTwistMotorSettings(), true);
+            c->SetTwistMotorState(state);
+        }
+        else
+        {
+            tune(c->GetSwingMotorSettings(), true);
+            c->SetSwingMotorState(state);
+        }
+        if (velocity)
+        {
+            JPH::Vec3 w = c->GetTargetAngularVelocityCS();
+            w.SetComponent(axis, motor.target);
+            c->SetTargetAngularVelocityCS(w);
+        }
+        else if (position)
+        {
+            c->SetTargetOrientationCS(JPH::Quat::sRotation(JPH::Vec3::sAxisX(), motor.target));
+        }
+    }
+    else
+    {
+        const bool rotation = axis >= 3;
+        if (position && axis >= 4)
+            return AURA_UNSUPPORTED_OPERATION;
+        auto* c = static_cast<JPH::SixDOFConstraint*>(slot->constraint);
+        const auto a = static_cast<JPH::SixDOFConstraint::EAxis>(axis);
+        tune(c->GetMotorSettings(a), rotation);
+        c->SetMotorState(a, state);
+        if (velocity && !rotation)
+        {
+            JPH::Vec3 v = c->GetTargetVelocityCS();
+            v.SetComponent(axis, motor.target);
+            c->SetTargetVelocityCS(v);
+        }
+        else if (velocity)
+        {
+            JPH::Vec3 w = c->GetTargetAngularVelocityCS();
+            w.SetComponent(axis - 3, motor.target);
+            c->SetTargetAngularVelocityCS(w);
+        }
+        else if (position && !rotation)
+        {
+            JPH::Vec3 p = c->GetTargetPositionCS();
+            p.SetComponent(axis, motor.target);
+            c->SetTargetPositionCS(p);
+        }
+        else if (position)
+        {
+            c->SetTargetOrientationCS(JPH::Quat::sRotation(JPH::Vec3::sAxisX(), motor.target));
+        }
+    }
+
+    JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
+    const Impl::Slot* sa = impl_->Find(slot->bodyA);
+    const Impl::Slot* sb = impl_->Find(slot->bodyB);
+    if (sa != nullptr && sa->enabled)
+        bi.ActivateBody(sa->id);
+    if (sb != nullptr && sb->enabled)
+        bi.ActivateBody(sb->id);
     return AURA_SUCCESS;
 }
 
