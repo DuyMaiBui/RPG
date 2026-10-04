@@ -132,3 +132,50 @@ Snapshots: `AuraBodyState::flags` carries the disabled bit through
 material, layer/mask, motors, limits and break thresholds are configuration,
 not simulation state, and are not part of the byte stream; callers re-apply
 them after a restore. The state hash is unchanged.
+
+
+## ABI 11 (packages B-E)
+
+`AURA_ENGINE_ABI_VERSION` is 11. Layout changes: `AuraCharacterDesc` grew from 64 to 72 bytes
+(`stepHeight`), `AuraJointDesc` grew from 140 to 280 bytes (appended fields; ragdoll part
+descriptors embed it), `AuraShapeDesc.isOneWay` reuses a former pad byte, and
+`AuraForceFieldDesc` is new (104 bytes). Managed mirrors assert these sizes.
+
+### Box2D queries and joints (B)
+- `OverlapPoint/Box/Capsule/Sphere/Shape` and `SphereCast/CapsuleCast/BoxCast/ShapeCast` work in
+  Plane2D. Overlaps return one hit per body (`distance = 0`, closest point on the hit shape, normal
+  from that point toward the query centre, `shape` = body index); casts return the closest hit.
+- New joint types: `AURA_JOINT_WHEEL = 10` (axisA = suspension axis, `springFrequency` 0 = rigid,
+  motor target in rad/s), `AURA_JOINT_MOUSE = 11` (`anchorB` is the target, moved with
+  `Aura_SetJointTarget`), `AURA_JOINT_ROPE = 12` (`distance` = max length). All support break
+  thresholds and feedback; wheel also supports `SetMotor`/`SetLimits`. 3D rejects them.
+
+### Characters and one-way platforms (C)
+- Plane2D now implements the character ABI as a virtual capsule: ground detection, slopes up to the
+  max angle, step-up, wall sliding, moving-platform carry, pushing light bodies, jump (positive
+  vertical translation), snapshot round-trip. Dynamic bodies do not collide with the virtual capsule.
+- `isOneWay` shapes are solid only when the contact normal is within 60 degrees of the shape's local
+  +Y and the other body is not rising through it (Box2D pre-solve; the mover uses its own filter).
+  Jolt ignores `isOneWay` and `stepHeight`.
+
+### Jolt joints (D)
+| Type | Motor / limits | Break threshold |
+|---|---|---|
+| SixDof | per axis (`Aura_SetJointAxisLimits/Motor`) | force, torque |
+| Cone | none | force, torque |
+| SwingTwist | twist via `SetLimits`; per-axis motor | force, torque |
+| Pulley | `SetLimits` changes the rope length | force |
+| Gear (13), RackAndPinion (14) | none | torque |
+| Path (15) | not implemented (`UNSUPPORTED_OPERATION`) | none |
+
+Gear and RackAndPinion reference two existing joints; destroying or breaking either removes the
+dependent joint first and flags it broken. SixDof axes 0-5 are translation XYZ then rotation XYZ;
+SwingTwist axes are 0 twist, 1 normal swing, 2 plane swing. Gear: A = -ratio * B; rack ratio is rad/m.
+
+### Gravity, force fields, CCD (E)
+- `Aura_SetWorldGravity/GetWorldGravity`, `Aura_CreateForceField/UpdateForceField/DestroyForceField`
+  (directional, radial with none/linear/inverse-square falloff, drag/wind; applied in slot order
+  before each step), `Aura_SetBodyCollisionDetection`. Fields are configuration, not part of
+  snapshots or the state hash: recreate them after a rollback. Box2D bodies now honor the bullet flag.
+- Time control is managed-level (`AuraTimeStepper`, `AuraHitStop`): the kernel's fixed dt never
+  changes; time scale 0.5 runs a step every second tick.

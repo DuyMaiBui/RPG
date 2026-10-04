@@ -157,6 +157,14 @@ Bugs found by the edge-case suite and fixed:
   end-to-end from a standalone .NET probe; structured content, resources,
   prompts and transport beyond stdio are not implemented.
 
+## Phase 0 and ABI 11 validation (2026-10-04)
+
+- Kernel suite: 169 passed, normally and under Guard Malloc. Editor EditMode tests: 123 passed.
+- `Tools/AuraSmoke/aura_smoke.sh` plays all 18 demo scenes: 0 console errors. Hair/cloth report
+  STATIC because the probe measures transforms, not meshes; they were verified from screenshots.
+- Known demo gaps: ragdoll, chain-ragdoll, car-2D and core-3D scenes come to rest and stay still;
+  the 2D water surface is a horizontal quad, invisible edge-on in the orthographic 2D view.
+
 ## Known environment issues
 
 - **Correction (heap corruption, fixed):** the Editor aborts described below were
