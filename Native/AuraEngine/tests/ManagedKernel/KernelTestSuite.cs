@@ -45,6 +45,7 @@ namespace AuraEngine.KernelTests
                 ("kinematic_mover_relocates", KinematicMover_Relocates),
                 ("plane2d_ball_rests", Plane2D_BallRests),
                 ("plane2d_distance_joint", Plane2D_DistanceJoint),
+                ("plane2d_offset_rotated_box_fixture", Plane2D_OffsetRotatedBoxFixture),
                 ("determinism_same_steps", Determinism_SameStepsMatch),
                 ("net_prediction_matches_server", NetPrediction_MatchesServer),
                 ("capsule_rests_upright", Capsule_RestsUpright),
@@ -467,6 +468,32 @@ namespace AuraEngine.KernelTests
             world.TryGetBodyState(a, out var sa);
             world.TryGetBodyState(b, out var sb);
             Near(AuraVector3.Distance(sa.Pose.Position, sb.Pose.Position), 2f, 0.5f, "2D joint distance");
+        }
+
+        private static void Plane2D_OffsetRotatedBoxFixture()
+        {
+            using var world = NewWorld(AuraPhysicsMode.Plane2D);
+            var box = AuraPhysicsShapeDefinition.Box(new AuraVector3(0.25f, 2f, 0.5f))
+                .WithLocalPose(new AuraPose(
+                    new AuraVector3(1f, 0f, 0f),
+                    new AuraQuaternion(0f, 0f, MathF.Sin(MathF.PI * 0.25f), MathF.Cos(MathF.PI * 0.25f))));
+            var body = world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateStatic(
+                AuraPose.Identity, AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, box));
+            Check(body.IsValid, "2D rotated offset box fixture creation failed.");
+
+            var hitRotatedOffset = world.Raycast(
+                new AuraRay(new AuraVector3(2.5f, 5f, 0f), new AuraVector3(0f, -1f, 0f)),
+                10f,
+                AuraPhysicsQueryFilter.All,
+                out _);
+            var missUnrotatedOrigin = world.Raycast(
+                new AuraRay(new AuraVector3(-2.5f, 5f, 0f), new AuraVector3(0f, -1f, 0f)),
+                10f,
+                AuraPhysicsQueryFilter.All,
+                out _);
+
+            Check(hitRotatedOffset, "2D ray should hit the rotated offset fixture.");
+            Check(!missUnrotatedOrigin, "2D ray should miss the old origin-aligned box position.");
         }
 
         private static void Determinism_SameStepsMatch()

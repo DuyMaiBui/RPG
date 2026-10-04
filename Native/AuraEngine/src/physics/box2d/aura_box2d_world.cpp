@@ -354,15 +354,19 @@ AuraResultCode Box2DWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* 
             case AURA_SHAPE_CYLINDER:
             {
                 const float half = std::max(0.0f, source.height * 0.5f - source.radius);
-                const b2Capsule capsule{ b2Vec2{ source.localPose.position.x, source.localPose.position.y - half },
-                                         b2Vec2{ source.localPose.position.x, source.localPose.position.y + half }, source.radius };
+                const b2Vec2 center{ source.localPose.position.x, source.localPose.position.y };
+                const b2Rot rotation = b2MakeRot(AngleFromQuat(source.localPose.rotation));
+                const b2Vec2 halfAxis = b2RotateVector(rotation, b2Vec2{ 0.0f, half });
+                const b2Capsule capsule{ b2Sub(center, halfAxis), b2Add(center, halfAxis), source.radius };
                 const b2ShapeId shape = b2CreateCapsuleShape(body, &shapeDef, &capsule);
                 b2Shape_EnableSensorEvents(shape, true);
                 break;
             }
             default:
             {
-                const b2Polygon polygon = b2MakeBox(source.halfExtents.x, source.halfExtents.y);
+                const b2Vec2 localCenter{ source.localPose.position.x, source.localPose.position.y };
+                const b2Rot localRotation = b2MakeRot(AngleFromQuat(source.localPose.rotation));
+                const b2Polygon polygon = b2MakeOffsetBox(source.halfExtents.x, source.halfExtents.y, localCenter, localRotation);
                 const b2ShapeId shape = b2CreatePolygonShape(body, &shapeDef, &polygon);
                 b2Shape_EnableSensorEvents(shape, true);
                 break;
