@@ -15,6 +15,10 @@ namespace AuraEngine.Unity
         private bool _isTrigger;
 
         [SerializeField]
+        [Tooltip("One-way platform: solid only for bodies and characters approaching from this collider's local +Y side (rotate the collider to tilt it). Bodies and characters pass up through it from below.")]
+        private bool _oneWay;
+
+        [SerializeField]
         private AuraPhysicsMaterialAsset _material;
 
         [SerializeField]
@@ -40,7 +44,8 @@ namespace AuraEngine.Unity
                 _isTrigger,
                 _material != null ? _material.ToDefinition() : AuraPhysicsMaterialDefinition.Default,
                 new AuraPhysicsLayer(Mathf.Clamp(layerIndex, 0, AuraPhysicsLayer.MaxLayers - 1)),
-                Geometry);
+                Geometry,
+                _oneWay);
         }
     }
 }

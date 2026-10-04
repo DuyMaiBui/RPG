@@ -4,15 +4,8 @@ using UnityEngine;
 namespace AuraEngine.Unity
 {
     [DisallowMultipleComponent]
-    public sealed class AuraJointAuthoring : MonoBehaviour
+    public sealed class AuraJointAuthoring : AuraJointAuthoringBase
     {
-        [Header("Bodies")]
-        [SerializeField]
-        private AuraPhysicsBodyAuthoring _bodyA;
-
-        [SerializeField]
-        private AuraPhysicsBodyAuthoring _bodyB;
-
         [Header("Joint")]
         [SerializeField]
         private AuraJointType _type = AuraJointType.Hinge;
@@ -62,60 +55,19 @@ namespace AuraEngine.Unity
         [SerializeField]
         private float _springDamping = 0.5f;
 
-        private AuraSimulationInstance _instance;
-        private AuraJointId _joint = AuraJointId.Invalid;
+        public AuraJointType JointType => _type;
 
-        public AuraJointId JointId => _joint;
-
-        private void OnEnable()
+        protected override bool TryCreateDefinition(AuraSimulationInstance instance, out AuraJointDefinition definition)
         {
-            _instance = GetComponentInParent<AuraSimulationInstance>();
-            if (_instance == null)
-            {
-                Debug.LogError($"{nameof(AuraJointAuthoring)} requires an {nameof(AuraSimulationInstance)} in its parent hierarchy.", this);
-                return;
-            }
-
-            _instance.Register(this);
-        }
-
-        private void OnDisable()
-        {
-            if (_instance != null)
-                _instance.Unregister(this);
-
-            _instance = null;
-            _joint = AuraJointId.Invalid;
-        }
-
-        public void BuildInto(AuraSimulationInstance instance)
-        {
-            if (_bodyA == null || _bodyB == null)
-            {
-                Debug.LogError($"{nameof(AuraJointAuthoring)} on '{name}' is missing a body reference.", this);
-                return;
-            }
-
-            if (_bodyA.EntityId.IsNone || _bodyB.EntityId.IsNone)
-            {
-                Debug.LogError($"{nameof(AuraJointAuthoring)} on '{name}' references a body that has no entity.", this);
-                return;
-            }
-
-            var anchorA = ToAura(_bodyA.transform.TransformPoint(_anchorA));
-            var anchorB = ToAura(_bodyB.transform.TransformPoint(_anchorB));
-            var axisA = ToAura(_bodyA.transform.TransformDirection(_axisA));
-            var axisB = ToAura(_bodyB.transform.TransformDirection(_axisB));
-
-            var definition = new AuraJointDefinition(
+            definition = new AuraJointDefinition(
                 _type,
                 PhysicsBodyId.Invalid,
                 PhysicsBodyId.Invalid,
-                anchorA,
-                anchorB,
+                AnchorOnA(_anchorA),
+                AnchorOnB(_anchorB),
                 _distance,
-                axisA,
-                axisB,
+                DirectionOnA(_axisA),
+                DirectionOnB(_axisB),
                 _enableLimit,
                 _minLimit,
                 _maxLimit,
@@ -127,21 +79,7 @@ namespace AuraEngine.Unity
                 _maxMotorForce,
                 _springFrequency,
                 _springDamping);
-
-            _joint = instance.AttachJoint(_bodyA.EntityId, _bodyB.EntityId, definition);
-            if (!_joint.IsValid)
-                Debug.LogError($"{nameof(AuraJointAuthoring)} on '{name}' failed to create a {_type} joint.", this);
+            return true;
         }
-
-        public void ReleaseFrom(AuraSimulationInstance instance)
-        {
-            if (!_joint.IsValid)
-                return;
-
-            instance.DetachJoint(_joint);
-            _joint = AuraJointId.Invalid;
-        }
-
-        private static AuraVector3 ToAura(Vector3 value) => new AuraVector3(value.x, value.y, value.z);
     }
 }

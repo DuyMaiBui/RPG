@@ -29,6 +29,11 @@ namespace AuraEngine.Unity
         [SerializeField]
         private bool _autoCreateOnStart = true;
 
+        [Tooltip("1 = real time, 0 = paused, below 1 = slow motion. The kernel step stays fixed; steps are skipped or accumulated.")]
+        [SerializeField]
+        [Min(0f)]
+        private float _timeScale = 1f;
+
         [SerializeField]
         private AuraBackendKind _backendKind = AuraBackendKind.Native;
 
@@ -37,16 +42,18 @@ namespace AuraEngine.Unity
 
         private readonly List<AuraPhysicsBodyAuthoring> _authoring = new List<AuraPhysicsBodyAuthoring>();
         private readonly List<AuraPhysicsBody2DAuthoring> _authoring2D = new List<AuraPhysicsBody2DAuthoring>();
-        private readonly List<AuraJointAuthoring> _jointAuthoring = new List<AuraJointAuthoring>();
+        private readonly List<AuraJointAuthoringBase> _jointAuthoring = new List<AuraJointAuthoringBase>();
         private readonly List<AuraJoint2DAuthoring> _joint2DAuthoring = new List<AuraJoint2DAuthoring>();
         private readonly List<AuraRagdollChainAuthoring> _chainAuthoring = new List<AuraRagdollChainAuthoring>();
         private readonly List<AuraRagdollChain2DAuthoring> _chain2DAuthoring = new List<AuraRagdollChain2DAuthoring>();
         private readonly List<AuraCharacterAuthoring> _characterAuthoring = new List<AuraCharacterAuthoring>();
+        private readonly List<AuraCharacter2DAuthoring> _character2DAuthoring = new List<AuraCharacter2DAuthoring>();
         private readonly List<AuraVehicleAuthoring> _vehicleAuthoring = new List<AuraVehicleAuthoring>();
         private readonly List<AuraSoftBodyAuthoring> _softBodyAuthoring = new List<AuraSoftBodyAuthoring>();
         private readonly List<AuraRagdollAuthoring> _ragdollAuthoring = new List<AuraRagdollAuthoring>();
         private readonly List<AuraWaterAuthoring> _waterAuthoring = new List<AuraWaterAuthoring>();
         private readonly List<AuraWaterId> _waters = new List<AuraWaterId>();
+        private readonly List<AuraForceFieldAuthoring> _forceFieldAuthoring = new List<AuraForceFieldAuthoring>();
         private AuraSimulationWorld _world;
         private AuraViewRegistry _registry;
         private AuraEventDispatcher _dispatcher;
@@ -126,6 +133,9 @@ namespace AuraEngine.Unity
             {
                 for (var index = 0; index < _characterAuthoring.Count; index++)
                     _characterAuthoring[index].BuildInto(this);
+
+                for (var index = 0; index < _character2DAuthoring.Count; index++)
+                    _character2DAuthoring[index].BuildInto(this);
             }
 
             if ((_world.Capabilities & AuraPhysicsCapabilities.Vehicles) != 0)
@@ -143,7 +153,26 @@ namespace AuraEngine.Unity
             for (var index = 0; index < _waterAuthoring.Count; index++)
                 _waterAuthoring[index].BuildInto(this);
 
+            if ((_world.Capabilities & AuraPhysicsCapabilities.ForceFields) != 0)
+            {
+                for (var index = 0; index < _forceFieldAuthoring.Count; index++)
+                    _forceFieldAuthoring[index].BuildInto(this);
+            }
+
+            _world.TimeScale = _timeScale;
             _tick = 0;
+        }
+
+        /* Time scale: 1 = real time, 0 = pause, below 1 = slow motion / hit-stop. Takes effect on the next fixed update. */
+        public float TimeScale
+        {
+            get => _world != null ? _world.TimeScale : _timeScale;
+            set
+            {
+                _timeScale = Mathf.Max(0f, value);
+                if (_world != null)
+                    _world.TimeScale = _timeScale;
+            }
         }
 
         public bool TryGetBodyState(SimulationEntityId entity, out AuraBodyState state)
@@ -241,7 +270,7 @@ namespace AuraEngine.Unity
             authoring.ReleaseFrom(this);
         }
 
-        public void Register(AuraJointAuthoring authoring)
+        public void Register(AuraJointAuthoringBase authoring)
         {
             if (authoring == null)
                 throw new ArgumentNullException(nameof(authoring));
@@ -254,7 +283,7 @@ namespace AuraEngine.Unity
                 authoring.BuildInto(this);
         }
 
-        public void Unregister(AuraJointAuthoring authoring)
+        public void Unregister(AuraJointAuthoringBase authoring)
         {
             if (authoring == null)
                 return;
@@ -304,6 +333,28 @@ namespace AuraEngine.Unity
                 return;
 
             _characterAuthoring.Remove(authoring);
+            authoring.ReleaseFrom(this);
+        }
+
+        public void Register(AuraCharacter2DAuthoring authoring)
+        {
+            if (authoring == null)
+                throw new ArgumentNullException(nameof(authoring));
+
+            if (_character2DAuthoring.Contains(authoring))
+                return;
+
+            _character2DAuthoring.Add(authoring);
+            if (_world != null && (_world.Capabilities & AuraPhysicsCapabilities.Characters) != 0)
+                authoring.BuildInto(this);
+        }
+
+        public void Unregister(AuraCharacter2DAuthoring authoring)
+        {
+            if (authoring == null)
+                return;
+
+            _character2DAuthoring.Remove(authoring);
             authoring.ReleaseFrom(this);
         }
 
@@ -393,6 +444,52 @@ namespace AuraEngine.Unity
 
             _waterAuthoring.Remove(authoring);
             authoring.ReleaseFrom(this);
+        }
+
+        public void Register(AuraForceFieldAuthoring authoring)
+        {
+            if (authoring == null)
+                throw new ArgumentNullException(nameof(authoring));
+
+            if (_forceFieldAuthoring.Contains(authoring))
+                return;
+
+            _forceFieldAuthoring.Add(authoring);
+            if (_world != null && (_world.Capabilities & AuraPhysicsCapabilities.ForceFields) != 0)
+                authoring.BuildInto(this);
+        }
+
+        public void Unregister(AuraForceFieldAuthoring authoring)
+        {
+            if (authoring == null)
+                return;
+
+            _forceFieldAuthoring.Remove(authoring);
+            authoring.ReleaseFrom(this);
+        }
+
+        public AuraForceFieldId AttachForceField(in AuraForceFieldDefinition definition)
+        {
+            if (_world == null)
+                throw new InvalidOperationException("The simulation world has not been created.");
+
+            return _world.ForceFields.CreateField(definition);
+        }
+
+        public AuraResult UpdateForceField(AuraForceFieldId field, in AuraForceFieldDefinition definition)
+        {
+            if (_world == null)
+                return AuraResult.InvalidWorld;
+
+            return _world.ForceFields.UpdateField(field, definition);
+        }
+
+        public AuraResult DetachForceField(AuraForceFieldId field)
+        {
+            if (_world == null)
+                return AuraResult.InvalidWorld;
+
+            return _world.ForceFields.DestroyField(field);
         }
 
         public AuraCharacterId AttachCharacter(in AuraCharacterDefinition definition)
@@ -578,15 +675,25 @@ namespace AuraEngine.Unity
             if (!_autoTick || _world == null)
                 return;
 
+            // The kernel step stays Time.fixedDeltaTime; the time scale only changes how many steps run per tick.
             var deltaTime = Time.fixedDeltaTime;
-            for (var index = 0; index < _characterAuthoring.Count; index++)
-                _characterAuthoring[index].Tick(deltaTime);
+            var steps = _world.PlanSteps(deltaTime, deltaTime);
+            for (var step = 0; step < steps; step++)
+            {
+                for (var index = 0; index < _characterAuthoring.Count; index++)
+                    _characterAuthoring[index].Tick(deltaTime);
 
-            for (var index = 0; index < _waters.Count; index++)
-                _world.ApplyWaterStep(_waters[index], deltaTime);
+                for (var index = 0; index < _character2DAuthoring.Count; index++)
+                    _character2DAuthoring[index].Tick(deltaTime);
 
-            _world.Step(new SimulationStep(new SimulationTick(_tick++), deltaTime));
-            _dispatcher.Dispatch(_world, _registry);
+                for (var index = 0; index < _waters.Count; index++)
+                    _world.ApplyWaterStep(_waters[index], deltaTime);
+
+                _world.Step(new SimulationStep(new SimulationTick(_tick++), deltaTime));
+            }
+
+            if (steps > 0)
+                _dispatcher.Dispatch(_world, _registry);
         }
 
         private void OnDestroy()
