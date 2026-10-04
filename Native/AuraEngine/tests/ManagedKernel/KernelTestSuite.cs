@@ -34,6 +34,7 @@ namespace AuraEngine.KernelTests
                 ("contact_reports_ground", Contact_ReportsGround),
                 ("distance_joint_keeps_distance", DistanceJoint_KeepsDistance),
                 ("fixed_joint_keeps_offset", FixedJoint_KeepsOffset),
+                ("joint_destroy_paths_are_memory_safe", JointDestroy_BothPathsAreMemorySafe),
                 ("hinge_joint_holds_anchor", HingeJoint_HoldsAnchor),
                 ("tapered_cylinder_rests", TaperedCylinder_Rests),
                 ("convex_hull_collides", ConvexHull_Collides),
@@ -288,6 +289,33 @@ namespace AuraEngine.KernelTests
             world.TryGetBodyState(a, out var sa);
             world.TryGetBodyState(b, out var sb);
             Near(AuraVector3.Distance(sa.Pose.Position, sb.Pose.Position), 0f, 0.3f, "fixed pin distance");
+        }
+
+        /* Regression for a use-after-free: DestroyJoint and destroying a jointed entity used to
+           Release() a constraint the physics system had already freed. The corruption is silent in a
+           normal run; run the suite with AURA_GMALLOC=1 to make it fail loudly. */
+        private static void JointDestroy_BothPathsAreMemorySafe()
+        {
+            using var world = NewWorld();
+            var half = new AuraVector3(0.5f, 0.5f, 0.5f);
+            PhysicsBodyId NewBox(float x) => world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateDynamic(
+                new AuraPose(new AuraVector3(x, 6f, 0f), AuraQuaternion.Identity),
+                AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, AuraPhysicsShapeDefinition.Box(half)));
+
+            var a = NewBox(0f);
+            var b = NewBox(1.5f);
+            var joint = world.CreateJoint(FindEntity(world, a), FindEntity(world, b),
+                AuraJointDefinition.CreateFixed(a, b, new AuraVector3(0f, 6f, 0f), new AuraVector3(1.5f, 6f, 0f)));
+            Step(world, 10);
+            Check(world.DestroyJoint(joint) == AuraResult.Success, "destroy joint");
+
+            var c = NewBox(3f);
+            var d = NewBox(4.5f);
+            world.CreateJoint(FindEntity(world, c), FindEntity(world, d),
+                AuraJointDefinition.CreateFixed(c, d, new AuraVector3(3f, 6f, 0f), new AuraVector3(4.5f, 6f, 0f)));
+            Step(world, 10);
+            Check(world.DestroyEntity(FindEntity(world, c)), "destroy jointed entity");
+            Step(world, 10);
         }
 
         private static void HingeJoint_HoldsAnchor()

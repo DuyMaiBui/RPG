@@ -210,8 +210,8 @@ AuraResultCode JoltWorld::DestroyJoint(uint64_t joint)
 
     if (slot->constraint != nullptr)
     {
+        /* The constraint manager owns the only reference, so RemoveConstraint frees it. */
         impl_->physics.RemoveConstraint(slot->constraint);
-        slot->constraint->Release();
         slot->constraint = nullptr;
     }
 

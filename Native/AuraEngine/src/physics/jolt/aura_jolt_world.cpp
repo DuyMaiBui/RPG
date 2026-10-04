@@ -212,8 +212,8 @@ AuraResultCode JoltWorld::DestroyBody(AuraBodyHandle body)
             continue;
         if (joint.constraint != nullptr)
         {
+            /* The constraint manager owns the only reference, so RemoveConstraint frees it. */
             impl_->physics.RemoveConstraint(joint.constraint);
-            joint.constraint->Release();
             joint.constraint = nullptr;
         }
         joint.occupied = false;

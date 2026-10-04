@@ -27,4 +27,9 @@ case "$(uname -s)" in
         ;;
 esac
 
-"$DOTNET" "$OUT/managed_kernel_tests.dll" "$@"
+# AURA_GMALLOC=1 runs the suite under macOS Guard Malloc so silent use-after-free bugs abort.
+if [ "${AURA_GMALLOC:-0}" = "1" ] && [ "$(uname -s)" = "Darwin" ]; then
+    DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib "$DOTNET" "$OUT/managed_kernel_tests.dll" "$@"
+else
+    "$DOTNET" "$OUT/managed_kernel_tests.dll" "$@"
+fi

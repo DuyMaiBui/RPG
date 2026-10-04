@@ -10,6 +10,9 @@ void JoltWorld::Impl::ApplySurfaceVelocity(const JPH::Body& body1, const JPH::Bo
 {
     const AuraBodyHandle a = EntityHandleBody(body1);
     const AuraBodyHandle b = EntityHandleBody(body2);
+
+    /* Jolt calls this from worker threads while the world thread may call SetSurfaceVelocity. */
+    std::lock_guard<std::mutex> lock(eventMutex);
     auto ia = surfaceVelocities.find(a.index);
     auto ib = surfaceVelocities.find(b.index);
     if (ia == surfaceVelocities.end() && ib == surfaceVelocities.end())
