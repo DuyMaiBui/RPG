@@ -57,9 +57,11 @@ namespace AuraEngine.Physics.Native
                        AuraPhysicsCapabilities.ShapeTaperedCapsule |
                        AuraPhysicsCapabilities.ShapeTaperedCylinder |
                             AuraPhysicsCapabilities.ShapeHeightField |
-                            AuraPhysicsCapabilities.Characters |
-                             AuraPhysicsCapabilities.Vehicles |
-                             AuraPhysicsCapabilities.SoftBodies;
+                             AuraPhysicsCapabilities.Characters |
+                              AuraPhysicsCapabilities.Vehicles |
+                              AuraPhysicsCapabilities.SoftBodies |
+                              AuraPhysicsCapabilities.Ragdolls |
+                              AuraPhysicsCapabilities.Water;
             }
         }
 
@@ -81,6 +83,40 @@ namespace AuraEngine.Physics.Native
             }
         }
 
+        private static void MarshalShapeDesc(in AuraPhysicsShapeDefinition shape, IntPtr dest, List<GCHandle> pins)
+        {
+            var native = NativeShapeDesc.From(shape);
+            var geometry = shape.Geometry;
+            if (geometry.HeightSamples != null && geometry.HeightSamples.Length > 0)
+            {
+                var pin = GCHandle.Alloc(geometry.HeightSamples, GCHandleType.Pinned);
+                pins.Add(pin);
+                native.Vertices = pin.AddrOfPinnedObject();
+            }
+            else if (geometry.MeshVertices != null && geometry.MeshVertices.Length > 0)
+            {
+                var pin = GCHandle.Alloc(geometry.MeshVertices, GCHandleType.Pinned);
+                pins.Add(pin);
+                native.Vertices = pin.AddrOfPinnedObject();
+            }
+
+            if (geometry.MeshIndices != null && geometry.MeshIndices.Length > 0)
+            {
+                var pin = GCHandle.Alloc(geometry.MeshIndices, GCHandleType.Pinned);
+                pins.Add(pin);
+                native.Indices = pin.AddrOfPinnedObject();
+            }
+
+            if (geometry.MaterialIndices != null && geometry.MaterialIndices.Length > 0)
+            {
+                var pin = GCHandle.Alloc(geometry.MaterialIndices, GCHandleType.Pinned);
+                pins.Add(pin);
+                native.MaterialIndices = pin.AddrOfPinnedObject();
+            }
+
+            Marshal.StructureToPtr(native, dest, false);
+        }
+
         PhysicsBodyId IPhysicsWorld.CreateBody(in AuraPhysicsBodyDefinition definition)
         {
             var shapeSize = Marshal.SizeOf<NativeShapeDesc>();
@@ -89,38 +125,7 @@ namespace AuraEngine.Physics.Native
             try
             {
                 for (var index = 0; index < definition.Shapes.Length; index++)
-                {
-                    var shape = NativeShapeDesc.From(definition.Shapes[index]);
-                    var geometry = definition.Shapes[index].Geometry;
-                    if (geometry.HeightSamples != null && geometry.HeightSamples.Length > 0)
-                    {
-                        var pin = GCHandle.Alloc(geometry.HeightSamples, GCHandleType.Pinned);
-                        pins.Add(pin);
-                        shape.Vertices = pin.AddrOfPinnedObject();
-                    }
-                    else if (geometry.MeshVertices != null && geometry.MeshVertices.Length > 0)
-                    {
-                        var pin = GCHandle.Alloc(geometry.MeshVertices, GCHandleType.Pinned);
-                        pins.Add(pin);
-                        shape.Vertices = pin.AddrOfPinnedObject();
-                    }
-
-                    if (geometry.MeshIndices != null && geometry.MeshIndices.Length > 0)
-                    {
-                        var pin = GCHandle.Alloc(geometry.MeshIndices, GCHandleType.Pinned);
-                        pins.Add(pin);
-                        shape.Indices = pin.AddrOfPinnedObject();
-                    }
-
-                    if (geometry.MaterialIndices != null && geometry.MaterialIndices.Length > 0)
-                    {
-                        var pin = GCHandle.Alloc(geometry.MaterialIndices, GCHandleType.Pinned);
-                        pins.Add(pin);
-                        shape.MaterialIndices = pin.AddrOfPinnedObject();
-                    }
-
-                    Marshal.StructureToPtr(shape, shapes + index * shapeSize, false);
-                }
+                    MarshalShapeDesc(definition.Shapes[index], shapes + index * shapeSize, pins);
 
                 var desc = NativeBodyDesc.From(definition);
                 desc.Shapes = shapes;
@@ -317,10 +322,123 @@ namespace AuraEngine.Physics.Native
         AuraResult IPhysicsSoftBodies.DestroySoftBody(AuraSoftBodyId softBody) =>
             softBody.IsValid ? (AuraResult)NativeMethods.Aura_DestroySoftBody(_world, NativeSoftBodyHandle.From(softBody)) : AuraResult.InvalidHandle;
 
-        AuraRagdollId IPhysicsRagdolls.CreateRagdoll(in AuraRagdollDefinition definition) => AuraRagdollId.Invalid;
-        AuraResult IPhysicsRagdolls.DestroyRagdoll(AuraRagdollId ragdoll) => AuraResult.InvalidHandle;
-        AuraResult IPhysicsRagdolls.GetPose(AuraRagdollId ragdoll, Span<AuraPose> poses) => AuraResult.InvalidHandle;
-        AuraResult IPhysicsRagdolls.SetPose(AuraRagdollId ragdoll, ReadOnlySpan<AuraPose> poses) => AuraResult.InvalidHandle;
+        AuraRagdollId IPhysicsRagdolls.CreateRagdoll(in AuraRagdollDefinition definition)
+        {
+            if (definition.Bodies == null || definition.JointsToParent == null || definition.Bodies.Length == 0
+                || definition.Bodies.Length != definition.JointsToParent.Length)
+                return AuraRagdollId.Invalid;
+            if (definition.Rig.ParentIndices == null || definition.Rig.BindPoses == null
+                || definition.Rig.ParentIndices.Length != definition.Bodies.Length
+                || definition.Rig.BindPoses.Length != definition.Bodies.Length)
+                return AuraRagdollId.Invalid;
+
+            var partCount = definition.Bodies.Length;
+            for (var index = 0; index < partCount; index++)
+            {
+                if (definition.Bodies[index].Shapes == null || definition.Bodies[index].Shapes.Length != 1)
+                    return AuraRagdollId.Invalid;
+            }
+
+            var rigJoints = new NativeRigJointDesc[partCount];
+            for (var index = 0; index < partCount; index++)
+            {
+                rigJoints[index] = new NativeRigJointDesc
+                {
+                    ParentIndex = definition.Rig.ParentIndices[index],
+                    BindPose = NativePose.From(definition.Rig.BindPoses[index]),
+                };
+            }
+
+            var rigPin = GCHandle.Alloc(rigJoints, GCHandleType.Pinned);
+            var partSize = Marshal.SizeOf<NativeRagdollPartDesc>();
+            var shapeSize = Marshal.SizeOf<NativeShapeDesc>();
+            var parts = Marshal.AllocHGlobal(partSize * partCount);
+            var shapePtrs = new List<IntPtr>(partCount);
+            var pins = new List<GCHandle> { rigPin };
+            try
+            {
+                for (var part = 0; part < partCount; part++)
+                {
+                    var shapePtr = Marshal.AllocHGlobal(shapeSize);
+                    shapePtrs.Add(shapePtr);
+                    MarshalShapeDesc(definition.Bodies[part].Shapes[0], shapePtr, pins);
+
+                    var bodyDesc = NativeBodyDesc.From(definition.Bodies[part]);
+                    bodyDesc.Shapes = shapePtr;
+                    var partDesc = new NativeRagdollPartDesc
+                    {
+                        Body = bodyDesc,
+                        JointToParent = NativeJointDesc.From(definition.JointsToParent[part]),
+                    };
+                    Marshal.StructureToPtr(partDesc, parts + part * partSize, false);
+                }
+
+                var desc = new NativeRagdollDesc
+                {
+                    Rig = new NativeRigDesc { Joints = rigPin.AddrOfPinnedObject(), JointCount = (uint)partCount },
+                    Parts = parts,
+                    PartCount = (uint)partCount,
+                    CollisionGroup = definition.CollisionGroup,
+                };
+                var result = (AuraResult)NativeMethods.Aura_CreateRagdoll(_world, ref desc, out var handle);
+                return result == AuraResult.Success ? handle.ToManaged() : AuraRagdollId.Invalid;
+            }
+            finally
+            {
+                for (var index = 0; index < shapePtrs.Count; index++)
+                    Marshal.FreeHGlobal(shapePtrs[index]);
+                Marshal.FreeHGlobal(parts);
+                for (var index = 0; index < pins.Count; index++)
+                    pins[index].Free();
+            }
+        }
+
+        AuraResult IPhysicsRagdolls.DestroyRagdoll(AuraRagdollId ragdoll) =>
+            ragdoll.IsValid ? (AuraResult)NativeMethods.Aura_DestroyRagdoll(_world, NativeRagdollHandle.From(ragdoll)) : AuraResult.InvalidHandle;
+
+        AuraResult IPhysicsRagdolls.GetPose(AuraRagdollId ragdoll, Span<AuraPose> poses)
+        {
+            if (!ragdoll.IsValid || poses.Length == 0)
+                return AuraResult.InvalidHandle;
+
+            var size = Marshal.SizeOf<NativePose>();
+            var buffer = Marshal.AllocHGlobal(size * poses.Length);
+            try
+            {
+                var result = (AuraResult)NativeMethods.Aura_GetRagdollPose(_world, NativeRagdollHandle.From(ragdoll), buffer, (uint)poses.Length, out var count);
+                if (result != AuraResult.Success)
+                    return result;
+
+                for (var index = 0; index < count && index < poses.Length; index++)
+                    poses[index] = Marshal.PtrToStructure<NativePose>(buffer + index * size).ToManaged();
+
+                return AuraResult.Success;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        AuraResult IPhysicsRagdolls.SetPose(AuraRagdollId ragdoll, ReadOnlySpan<AuraPose> poses)
+        {
+            if (!ragdoll.IsValid || poses.Length == 0)
+                return AuraResult.InvalidHandle;
+
+            var native = new NativePose[poses.Length];
+            for (var index = 0; index < native.Length; index++)
+                native[index] = NativePose.From(poses[index]);
+
+            var pin = GCHandle.Alloc(native, GCHandleType.Pinned);
+            try
+            {
+                return (AuraResult)NativeMethods.Aura_SetRagdollPose(_world, NativeRagdollHandle.From(ragdoll), pin.AddrOfPinnedObject(), (uint)native.Length);
+            }
+            finally
+            {
+                pin.Free();
+            }
+        }
 
         AuraHairId IPhysicsHair.CreateHair(in AuraHairDefinition definition) => AuraHairId.Invalid;
         AuraResult IPhysicsHair.DestroyHair(AuraHairId hair) => AuraResult.UnsupportedShape;
