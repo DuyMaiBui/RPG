@@ -52,3 +52,6 @@ ExportedObj/
 
 # AuraEngine native third-party sources (fetched by Native/AuraEngine/fetch_jolt.sh)
 Native/AuraEngine/third_party/
+
+# Agent validation screenshots (pipeline capture output, never commit)
+Assets/Temp/aura_*.png
