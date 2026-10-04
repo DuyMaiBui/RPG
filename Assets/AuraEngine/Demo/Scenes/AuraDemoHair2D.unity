@@ -967,8 +967,8 @@ GameObject:
   - component: {fileID: 1905722992}
   - component: {fileID: 1905722990}
   - component: {fileID: 1905722993}
-  - component: {fileID: 1905722994}
-  - component: {fileID: 1905722995}
+  - component: {fileID: 1905722997}
+  - component: {fileID: 1905722996}
   m_Layer: 0
   m_Name: Ground
   m_TagString: Untagged
@@ -1061,7 +1061,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsView
   _syncTransform: 1
---- !u!114 &1905722994
+--- !u!114 &1905722996
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1070,43 +1070,36 @@ MonoBehaviour:
   m_GameObject: {fileID: 1905722988}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e4f04eba9367241f0b4f51b18c895325, type: 3}
+  m_Script: {fileID: 11500000, guid: 176f22162e7fe45fe839359499e59e61, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBodyAuthoring
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxCollider2DAuthoring
+  _offset: {x: 0, y: 0}
+  _rotationDegrees: 0
+  _isTrigger: 0
+  _material: {fileID: 0}
+  _layer: 0
+  _size: {x: 16, y: 1}
+--- !u!114 &1905722997
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1905722988}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2983e3bd57f934e5abd0e8d81575bf76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBody2DAuthoring
   _type: 0
   _mass: 1
   _gravityScale: 1
   _linearDamping: 0
   _angularDamping: 0
-  _freezePosX: 0
-  _freezePosY: 0
-  _freezePosZ: 0
-  _freezeRotX: 0
-  _freezeRotY: 0
-  _freezeRotZ: 0
-  _centerOfMass: {x: 0, y: 0, z: 0}
-  _inertiaMultiplier: 1
-  _collisionDetection: 0
+  _freezePositionX: 0
+  _freezePositionY: 0
+  _freezeRotation: 0
   _allowSleeping: 1
-  _maxLinearVelocity: 0
-  _maxAngularVelocity: 0
---- !u!114 &1905722995
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1905722988}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b5dcc32b4e604207816ef2efd789a2c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxColliderAuthoring
-  _center: {x: 0, y: 0, z: 0}
-  _isTrigger: 0
-  _material: {fileID: 0}
-  _layer: 0
-  _size: {x: 16, y: 1, z: 4}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

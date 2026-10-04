@@ -131,8 +131,8 @@ GameObject:
   - component: {fileID: 157548314}
   - component: {fileID: 157548312}
   - component: {fileID: 157548315}
-  - component: {fileID: 157548316}
-  - component: {fileID: 157548317}
+  - component: {fileID: 157548319}
+  - component: {fileID: 157548318}
   m_Layer: 0
   m_Name: Ground
   m_TagString: Untagged
@@ -225,7 +225,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsView
   _syncTransform: 1
---- !u!114 &157548316
+--- !u!114 &157548318
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -234,43 +234,36 @@ MonoBehaviour:
   m_GameObject: {fileID: 157548310}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e4f04eba9367241f0b4f51b18c895325, type: 3}
+  m_Script: {fileID: 11500000, guid: 176f22162e7fe45fe839359499e59e61, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBodyAuthoring
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxCollider2DAuthoring
+  _offset: {x: 0, y: 0}
+  _rotationDegrees: 0
+  _isTrigger: 0
+  _material: {fileID: 0}
+  _layer: 0
+  _size: {x: 20, y: 1}
+--- !u!114 &157548319
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 157548310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2983e3bd57f934e5abd0e8d81575bf76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBody2DAuthoring
   _type: 0
   _mass: 1
   _gravityScale: 1
   _linearDamping: 0
   _angularDamping: 0
-  _freezePosX: 0
-  _freezePosY: 0
-  _freezePosZ: 0
-  _freezeRotX: 0
-  _freezeRotY: 0
-  _freezeRotZ: 0
-  _centerOfMass: {x: 0, y: 0, z: 0}
-  _inertiaMultiplier: 1
-  _collisionDetection: 0
+  _freezePositionX: 0
+  _freezePositionY: 0
+  _freezeRotation: 0
   _allowSleeping: 1
-  _maxLinearVelocity: 0
-  _maxAngularVelocity: 0
---- !u!114 &157548317
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 157548310}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b5dcc32b4e604207816ef2efd789a2c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxColliderAuthoring
-  _center: {x: 0, y: 0, z: 0}
-  _isTrigger: 0
-  _material: {fileID: 0}
-  _layer: 0
-  _size: {x: 20, y: 1, z: 4}
 --- !u!1 &203452408
 GameObject:
   m_ObjectHideFlags: 0
@@ -312,21 +305,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 203452408}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 613c3d190aa1d4567ac4e062755dcaae, type: 3}
+  m_Script: {fileID: 11500000, guid: 58ef23ea22fbc450bb5552a71664a9a3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraJointAuthoring
-  _bodyA: {fileID: 1899882371}
-  _bodyB: {fileID: 216216674}
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraJoint2DAuthoring
+  _bodyA: {fileID: 1899882373}
+  _bodyB: {fileID: 216216676}
   _type: 2
-  _anchorA: {x: 0, y: 0, z: 0}
-  _anchorB: {x: 0, y: 2, z: 0}
-  _axisA: {x: 0, y: 0, z: 1}
-  _axisB: {x: 0, y: 0, z: 1}
+  _anchorA: {x: 0, y: 0}
+  _anchorB: {x: 0, y: 2}
+  _axis: {x: 0, y: 0}
   _distance: 1
   _enableLimit: 0
   _minLimit: 0
   _maxLimit: 0
-  _swingLimit: 0
   _motorEnabled: 0
   _motorTargetVelocity: 0
   _maxMotorForce: 1
@@ -344,8 +335,8 @@ GameObject:
   - component: {fileID: 216216672}
   - component: {fileID: 216216670}
   - component: {fileID: 216216673}
-  - component: {fileID: 216216674}
-  - component: {fileID: 216216675}
+  - component: {fileID: 216216676}
+  - component: {fileID: 216216677}
   m_Layer: 0
   m_Name: PendulumArm
   m_TagString: Untagged
@@ -438,7 +429,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsView
   _syncTransform: 1
---- !u!114 &216216674
+--- !u!114 &216216676
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -447,27 +438,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 216216668}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e4f04eba9367241f0b4f51b18c895325, type: 3}
+  m_Script: {fileID: 11500000, guid: 2983e3bd57f934e5abd0e8d81575bf76, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBodyAuthoring
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBody2DAuthoring
   _type: 1
   _mass: 1
   _gravityScale: 1
   _linearDamping: 0
   _angularDamping: 0
-  _freezePosX: 0
-  _freezePosY: 0
-  _freezePosZ: 0
-  _freezeRotX: 0
-  _freezeRotY: 0
-  _freezeRotZ: 0
-  _centerOfMass: {x: 0, y: 0, z: 0}
-  _inertiaMultiplier: 1
-  _collisionDetection: 0
+  _freezePositionX: 0
+  _freezePositionY: 0
+  _freezeRotation: 0
   _allowSleeping: 1
-  _maxLinearVelocity: 0
-  _maxAngularVelocity: 0
---- !u!114 &216216675
+--- !u!114 &216216677
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -476,14 +459,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 216216668}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b5dcc32b4e604207816ef2efd789a2c, type: 3}
+  m_Script: {fileID: 11500000, guid: 176f22162e7fe45fe839359499e59e61, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxColliderAuthoring
-  _center: {x: 0, y: 0, z: 0}
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxCollider2DAuthoring
+  _offset: {x: 0, y: 0}
+  _rotationDegrees: 0
   _isTrigger: 0
   _material: {fileID: 0}
   _layer: 0
-  _size: {x: 0.4, y: 4, z: 0.4}
+  _size: {x: 0.4, y: 4}
 --- !u!1 &229590217
 GameObject:
   m_ObjectHideFlags: 0
@@ -525,21 +509,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 229590217}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 613c3d190aa1d4567ac4e062755dcaae, type: 3}
+  m_Script: {fileID: 11500000, guid: 58ef23ea22fbc450bb5552a71664a9a3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraJointAuthoring
-  _bodyA: {fileID: 1280194361}
-  _bodyB: {fileID: 1995994907}
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraJoint2DAuthoring
+  _bodyA: {fileID: 1280194363}
+  _bodyB: {fileID: 1995994909}
   _type: 4
-  _anchorA: {x: 0, y: 0, z: 0}
-  _anchorB: {x: 0, y: 0, z: 0}
-  _axisA: {x: 1, y: 0, z: 0}
-  _axisB: {x: 1, y: 0, z: 0}
+  _anchorA: {x: 0, y: 0}
+  _anchorB: {x: 0, y: 0}
+  _axis: {x: 1, y: 0}
   _distance: 1
   _enableLimit: 0
   _minLimit: 0
   _maxLimit: 0
-  _swingLimit: 0
   _motorEnabled: 0
   _motorTargetVelocity: 0
   _maxMotorForce: 1
@@ -616,8 +598,8 @@ GameObject:
   - component: {fileID: 458479969}
   - component: {fileID: 458479972}
   - component: {fileID: 458479973}
-  - component: {fileID: 458479974}
-  - component: {fileID: 458479975}
+  - component: {fileID: 458479977}
+  - component: {fileID: 458479976}
   m_Layer: 0
   m_Name: SwingTrigger
   m_TagString: Untagged
@@ -661,7 +643,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsView
   _syncTransform: 1
---- !u!114 &458479974
+--- !u!114 &458479976
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -670,43 +652,36 @@ MonoBehaviour:
   m_GameObject: {fileID: 458479968}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e4f04eba9367241f0b4f51b18c895325, type: 3}
+  m_Script: {fileID: 11500000, guid: 176f22162e7fe45fe839359499e59e61, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBodyAuthoring
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxCollider2DAuthoring
+  _offset: {x: 0, y: 0}
+  _rotationDegrees: 0
+  _isTrigger: 1
+  _material: {fileID: 0}
+  _layer: 0
+  _size: {x: 4, y: 4}
+--- !u!114 &458479977
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 458479968}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2983e3bd57f934e5abd0e8d81575bf76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBody2DAuthoring
   _type: 0
   _mass: 1
   _gravityScale: 1
   _linearDamping: 0
   _angularDamping: 0
-  _freezePosX: 0
-  _freezePosY: 0
-  _freezePosZ: 0
-  _freezeRotX: 0
-  _freezeRotY: 0
-  _freezeRotZ: 0
-  _centerOfMass: {x: 0, y: 0, z: 0}
-  _inertiaMultiplier: 1
-  _collisionDetection: 0
+  _freezePositionX: 0
+  _freezePositionY: 0
+  _freezeRotation: 0
   _allowSleeping: 1
-  _maxLinearVelocity: 0
-  _maxAngularVelocity: 0
---- !u!114 &458479975
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 458479968}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b5dcc32b4e604207816ef2efd789a2c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxColliderAuthoring
-  _center: {x: 0, y: 0, z: 0}
-  _isTrigger: 1
-  _material: {fileID: 0}
-  _layer: 0
-  _size: {x: 4, y: 4, z: 2}
 --- !u!1 &906408012
 GameObject:
   m_ObjectHideFlags: 0
@@ -873,8 +848,8 @@ GameObject:
   - component: {fileID: 1280194359}
   - component: {fileID: 1280194357}
   - component: {fileID: 1280194360}
-  - component: {fileID: 1280194361}
-  - component: {fileID: 1280194362}
+  - component: {fileID: 1280194363}
+  - component: {fileID: 1280194364}
   m_Layer: 0
   m_Name: RailFrame
   m_TagString: Untagged
@@ -967,7 +942,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsView
   _syncTransform: 1
---- !u!114 &1280194361
+--- !u!114 &1280194363
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -976,27 +951,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 1280194355}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e4f04eba9367241f0b4f51b18c895325, type: 3}
+  m_Script: {fileID: 11500000, guid: 2983e3bd57f934e5abd0e8d81575bf76, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBodyAuthoring
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBody2DAuthoring
   _type: 0
   _mass: 1
   _gravityScale: 1
   _linearDamping: 0
   _angularDamping: 0
-  _freezePosX: 0
-  _freezePosY: 0
-  _freezePosZ: 0
-  _freezeRotX: 0
-  _freezeRotY: 0
-  _freezeRotZ: 0
-  _centerOfMass: {x: 0, y: 0, z: 0}
-  _inertiaMultiplier: 1
-  _collisionDetection: 0
+  _freezePositionX: 0
+  _freezePositionY: 0
+  _freezeRotation: 0
   _allowSleeping: 1
-  _maxLinearVelocity: 0
-  _maxAngularVelocity: 0
---- !u!114 &1280194362
+--- !u!114 &1280194364
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1005,14 +972,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 1280194355}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b5dcc32b4e604207816ef2efd789a2c, type: 3}
+  m_Script: {fileID: 11500000, guid: 176f22162e7fe45fe839359499e59e61, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxColliderAuthoring
-  _center: {x: 0, y: 0, z: 0}
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxCollider2DAuthoring
+  _offset: {x: 0, y: 0}
+  _rotationDegrees: 0
   _isTrigger: 0
   _material: {fileID: 0}
   _layer: 0
-  _size: {x: 6, y: 0.5, z: 1}
+  _size: {x: 6, y: 0.5}
 --- !u!1 &1325847274
 GameObject:
   m_ObjectHideFlags: 0
@@ -1122,8 +1090,8 @@ GameObject:
   - component: {fileID: 1899882369}
   - component: {fileID: 1899882367}
   - component: {fileID: 1899882370}
-  - component: {fileID: 1899882371}
-  - component: {fileID: 1899882372}
+  - component: {fileID: 1899882373}
+  - component: {fileID: 1899882374}
   m_Layer: 0
   m_Name: Pivot
   m_TagString: Untagged
@@ -1216,7 +1184,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsView
   _syncTransform: 1
---- !u!114 &1899882371
+--- !u!114 &1899882373
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1225,27 +1193,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 1899882365}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e4f04eba9367241f0b4f51b18c895325, type: 3}
+  m_Script: {fileID: 11500000, guid: 2983e3bd57f934e5abd0e8d81575bf76, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBodyAuthoring
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBody2DAuthoring
   _type: 0
   _mass: 1
   _gravityScale: 1
   _linearDamping: 0
   _angularDamping: 0
-  _freezePosX: 0
-  _freezePosY: 0
-  _freezePosZ: 0
-  _freezeRotX: 0
-  _freezeRotY: 0
-  _freezeRotZ: 0
-  _centerOfMass: {x: 0, y: 0, z: 0}
-  _inertiaMultiplier: 1
-  _collisionDetection: 0
+  _freezePositionX: 0
+  _freezePositionY: 0
+  _freezeRotation: 0
   _allowSleeping: 1
-  _maxLinearVelocity: 0
-  _maxAngularVelocity: 0
---- !u!114 &1899882372
+--- !u!114 &1899882374
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1254,14 +1214,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 1899882365}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b5dcc32b4e604207816ef2efd789a2c, type: 3}
+  m_Script: {fileID: 11500000, guid: 176f22162e7fe45fe839359499e59e61, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxColliderAuthoring
-  _center: {x: 0, y: 0, z: 0}
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxCollider2DAuthoring
+  _offset: {x: 0, y: 0}
+  _rotationDegrees: 0
   _isTrigger: 0
   _material: {fileID: 0}
   _layer: 0
-  _size: {x: 1, y: 1, z: 1}
+  _size: {x: 1, y: 1}
 --- !u!1 &1995994901
 GameObject:
   m_ObjectHideFlags: 0
@@ -1274,8 +1235,8 @@ GameObject:
   - component: {fileID: 1995994905}
   - component: {fileID: 1995994903}
   - component: {fileID: 1995994906}
-  - component: {fileID: 1995994907}
-  - component: {fileID: 1995994908}
+  - component: {fileID: 1995994909}
+  - component: {fileID: 1995994910}
   m_Layer: 0
   m_Name: SliderBlock
   m_TagString: Untagged
@@ -1368,7 +1329,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsView
   _syncTransform: 1
---- !u!114 &1995994907
+--- !u!114 &1995994909
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1377,27 +1338,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 1995994901}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e4f04eba9367241f0b4f51b18c895325, type: 3}
+  m_Script: {fileID: 11500000, guid: 2983e3bd57f934e5abd0e8d81575bf76, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBodyAuthoring
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraPhysicsBody2DAuthoring
   _type: 1
   _mass: 1
   _gravityScale: 1
   _linearDamping: 0
   _angularDamping: 0
-  _freezePosX: 0
-  _freezePosY: 0
-  _freezePosZ: 0
-  _freezeRotX: 0
-  _freezeRotY: 0
-  _freezeRotZ: 0
-  _centerOfMass: {x: 0, y: 0, z: 0}
-  _inertiaMultiplier: 1
-  _collisionDetection: 0
+  _freezePositionX: 0
+  _freezePositionY: 0
+  _freezeRotation: 0
   _allowSleeping: 1
-  _maxLinearVelocity: 0
-  _maxAngularVelocity: 0
---- !u!114 &1995994908
+--- !u!114 &1995994910
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1406,14 +1359,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 1995994901}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b5dcc32b4e604207816ef2efd789a2c, type: 3}
+  m_Script: {fileID: 11500000, guid: 176f22162e7fe45fe839359499e59e61, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxColliderAuthoring
-  _center: {x: 0, y: 0, z: 0}
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraBoxCollider2DAuthoring
+  _offset: {x: 0, y: 0}
+  _rotationDegrees: 0
   _isTrigger: 0
   _material: {fileID: 0}
   _layer: 0
-  _size: {x: 1, y: 1, z: 1}
+  _size: {x: 1, y: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
