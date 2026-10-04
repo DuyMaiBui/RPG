@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace AuraEngine.Physics.Native
 {
-    internal static class NativeMethods
+    internal static partial class NativeMethods
     {
         private const string Library = "aura";
 

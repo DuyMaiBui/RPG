@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using AuraEngine.Core;
 using AuraEngine.Networking;
 using AuraEngine.Physics;
@@ -12,7 +13,7 @@ namespace AuraEngine.KernelTests
     /* Exercises the Jolt/Box2D physics kernel through the managed binding. Every
        case builds a world on libaura, drives it and asserts the result, so the
        C++ kernel is covered where the in-Editor native suite cannot run. */
-    public sealed class KernelTestSuite
+    public sealed partial class KernelTestSuite
     {
         public int Passed { get; private set; }
 
@@ -99,6 +100,9 @@ namespace AuraEngine.KernelTests
                 ("joint_unsupported_and_stale_3d", () => Joint_UnsupportedAndStale(AuraPhysicsMode.Full3D)),
                 ("joint_unsupported_and_stale_2d", () => Joint_UnsupportedAndStale(AuraPhysicsMode.Plane2D)),
             };
+
+            // Per-package cases live in KernelTestSuite.Package*.cs so parallel work does not collide here.
+            cases = cases.Concat(PackageBTests()).Concat(PackageCTests()).Concat(PackageDTests()).Concat(PackageETests()).ToArray();
 
             foreach (var (name, body) in cases)
             {
