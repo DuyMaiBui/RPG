@@ -7,6 +7,9 @@ namespace AuraEngine.Physics.Native
     {
         private const string Library = "aura";
 
+        /* Must equal AURA_ENGINE_ABI_VERSION in aura_types.h; bumped together with every ABI change. */
+        public const uint ExpectedAbiVersion = 10u;
+
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         public static extern uint Aura_AbiVersion();
 
@@ -143,5 +146,26 @@ namespace AuraEngine.Physics.Native
         public static extern int Aura_GetRagdollPose(NativeWorldHandle world, NativeRagdollHandle ragdoll, IntPtr buffer, uint capacity, out uint outCount);
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         public static extern int Aura_SetRagdollPose(NativeWorldHandle world, NativeRagdollHandle ragdoll, IntPtr poses, uint poseCount);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetLinearVelocity(NativeWorldHandle world, NativeBodyHandle body, NativeVector3 velocity);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetAngularVelocity(NativeWorldHandle world, NativeBodyHandle body, NativeVector3 velocity);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_AddForce(NativeWorldHandle world, NativeBodyHandle body, NativeVector3 force);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_AddImpulse(NativeWorldHandle world, NativeBodyHandle body, NativeVector3 impulse);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_AddTorque(NativeWorldHandle world, NativeBodyHandle body, NativeVector3 torque);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_AddAngularImpulse(NativeWorldHandle world, NativeBodyHandle body, NativeVector3 impulse);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetBodyPose(NativeWorldHandle world, NativeBodyHandle body, ref NativePose pose, byte zeroVelocity);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetGravityScale(NativeWorldHandle world, NativeBodyHandle body, float gravityScale);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetFriction(NativeWorldHandle world, NativeBodyHandle body, float friction);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetRestitution(NativeWorldHandle world, NativeBodyHandle body, float restitution);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetMotionType(NativeWorldHandle world, NativeBodyHandle body, int bodyType);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetBodyLayer(NativeWorldHandle world, NativeBodyHandle body, uint layer, ulong collisionMask);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetBodyEnabled(NativeWorldHandle world, NativeBodyHandle body, byte enabled);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_IsBodyEnabled(NativeWorldHandle world, NativeBodyHandle body, out byte outEnabled);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetJointMotor(NativeWorldHandle world, ulong joint, ref NativeJointMotorDesc motor);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetJointLimits(NativeWorldHandle world, ulong joint, byte enabled, float minLimit, float maxLimit);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_SetJointBreakThreshold(NativeWorldHandle world, ulong joint, float maxForce, float maxTorque);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_IsJointBroken(NativeWorldHandle world, ulong joint, out byte outBroken);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] public static extern int Aura_GetJointFeedback(NativeWorldHandle world, ulong joint, out NativeJointFeedback outFeedback);
     }
 }

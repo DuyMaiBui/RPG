@@ -40,6 +40,12 @@ namespace AuraEngine.Core
         Ragdolls = 1 << 24,
         Water = 1 << 25,
 
+        /* Runtime body control: IPhysicsWorld.BodyControl. */
+        BodyControl = 1 << 26,
+
+        /* Runtime joint control: IPhysicsWorld.JointControl. */
+        JointControl = 1 << 27,
+
         All = ~0,
     }
 }

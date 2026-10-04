@@ -13,6 +13,11 @@ namespace AuraEngine.Physics
 
         IPhysicsJoints Joints { get; }
 
+        /* Runtime body/joint mutation; check AuraPhysicsCapabilities.BodyControl / JointControl. */
+        IPhysicsBodyControl BodyControl { get; }
+
+        IPhysicsJointControl JointControl { get; }
+
         IPhysicsCharacters Characters { get; }
         IPhysicsVehicles Vehicles { get; }
         IPhysicsSoftBodies SoftBodies { get; }

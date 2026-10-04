@@ -117,6 +117,10 @@ namespace AuraEngine.Tests
 
         IPhysicsJoints IPhysicsWorld.Joints => this;
 
+        IPhysicsBodyControl IPhysicsWorld.BodyControl => NullPhysicsBodyControl.Instance;
+
+        IPhysicsJointControl IPhysicsWorld.JointControl => NullPhysicsJointControl.Instance;
+
         IPhysicsCharacters IPhysicsWorld.Characters => this;
 
         IPhysicsContacts IPhysicsWorld.Contacts => this;

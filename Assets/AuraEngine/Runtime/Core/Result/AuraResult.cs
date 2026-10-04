@@ -12,5 +12,11 @@ namespace AuraEngine.Core
         AbiMismatch = 7,
         CapacityExceeded = 8,
         BackendFailure = 9,
+
+        /* ABI v10: the body is removed from the simulation. */
+        BodyDisabled = 10,
+
+        /* ABI v10: valid request the body/joint type or backend cannot perform. */
+        UnsupportedOperation = 11,
     }
 }

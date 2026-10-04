@@ -10,6 +10,8 @@ namespace AuraEngine.Physics.Native
         private readonly NativeWorldHandle _world;
         private readonly AuraPhysicsMode _mode;
         private readonly HashSet<PhysicsBodyId> _bodies = new HashSet<PhysicsBodyId>();
+        private readonly NativeBodyControl _bodyControl;
+        private readonly NativeJointControl _jointControl;
         private IntPtr _collisionMasks;
         private bool _disposed;
 
@@ -25,6 +27,8 @@ namespace AuraEngine.Physics.Native
             desc.CollisionMaskCount = AuraPhysicsLayer.MaxLayers;
 
             AuraException.ThrowIfFailed((AuraResult)NativeMethods.Aura_CreateWorld(ref desc, out _world), "Failed to create the native physics world.");
+            _bodyControl = new NativeBodyControl(_world);
+            _jointControl = new NativeJointControl(_world);
         }
 
         AuraPhysicsMode IPhysicsWorld.Mode => _mode;
@@ -42,7 +46,9 @@ namespace AuraEngine.Physics.Native
                            AuraPhysicsCapabilities.Triggers |
                            AuraPhysicsCapabilities.Contacts |
                            AuraPhysicsCapabilities.SleepWake |
-                           AuraPhysicsCapabilities.Joints;
+                           AuraPhysicsCapabilities.Joints |
+                           AuraPhysicsCapabilities.BodyControl |
+                           AuraPhysicsCapabilities.JointControl;
 
                 if (_mode == AuraPhysicsMode.Plane2D)
                     return body | AuraPhysicsCapabilities.ShapeBox | AuraPhysicsCapabilities.ShapeSphere |
@@ -168,7 +174,12 @@ namespace AuraEngine.Physics.Native
 
         void IPhysicsWorld.ApplyImpulse(PhysicsBodyId body, AuraVector3 impulse)
         {
+            ((IPhysicsBodyControl)_bodyControl).AddImpulse(body, impulse);
         }
+
+        IPhysicsBodyControl IPhysicsWorld.BodyControl => _bodyControl;
+
+        IPhysicsJointControl IPhysicsWorld.JointControl => _jointControl;
 
         AuraResult IPhysicsWorld.SetSurfaceVelocity(PhysicsBodyId body, AuraVector3 velocity)
         {
@@ -828,6 +839,8 @@ namespace AuraEngine.Physics.Native
                 return;
 
             _disposed = true;
+            _bodyControl.Invalidate();
+            _jointControl.Invalidate();
             NativeMethods.Aura_DestroyWorld(_world);
             if (_collisionMasks != IntPtr.Zero)
             {

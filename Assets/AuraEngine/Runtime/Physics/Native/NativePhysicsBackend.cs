@@ -25,7 +25,9 @@ namespace AuraEngine.Physics.Native
             AuraPhysicsCapabilities.QueryOverlap |
             AuraPhysicsCapabilities.Triggers |
             AuraPhysicsCapabilities.Contacts |
-            AuraPhysicsCapabilities.SleepWake;
+            AuraPhysicsCapabilities.SleepWake |
+            AuraPhysicsCapabilities.BodyControl |
+            AuraPhysicsCapabilities.JointControl;
 
         IPhysicsWorld IPhysicsBackend.CreateWorld(in AuraWorldDefinition definition) =>
             new NativePhysicsWorld(definition);
@@ -34,7 +36,8 @@ namespace AuraEngine.Physics.Native
         {
             try
             {
-                return NativeMethods.Aura_CheckAbi(NativeMethods.Aura_AbiVersion()) == (int)AuraResult.Success;
+                return NativeMethods.Aura_AbiVersion() == NativeMethods.ExpectedAbiVersion
+                    && NativeMethods.Aura_CheckAbi(NativeMethods.ExpectedAbiVersion) == (int)AuraResult.Success;
             }
             catch (DllNotFoundException)
             {

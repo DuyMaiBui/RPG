@@ -45,6 +45,29 @@ namespace AuraEngine.Simulation
 
         public IPhysicsWorld Physics => _physics;
 
+        /* Runtime body mutation (velocity, forces, teleport, motion type, layer, enable). Check
+           Capabilities for AuraPhysicsCapabilities.BodyControl; unsupported backends return
+           AuraResult.UnsupportedOperation instead of ignoring the call. */
+        public IPhysicsBodyControl BodyControl
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _physics.BodyControl;
+            }
+        }
+
+        /* Runtime joint mutation (motor, limits, break threshold, feedback). Check
+           Capabilities for AuraPhysicsCapabilities.JointControl. */
+        public IPhysicsJointControl JointControl
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _physics.JointControl;
+            }
+        }
+
         public int EntityCount => _entities.AliveCount;
 
         public int BodyCount => _physics.BodyCount;
