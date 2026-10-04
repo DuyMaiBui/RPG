@@ -37,6 +37,7 @@ namespace AuraEngine.Unity
 
         private readonly List<AuraPhysicsBodyAuthoring> _authoring = new List<AuraPhysicsBodyAuthoring>();
         private readonly List<AuraJointAuthoring> _jointAuthoring = new List<AuraJointAuthoring>();
+        private readonly List<AuraRagdollChainAuthoring> _chainAuthoring = new List<AuraRagdollChainAuthoring>();
         private readonly List<AuraCharacterAuthoring> _characterAuthoring = new List<AuraCharacterAuthoring>();
         private readonly List<AuraVehicleAuthoring> _vehicleAuthoring = new List<AuraVehicleAuthoring>();
         private readonly List<AuraSoftBodyAuthoring> _softBodyAuthoring = new List<AuraSoftBodyAuthoring>();
@@ -104,6 +105,9 @@ namespace AuraEngine.Unity
             {
                 for (var index = 0; index < _jointAuthoring.Count; index++)
                     _jointAuthoring[index].BuildInto(this);
+
+                for (var index = 0; index < _chainAuthoring.Count; index++)
+                    _chainAuthoring[index].BuildInto(this);
             }
 
             if ((_world.Capabilities & AuraPhysicsCapabilities.Characters) != 0)
@@ -182,6 +186,28 @@ namespace AuraEngine.Unity
                 return;
 
             _jointAuthoring.Remove(authoring);
+            authoring.ReleaseFrom(this);
+        }
+
+        public void Register(AuraRagdollChainAuthoring authoring)
+        {
+            if (authoring == null)
+                throw new ArgumentNullException(nameof(authoring));
+
+            if (_chainAuthoring.Contains(authoring))
+                return;
+
+            _chainAuthoring.Add(authoring);
+            if (_world != null && (_world.Capabilities & AuraPhysicsCapabilities.Joints) != 0)
+                authoring.BuildInto(this);
+        }
+
+        public void Unregister(AuraRagdollChainAuthoring authoring)
+        {
+            if (authoring == null)
+                return;
+
+            _chainAuthoring.Remove(authoring);
             authoring.ReleaseFrom(this);
         }
 
