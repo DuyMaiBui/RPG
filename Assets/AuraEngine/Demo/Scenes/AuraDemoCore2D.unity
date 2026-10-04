@@ -391,7 +391,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: AuraEngine.Demo::AuraEngine.Demo.AuraDemoKinematicMover2D
   _instance: {fileID: 1380625797}
-  _body: {fileID: 0}
+  _body: {fileID: 977318926}
   _amplitude: {x: 3, y: 0}
   _speed: 1.5
 --- !u!1 &1000300211
