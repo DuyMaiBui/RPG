@@ -136,6 +136,11 @@ namespace AuraEngine.Tests
         AuraResult IPhysicsRagdolls.GetPose(AuraRagdollId ragdoll, Span<AuraPose> poses) => AuraResult.InvalidHandle;
         AuraResult IPhysicsRagdolls.SetPose(AuraRagdollId ragdoll, ReadOnlySpan<AuraPose> poses) => AuraResult.InvalidHandle;
 
+        AuraWaterId IPhysicsWater.CreateWater(in AuraWaterDefinition definition) => AuraWaterId.Invalid;
+        AuraResult IPhysicsWater.DestroyWater(AuraWaterId water) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsWater.SetWaterParameters(AuraWaterId water, in AuraWaterDefinition definition) => AuraResult.InvalidHandle;
+        AuraResult IPhysicsWater.ApplyWaterStep(AuraWaterId water, float deltaTime) => AuraResult.InvalidHandle;
+
         AuraWaterId IPhysicsWorld.CreateWater(in AuraWaterDefinition definition) => AuraWaterId.Invalid;
         AuraResult IPhysicsWorld.DestroyWater(AuraWaterId water) => AuraResult.InvalidHandle;
         AuraResult IPhysicsWorld.SetWaterParameters(AuraWaterId water, in AuraWaterDefinition definition) => AuraResult.InvalidHandle;
