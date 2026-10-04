@@ -54,6 +54,15 @@ namespace AuraEngine.Core
                 layer,
                 AuraShapeGeometry.HeightField(samples, resolution, scale));
 
+        public static AuraPhysicsShapeDefinition TriangleMesh(AuraVector3[] vertices, int[] indices, int meshAssetId = -1, AuraPhysicsLayer layer = default) =>
+            new AuraPhysicsShapeDefinition(
+                AuraShapeType.TriangleMesh,
+                AuraPose.Identity,
+                false,
+                AuraPhysicsMaterialDefinition.Default,
+                layer,
+                AuraShapeGeometry.TriangleMesh(vertices, indices, meshAssetId));
+
         public AuraPhysicsShapeDefinition WithLocalPose(AuraPose localPose) =>
             new AuraPhysicsShapeDefinition(Type, localPose, IsTrigger, Material, Layer, Geometry);
 
