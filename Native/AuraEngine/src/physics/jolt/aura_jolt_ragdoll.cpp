@@ -1,4 +1,5 @@
 #include "aura_jolt_internal.h"
+#include <Jolt/Physics/Constraints/SwingTwistConstraint.h>
 
 namespace aura
 {
@@ -43,11 +44,32 @@ AuraResultCode JoltWorld::CreateRagdoll(const AuraRagdollDesc& desc, AuraRagdoll
         if (parent >= 0)
         {
             const AuraJointDesc& joint = desc.parts[index].jointToParent;
-            JPH::FixedConstraintSettings constraint;
-            constraint.mAutoDetectPoint = false;
-            constraint.mPoint1 = ToRVec3(joint.anchorA);
-            constraint.mPoint2 = ToRVec3(joint.anchorB);
-            part.mToParent = new JPH::FixedConstraintSettings(constraint);
+            if (joint.type == AURA_JOINT_CONE || joint.type == AURA_JOINT_SWING_TWIST)
+            {
+                const float swing = joint.swingLimit > 0.0f ? joint.swingLimit : 0.0f;
+                JPH::SwingTwistConstraintSettings constraint;
+                constraint.mSpace = JPH::EConstraintSpace::WorldSpace;
+                constraint.mPosition1 = ToRVec3(joint.anchorA);
+                constraint.mPosition2 = ToRVec3(joint.anchorB);
+                constraint.mTwistAxis1 = ToVec3(joint.axisA).NormalizedOr(JPH::Vec3::sAxisY());
+                constraint.mTwistAxis2 = ToVec3(joint.axisB).NormalizedOr(JPH::Vec3::sAxisY());
+                constraint.mPlaneAxis1 = ToVec3(joint.normalAxisA).NormalizedOr(JPH::Vec3::sAxisZ());
+                constraint.mPlaneAxis2 = ToVec3(joint.normalAxisB).NormalizedOr(JPH::Vec3::sAxisZ());
+                constraint.mSwingType = JPH::ESwingType::Cone;
+                constraint.mNormalHalfConeAngle = swing;
+                constraint.mPlaneHalfConeAngle = swing;
+                constraint.mTwistMinAngle = joint.minLimit;
+                constraint.mTwistMaxAngle = joint.maxLimit;
+                part.mToParent = new JPH::SwingTwistConstraintSettings(constraint);
+            }
+            else
+            {
+                JPH::FixedConstraintSettings constraint;
+                constraint.mAutoDetectPoint = false;
+                constraint.mPoint1 = ToRVec3(joint.anchorA);
+                constraint.mPoint2 = ToRVec3(joint.anchorB);
+                part.mToParent = new JPH::FixedConstraintSettings(constraint);
+            }
         }
     }
 

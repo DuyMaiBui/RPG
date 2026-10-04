@@ -18,6 +18,14 @@ namespace AuraEngine.Unity
         [Min(0.01f)]
         private float _mass = 1f;
 
+        [SerializeField]
+        [Range(0f, 180f)]
+        private float _swingLimitDegrees = 35f;
+
+        [SerializeField]
+        [Range(0f, 180f)]
+        private float _twistLimitDegrees = 20f;
+
         private AuraSimulationInstance _instance;
         private AuraRagdollId _ragdoll = AuraRagdollId.Invalid;
 
@@ -78,8 +86,13 @@ namespace AuraEngine.Unity
 
                 var limbPose = _limbs[index].transform.ToAuraPose();
                 bindPoses[index] = limbPose;
-                bodies[index] = AuraPhysicsBodyDefinition.CreateDynamic(
-                    limbPose, shape.Layer, AuraPhysicsLayerMask.All, shape);
+                bodies[index] = new AuraPhysicsBodyDefinition(
+                    AuraBodyType.Dynamic,
+                    limbPose,
+                    shape.Layer,
+                    AuraPhysicsLayerMask.All,
+                    new[] { shape },
+                    mass: _mass);
 
                 var anchor = limbPose.Position;
                 if (_parentIndices[index] >= 0 && _parentIndices[index] < _limbs.Length && _limbs[_parentIndices[index]] != null)
@@ -92,7 +105,7 @@ namespace AuraEngine.Unity
                 }
 
                 joints[index] = new AuraJointDefinition(
-                    AuraJointType.Fixed,
+                    AuraJointType.SwingTwist,
                     PhysicsBodyId.Invalid,
                     PhysicsBodyId.Invalid,
                     anchor,
@@ -100,10 +113,13 @@ namespace AuraEngine.Unity
                     0f,
                     AuraVector3.UnitY,
                     AuraVector3.UnitY,
-                    false, 0f, 0f,
+                    true,
+                    -_twistLimitDegrees * Mathf.Deg2Rad,
+                    _twistLimitDegrees * Mathf.Deg2Rad,
                     AuraVector3.UnitZ,
                     AuraVector3.UnitZ,
-                    0f, false, 0f, 0f, 0f, 0f);
+                    _swingLimitDegrees * Mathf.Deg2Rad,
+                    false, 0f, 0f, 0f, 0f);
             }
 
             var definition = new AuraRagdollDefinition(new AuraRigDefinition(_parentIndices, bindPoses), bodies, joints);

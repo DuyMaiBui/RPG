@@ -686,9 +686,16 @@ bool RunRagdoll()
         parts[index].body.shapeCount = 1;
         parts[index].body.initialPose = joints[index].bindPose;
     }
-    parts[1].jointToParent.type = AURA_JOINT_FIXED;
+    parts[1].jointToParent.type = AURA_JOINT_SWING_TWIST;
     parts[1].jointToParent.anchorA = AuraVec3{ 0.0f, 1.5f, 0.0f };
     parts[1].jointToParent.anchorB = AuraVec3{ 0.0f, 1.5f, 0.0f };
+    parts[1].jointToParent.axisA = AuraVec3{ 0.0f, 1.0f, 0.0f };
+    parts[1].jointToParent.axisB = AuraVec3{ 0.0f, 1.0f, 0.0f };
+    parts[1].jointToParent.normalAxisA = AuraVec3{ 0.0f, 0.0f, 1.0f };
+    parts[1].jointToParent.normalAxisB = AuraVec3{ 0.0f, 0.0f, 1.0f };
+    parts[1].jointToParent.swingLimit = 0.5f;
+    parts[1].jointToParent.minLimit = -0.35f;
+    parts[1].jointToParent.maxLimit = 0.35f;
 
     AuraRagdollDesc desc{};
     desc.rig.joints = joints;
