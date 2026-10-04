@@ -159,6 +159,16 @@ Bugs found by the edge-case suite and fixed:
 
 ## Known environment issues
 
+- **Correction (heap corruption, fixed):** the Editor aborts described below were
+  attributed to mono's JIT, but libaura really corrupted the heap. `DestroyJoint`
+  and `DestroyBody` released a Jolt constraint that `RemoveConstraint` had already
+  freed (use-after-free, `aura_jolt_joints.cpp` / `aura_jolt_world.cpp`), and
+  `ApplySurfaceVelocity` mutated shared state from Jolt worker threads without the
+  event mutex. The damage is silent and surfaces in a later unrelated `malloc`
+  (often the JIT). Both are fixed; `AURA_GMALLOC=1 ./run_kernel_tests.sh` runs the
+  suite under Guard Malloc, where the old code aborts. Re-test the in-Editor native
+  suite before treating the JIT explanation below as still valid.
+
 - Running the native P/Invoke test suite inside the Editor aborts the Editor.
   The isolated failing test is `NativeBackend_SaveState_RestoresBodyState`,
   which calls `AuraSimulationWorld.SaveState` -> `NativePhysicsWorld.SaveState`.
