@@ -9,16 +9,20 @@ scenarios, not Jolt samples, and use the dedicated `Aura*2DAuthoring` components
 
 | Category | Scene(s) | Status |
 |---|---|---|
-| Character | `AuraDemoCharacter3D` | Done: stairs, 25° ramp, 65° blocked ramp, hurdle jump, moving platform. |
+| Character 3D | `AuraDemoCharacter3D` | Done: stairs, 25° ramp, 65° blocked ramp, hurdle jump, moving platform. |
+| Character 2D / platformer | `AuraDemoPlatformer2D` | Done: ramp, one-way platforms, pushable crate, moving platform, updraft zone, scripted hero. |
 | General body (basics) | `AuraDemoCore3D`, `AuraDemoCore2D`, `AuraDemo3D`, `AuraDemo2D` | Partial: stacking, kinematic, trigger, raycast. |
-| Constraints | `AuraDemoArticulation3D`, `AuraDemoArticulation2D` | Partial: distance, fixed, hinge only. |
-| Vehicle | `AuraDemoArticulation3D` (car), `AuraDemoVehicle2D` | Partial: wheeled car; no tank/motorcycle. |
-| SoftBody | `AuraDemoAdvancedSoftBody3D`, `AuraDemoCloth3D`, `AuraDemoCloth2D` | Partial. |
-| Rig / ragdoll | `AuraDemoHumanoid3D`, `AuraDemoAdvancedRagdoll3D`, `AuraDemoChainRagdoll2D` | Partial: no powered/kinematic rig. |
+| Constraints 3D | `AuraDemoConstraints3D`, `AuraDemoArticulation3D` | Done for gear, rack-and-pinion, pulley, SixDof door, swing-twist arm; Path is a gap. |
+| Constraints / sandbox 2D | `AuraDemoSandbox2D`, `AuraDemoArticulation2D` | Done: motorised wheel joints, rope bridge with a breakable joint, mouse-drag joint, impulse kicker. |
+| Vehicle | `AuraDemoArticulation3D` (car), `AuraDemoSandbox2D` (wheel car), `AuraDemoVehicle2D` | Partial: wheeled car; no tank/motorcycle. `AuraDemoVehicle2D` is not driven yet. |
+| Gravity / space | `AuraDemoSpace3D` | Done: radial inverse-square planet field, six circular orbits, wind tunnel, slow-motion pulse. |
+| Ragdoll / hit reaction | `AuraDemoRagdollHit3D`, `AuraDemoHumanoid3D`, `AuraDemoAdvancedRagdoll3D`, `AuraDemoChainRagdoll2D` | Partial: swing-twist humanoid blown over by blasts; the kernel ragdoll prefabs cannot take impulses. |
+| SoftBody / cloth | `AuraDemoAdvancedSoftBody3D`, `AuraDemoCloth3D`, `AuraDemoCloth2D` | Partial: cloth and hair collide with scene colliders. |
 | Water | `AuraDemoAdvancedWater3D`, `AuraDemoWater2D` | Done (buoyancy). |
-| Hair | `AuraDemoHair3D`, `AuraDemoHair2D` | Done (CPU Verlet). |
-| Shapes | — | Pending scene (ConvexHull, Mesh, HeightField, tapered kernels already tested). |
-| General body (conveyor, sensor, restitution, freeze DOF) | — | Pending scene (kernel tests exist). |
+| Hair | `AuraDemoHair3D`, `AuraDemoHair2D` | Done (CPU Verlet with collision). |
+| Shapes | none | Pending scene (ConvexHull, Mesh, HeightField, tapered kernels already tested). |
+| General body (conveyor, sensor, restitution, freeze DOF) | none | Pending scene (kernel tests exist). |
+| Top-down 2D | none | Pending: needs a driver that moves a dynamic body with velocity (the 2D character treats +Y as jump). |
 
 ## Character scene notes
 
@@ -37,3 +41,11 @@ moving platform.
   filters; contact manifold access.
 - Tank and motorcycle vehicles; powered and soft-keyframed rigs.
 - GPU hair/cloth backend (`IVerletSolverBackend` seam exists, CPU only).
+
+## Demo validation
+
+`Tools/AuraSmoke/aura_smoke.sh` plays every scene: 23 scenes, 0 console errors. Hair and cloth
+report STATIC because the probe measures transforms; their meshes were verified from screenshots.
+Coming to rest and staying still is expected for `AuraDemoCore3D`, `AuraDemoAdvancedRagdoll3D`,
+`AuraDemoChainRagdoll2D` and `AuraDemoVehicle2D`. Run it with the display awake: when the
+display sleeps macOS throttles the Editor and the CLI hangs.
