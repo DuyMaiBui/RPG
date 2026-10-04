@@ -5,7 +5,8 @@
     "AuraEngine.Core",
     "AuraEngine.Physics",
     "AuraEngine.Simulation",
-    "AuraEngine.Unity"
+    "AuraEngine.Unity",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
