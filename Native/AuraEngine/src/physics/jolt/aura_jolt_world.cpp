@@ -270,6 +270,7 @@ AuraResultCode JoltWorld::SetKinematicTarget(AuraBodyHandle body, const AuraPose
 
     const JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
     const_cast<JPH::BodyInterface&>(bi).MoveKinematic(slot->id, ToRVec3(pose.position), ToQuat(pose.rotation), impl_->lastDelta);
+    slot->kinematicTargetPending = true;
     return AURA_SUCCESS;
 }
 
@@ -328,6 +329,21 @@ void JoltWorld::Step(float deltaTime)
 
     impl_->ApplyForceFields(deltaTime);
     impl_->physics.Update(deltaTime, 1, &impl_->tempAllocator, &impl_->jobSystem);
+
+    /* A kinematic target is reached within one step. Without this the velocity set by MoveKinematic keeps
+       carrying the body past the target on every further step of the same frame and the error compounds. */
+    {
+        JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
+        for (Impl::Slot& slot : impl_->slots)
+        {
+            if (!slot.kinematicTargetPending)
+                continue;
+            slot.kinematicTargetPending = false;
+            if (slot.occupied && slot.enabled)
+                bi.SetLinearAndAngularVelocity(slot.id, JPH::Vec3::sZero(), JPH::Vec3::sZero());
+        }
+    }
+
     impl_->ProcessJointBreaks();
 }
 

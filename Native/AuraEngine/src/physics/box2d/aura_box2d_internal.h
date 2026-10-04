@@ -72,6 +72,8 @@ struct Box2DWorld::Impl
         bool occupied = false;
         uint32_t generation = 0;
         b2BodyId body = b2_nullBodyId;
+        /* Set by SetKinematicTarget; the velocity it produced is cleared after the step that reached the target. */
+        bool kinematicTargetPending = false;
     };
 
     struct JointSlot

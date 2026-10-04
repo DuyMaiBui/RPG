@@ -209,6 +209,7 @@ AuraResultCode Box2DWorld::SetKinematicTarget(AuraBodyHandle body, const AuraPos
     target.p = ToVec2(pose.position);
     target.q = b2MakeRot(AngleFromQuat(pose.rotation));
     b2Body_SetTargetTransform(slot->body, target, impl_->lastDelta);
+    slot->kinematicTargetPending = true;
     return AURA_SUCCESS;
 }
 
@@ -250,6 +251,20 @@ void Box2DWorld::Step(float deltaTime)
     impl_->lastDelta = deltaTime;
     impl_->ApplyForceFields(deltaTime);
     b2World_Step(impl_->world, deltaTime, 4);
+
+    /* See JoltWorld::Step: a kinematic target is consumed by one step. */
+    for (Impl::Slot& slot : impl_->slots)
+    {
+        if (!slot.kinematicTargetPending)
+            continue;
+        slot.kinematicTargetPending = false;
+        if (slot.occupied && b2Body_IsValid(slot.body) && b2Body_IsEnabled(slot.body))
+        {
+            b2Body_SetLinearVelocity(slot.body, b2Vec2{ 0.0f, 0.0f });
+            b2Body_SetAngularVelocity(slot.body, 0.0f);
+        }
+    }
+
     impl_->GatherEvents();
     impl_->ProcessJointBreaks();
 }
@@ -537,6 +552,7 @@ AuraResultCode Box2DWorld::SetLinearVelocity(AuraBodyHandle body, const AuraVec3
     AURA_B2_RESOLVE(body, kNeedEnabled | kNeedMovable)
     if (!IsFinite(velocity))
         return AURA_INVALID_DEFINITION;
+    slot->kinematicTargetPending = false;
     b2Body_SetLinearVelocity(slot->body, ToVec2(velocity));
     return AURA_SUCCESS;
 }

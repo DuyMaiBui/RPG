@@ -226,6 +226,8 @@ struct JoltWorld::Impl
         bool canChangeMotion = false;
         uint32_t shapeFilterGroup = 1u;
         uint32_t shapeFilterMask = ~0u;
+        /* Set by SetKinematicTarget; the velocity it produced is cleared after the step that reached the target. */
+        bool kinematicTargetPending = false;
     };
 
     struct JointSlot

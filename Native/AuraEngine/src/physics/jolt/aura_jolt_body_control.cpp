@@ -87,6 +87,7 @@ AuraResultCode JoltWorld::SetLinearVelocity(AuraBodyHandle body, const AuraVec3&
         return result;
     if (!IsFinite(velocity))
         return AURA_INVALID_DEFINITION;
+    slot->kinematicTargetPending = false;
     impl_->physics.GetBodyInterface().SetLinearVelocity(slot->id, ToVec3(velocity));
     return AURA_SUCCESS;
 }
