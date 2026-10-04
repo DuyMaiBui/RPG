@@ -54,6 +54,28 @@ public:
     virtual AuraResultCode DestroyJoint(uint64_t joint) = 0;
     virtual bool HasJoint(uint64_t joint) const = 0;
 
+    /* v10 runtime body/joint control. Backends that do not override these report
+       AURA_UNSUPPORTED_OPERATION instead of silently ignoring the call. */
+    virtual AuraResultCode SetLinearVelocity(AuraBodyHandle, const AuraVec3&) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetAngularVelocity(AuraBodyHandle, const AuraVec3&) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode AddForce(AuraBodyHandle, const AuraVec3&) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode AddImpulse(AuraBodyHandle, const AuraVec3&) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode AddTorque(AuraBodyHandle, const AuraVec3&) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode AddAngularImpulse(AuraBodyHandle, const AuraVec3&) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetBodyPose(AuraBodyHandle, const AuraPose&, bool) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetGravityScale(AuraBodyHandle, float) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetFriction(AuraBodyHandle, float) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetRestitution(AuraBodyHandle, float) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetMotionType(AuraBodyHandle, AuraBodyType) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetBodyLayer(AuraBodyHandle, AuraLayer, uint64_t) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetBodyEnabled(AuraBodyHandle, bool) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode IsBodyEnabled(AuraBodyHandle, bool*) const { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetJointMotor(uint64_t, const AuraJointMotorDesc&) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetJointLimits(uint64_t, bool, float, float) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode SetJointBreakThreshold(uint64_t, float, float) { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode IsJointBroken(uint64_t, bool*) const { return AURA_UNSUPPORTED_OPERATION; }
+    virtual AuraResultCode GetJointFeedback(uint64_t, AuraJointFeedback*) const { return AURA_UNSUPPORTED_OPERATION; }
+
     virtual AuraResultCode CreateCharacter(const AuraCharacterDesc& desc, uint64_t* outCharacter) = 0;
     virtual AuraResultCode DestroyCharacter(uint64_t character) = 0;
     virtual AuraResultCode GetCharacterState(uint64_t character, AuraCharacterState* outState) const = 0;

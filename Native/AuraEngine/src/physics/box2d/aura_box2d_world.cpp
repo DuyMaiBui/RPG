@@ -76,6 +76,13 @@ struct Box2DWorld::Impl
         b2JointId joint = b2_nullJointId;
         AuraBodyHandle bodyA{};
         AuraBodyHandle bodyB{};
+        AuraJointType type = AURA_JOINT_FIXED;
+        b2Vec2 localAxisA{ 1.0f, 0.0f };
+        float breakForce = 0.0f;
+        float breakTorque = 0.0f;
+        bool broken = false;
+        float lastForce = 0.0f;
+        float lastTorque = 0.0f;
     };
 
     b2WorldId world = b2_nullWorldId;
@@ -170,8 +177,12 @@ struct Box2DWorld::Impl
         const float angular = b2Body_GetAngularVelocity(slot.body);
         state.angularVelocity = AuraVec3{ 0.0f, 0.0f, angular };
         state.isAwake = b2Body_IsAwake(slot.body) ? 1 : 0;
-        state.flags = 0;
+        state.flags = b2Body_IsEnabled(slot.body) ? 0u : AURA_BODY_FLAG_DISABLED;
     }
+
+    /* Joint loads of the last step (aura_box2d_world.cpp, joint control section). */
+    bool JointLoads(const JointSlot& joint, float& force, float& torque, float& motorLoad) const;
+    void ProcessJointBreaks();
 
     void GatherEvents()
     {
@@ -418,6 +429,9 @@ AuraResultCode Box2DWorld::SetKinematicTarget(AuraBodyHandle body, const AuraPos
     if (slot == nullptr)
         return AURA_INVALID_HANDLE;
 
+    if (!b2Body_IsEnabled(slot->body))
+        return AURA_BODY_DISABLED;
+
     b2Transform target;
     target.p = ToVec2(pose.position);
     target.q = b2MakeRot(AngleFromQuat(pose.rotation));
@@ -463,6 +477,7 @@ void Box2DWorld::Step(float deltaTime)
     impl_->lastDelta = deltaTime;
     b2World_Step(impl_->world, deltaTime, 4);
     impl_->GatherEvents();
+    impl_->ProcessJointBreaks();
 }
 
 AuraResultCode Box2DWorld::CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater)
@@ -497,7 +512,7 @@ AuraResultCode Box2DWorld::ApplyWaterStep(AuraWaterHandle water, float deltaTime
         return AURA_INVALID_HANDLE;
     for (const Impl::Slot& slot : impl_->slots)
     {
-        if (!slot.occupied || !b2Body_IsValid(slot.body) || b2Body_GetType(slot.body) != b2_dynamicBody)
+        if (!slot.occupied || !b2Body_IsValid(slot.body) || !b2Body_IsEnabled(slot.body) || b2Body_GetType(slot.body) != b2_dynamicBody)
             continue;
         const float fraction = std::clamp((impl_->water.surfaceHeight - b2Body_GetPosition(slot.body).y + 0.5f) / 1.0f, 0.0f, 1.0f);
         const b2Vec2 impulse{ -impl_->gravity.x * impl_->water.density * fraction * deltaTime * b2Body_GetMass(slot.body) / 1000.0f,
@@ -622,12 +637,18 @@ AuraResultCode Box2DWorld::ApplyStates(const AuraBodyState* states, uint32_t cou
         if (slot == nullptr)
             return AURA_INVALID_HANDLE;
 
+        /* Snapshots carry the enabled flag: restore the pose with the body in the
+           simulation, then disable it again when it was disabled when captured. */
+        if (!b2Body_IsEnabled(slot->body))
+            b2Body_Enable(slot->body);
         b2Transform transform;
         transform.p = ToVec2(state.pose.position);
         transform.q = b2MakeRot(AngleFromQuat(state.pose.rotation));
         b2Body_SetTransform(slot->body, transform.p, transform.q);
         b2Body_SetLinearVelocity(slot->body, ToVec2(state.linearVelocity));
         b2Body_SetAngularVelocity(slot->body, state.angularVelocity.z);
+        if ((state.flags & AURA_BODY_FLAG_DISABLED) != 0u)
+            b2Body_Disable(slot->body);
     }
     return AURA_SUCCESS;
 }
@@ -702,6 +723,7 @@ AuraResultCode Box2DWorld::CreateJoint(const AuraJointDesc& desc, uint64_t* outJ
     const b2Vec2 anchorB = ToVec2(desc.anchorB);
 
     b2JointId joint = b2_nullJointId;
+    b2Vec2 localAxis{ 1.0f, 0.0f };
     switch (static_cast<AuraJointType>(desc.type))
     {
     case AURA_JOINT_DISTANCE:
@@ -767,6 +789,7 @@ AuraResultCode Box2DWorld::CreateJoint(const AuraJointDesc& desc, uint64_t* outJ
         def.localAnchorB = b2Body_GetLocalPoint(slotB->body, anchorB);
         const b2Vec2 axis = b2Body_GetLocalVector(slotA->body, ToVec2(desc.axisA));
         def.localAxisA = b2Normalize(axis);
+        localAxis = def.localAxisA;
         if (desc.enableLimit != 0)
         {
             def.enableLimit = true;
@@ -806,6 +829,13 @@ AuraResultCode Box2DWorld::CreateJoint(const AuraJointDesc& desc, uint64_t* outJ
     slot.joint = joint;
     slot.bodyA = desc.bodyA;
     slot.bodyB = desc.bodyB;
+    slot.type = static_cast<AuraJointType>(desc.type);
+    slot.localAxisA = localAxis;
+    slot.breakForce = 0.0f;
+    slot.breakTorque = 0.0f;
+    slot.broken = false;
+    slot.lastForce = 0.0f;
+    slot.lastTorque = 0.0f;
     *outJoint = Impl::MakeJointHandle(slot, index);
     return AURA_SUCCESS;
 }
@@ -827,7 +857,8 @@ AuraResultCode Box2DWorld::DestroyJoint(uint64_t joint)
 
 bool Box2DWorld::HasJoint(uint64_t joint) const
 {
-    return impl_->FindJoint(joint) != nullptr;
+    const Impl::JointSlot* slot = impl_->FindJoint(joint);
+    return slot != nullptr && !slot->broken;
 }
 
 AuraResultCode Box2DWorld::CreateCharacter(const AuraCharacterDesc& desc, uint64_t* outCharacter)
@@ -890,6 +921,450 @@ AuraResultCode Box2DWorld::DestroySoftBody(AuraSoftBodyHandle)
 AuraResultCode Box2DWorld::GetSoftBodyState(AuraSoftBodyHandle, float*, uint32_t, AuraSoftBodyState*) const
 {
     return AURA_UNSUPPORTED_SHAPE;
+}
+
+} // namespace aura
+
+namespace aura
+{
+namespace
+{
+constexpr float kPi = 3.14159265358979323846f;
+
+bool IsFinite(float value) { return std::isfinite(value); }
+bool IsFinite(const AuraVec3& v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
+float Length(b2Vec2 v) { return std::sqrt(v.x * v.x + v.y * v.y); }
+} // namespace
+
+/* ---- v10 body control. 2D ignores z of linear vectors and x/y of angular vectors. ---- */
+
+namespace
+{
+enum : uint32_t
+{
+    kNeedEnabled = 1u,
+    kNeedMovable = 2u,
+    kNeedDynamic = 4u
+};
+} // namespace
+
+namespace
+{
+/* Resting bodies sleep through property changes, so wake them (not static bodies, not disabled ones). */
+void Wake(b2BodyId body)
+{
+    if (b2Body_IsEnabled(body) && b2Body_GetType(body) != b2_staticBody)
+        b2Body_SetAwake(body, true);
+}
+} // namespace
+
+#define AURA_B2_RESOLVE(handle, requirements)                                                           \
+    Impl::Slot* slot = impl_->Find(handle);                                                             \
+    if (slot == nullptr)                                                                                \
+        return AURA_INVALID_HANDLE;                                                                     \
+    if (((requirements) & kNeedEnabled) != 0u && !b2Body_IsEnabled(slot->body))                         \
+        return AURA_BODY_DISABLED;                                                                      \
+    if (((requirements) & (kNeedMovable | kNeedDynamic)) != 0u)                                         \
+    {                                                                                                   \
+        const b2BodyType motion = b2Body_GetType(slot->body);                                           \
+        if (motion == b2_staticBody || (((requirements) & kNeedDynamic) != 0u && motion != b2_dynamicBody)) \
+            return AURA_INVALID_DEFINITION;                                                             \
+    }
+
+AuraResultCode Box2DWorld::SetLinearVelocity(AuraBodyHandle body, const AuraVec3& velocity)
+{
+    AURA_B2_RESOLVE(body, kNeedEnabled | kNeedMovable)
+    if (!IsFinite(velocity))
+        return AURA_INVALID_DEFINITION;
+    b2Body_SetLinearVelocity(slot->body, ToVec2(velocity));
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetAngularVelocity(AuraBodyHandle body, const AuraVec3& velocity)
+{
+    AURA_B2_RESOLVE(body, kNeedEnabled | kNeedMovable)
+    if (!IsFinite(velocity))
+        return AURA_INVALID_DEFINITION;
+    b2Body_SetAngularVelocity(slot->body, velocity.z);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::AddForce(AuraBodyHandle body, const AuraVec3& force)
+{
+    AURA_B2_RESOLVE(body, kNeedEnabled | kNeedDynamic)
+    if (!IsFinite(force))
+        return AURA_INVALID_DEFINITION;
+    b2Body_ApplyForceToCenter(slot->body, ToVec2(force), true);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::AddImpulse(AuraBodyHandle body, const AuraVec3& impulse)
+{
+    AURA_B2_RESOLVE(body, kNeedEnabled | kNeedDynamic)
+    if (!IsFinite(impulse))
+        return AURA_INVALID_DEFINITION;
+    b2Body_ApplyLinearImpulseToCenter(slot->body, ToVec2(impulse), true);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::AddTorque(AuraBodyHandle body, const AuraVec3& torque)
+{
+    AURA_B2_RESOLVE(body, kNeedEnabled | kNeedDynamic)
+    if (!IsFinite(torque))
+        return AURA_INVALID_DEFINITION;
+    b2Body_ApplyTorque(slot->body, torque.z, true);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::AddAngularImpulse(AuraBodyHandle body, const AuraVec3& impulse)
+{
+    AURA_B2_RESOLVE(body, kNeedEnabled | kNeedDynamic)
+    if (!IsFinite(impulse))
+        return AURA_INVALID_DEFINITION;
+    b2Body_ApplyAngularImpulse(slot->body, impulse.z, true);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetBodyPose(AuraBodyHandle body, const AuraPose& pose, bool zeroVelocity)
+{
+    AURA_B2_RESOLVE(body, 0u)
+    const float lengthSq = pose.rotation.z * pose.rotation.z + pose.rotation.w * pose.rotation.w;
+    if (!IsFinite(pose.position) || !IsFinite(pose.rotation.x) || !IsFinite(pose.rotation.y)
+        || !IsFinite(pose.rotation.z) || !IsFinite(pose.rotation.w) || lengthSq < 1.0e-12f)
+        return AURA_INVALID_DEFINITION;
+
+    b2Body_SetTransform(slot->body, ToVec2(pose.position), b2MakeRot(AngleFromQuat(pose.rotation)));
+    if (zeroVelocity && b2Body_GetType(slot->body) != b2_staticBody)
+    {
+        b2Body_SetLinearVelocity(slot->body, b2Vec2{ 0.0f, 0.0f });
+        b2Body_SetAngularVelocity(slot->body, 0.0f);
+    }
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetGravityScale(AuraBodyHandle body, float gravityScale)
+{
+    AURA_B2_RESOLVE(body, 0u)
+    if (!IsFinite(gravityScale))
+        return AURA_INVALID_DEFINITION;
+    b2Body_SetGravityScale(slot->body, gravityScale);
+    Wake(slot->body);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetFriction(AuraBodyHandle body, float friction)
+{
+    AURA_B2_RESOLVE(body, 0u)
+    if (!IsFinite(friction) || friction < 0.0f)
+        return AURA_INVALID_DEFINITION;
+    std::vector<b2ShapeId> shapes(static_cast<size_t>(std::max(0, b2Body_GetShapeCount(slot->body))));
+    const int count = b2Body_GetShapes(slot->body, shapes.data(), static_cast<int>(shapes.size()));
+    for (int i = 0; i < count; ++i)
+        b2Shape_SetFriction(shapes[i], friction);
+    Wake(slot->body);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetRestitution(AuraBodyHandle body, float restitution)
+{
+    AURA_B2_RESOLVE(body, 0u)
+    if (!IsFinite(restitution) || restitution < 0.0f)
+        return AURA_INVALID_DEFINITION;
+    std::vector<b2ShapeId> shapes(static_cast<size_t>(std::max(0, b2Body_GetShapeCount(slot->body))));
+    const int count = b2Body_GetShapes(slot->body, shapes.data(), static_cast<int>(shapes.size()));
+    for (int i = 0; i < count; ++i)
+        b2Shape_SetRestitution(shapes[i], restitution);
+    Wake(slot->body);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetMotionType(AuraBodyHandle body, AuraBodyType type)
+{
+    AURA_B2_RESOLVE(body, 0u)
+    if (type != AURA_BODY_STATIC && type != AURA_BODY_DYNAMIC && type != AURA_BODY_KINEMATIC)
+        return AURA_INVALID_DEFINITION;
+    b2Body_SetType(slot->body, type == AURA_BODY_STATIC ? b2_staticBody
+        : (type == AURA_BODY_KINEMATIC ? b2_kinematicBody : b2_dynamicBody));
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetBodyLayer(AuraBodyHandle body, AuraLayer layer, uint64_t collisionMask)
+{
+    AURA_B2_RESOLVE(body, 0u)
+    if (layer >= kMaxLayers)
+        return AURA_INVALID_DEFINITION;
+    std::vector<b2ShapeId> shapes(static_cast<size_t>(std::max(0, b2Body_GetShapeCount(slot->body))));
+    const int count = b2Body_GetShapes(slot->body, shapes.data(), static_cast<int>(shapes.size()));
+    for (int i = 0; i < count; ++i)
+    {
+        b2Filter filter = b2Shape_GetFilter(shapes[i]);
+        filter.categoryBits = 1ull << layer;
+        filter.maskBits = collisionMask & impl_->matrix[layer];
+        b2Shape_SetFilter(shapes[i], filter);
+    }
+    Wake(slot->body);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetBodyEnabled(AuraBodyHandle body, bool enabled)
+{
+    AURA_B2_RESOLVE(body, 0u)
+    if (enabled && !b2Body_IsEnabled(slot->body))
+        b2Body_Enable(slot->body);
+    else if (!enabled && b2Body_IsEnabled(slot->body))
+        b2Body_Disable(slot->body);
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::IsBodyEnabled(AuraBodyHandle body, bool* outEnabled) const
+{
+    const Impl::Slot* slot = impl_->Find(body);
+    if (slot == nullptr || outEnabled == nullptr)
+        return AURA_INVALID_HANDLE;
+    *outEnabled = b2Body_IsEnabled(slot->body);
+    return AURA_SUCCESS;
+}
+
+#undef AURA_B2_RESOLVE
+
+/* ---- v10 joint control. Box2D has no position motor: AURA_JOINT_MOTOR_POSITION is unsupported. ---- */
+
+bool Box2DWorld::Impl::JointLoads(const JointSlot& joint, float& force, float& torque, float& motorLoad) const
+{
+    force = 0.0f;
+    torque = 0.0f;
+    motorLoad = 0.0f;
+    if (joint.broken || !b2Joint_IsValid(joint.joint))
+        return false;
+
+    /* Sleeping joints keep the impulses of the step they fell asleep in, which is the load they still carry. */
+    const Slot* a = Find(joint.bodyA);
+    const Slot* b = Find(joint.bodyB);
+    if (a == nullptr || b == nullptr)
+        return false;
+
+    const b2Vec2 constraintForce = b2Joint_GetConstraintForce(joint.joint);
+    const float constraintTorque = b2Joint_GetConstraintTorque(joint.joint);
+    switch (joint.type)
+    {
+    case AURA_JOINT_FIXED:
+        force = Length(constraintForce);
+        torque = std::abs(constraintTorque);
+        return true;
+    case AURA_JOINT_DISTANCE:
+    case AURA_JOINT_SPRING:
+        force = Length(constraintForce);
+        return true;
+    case AURA_JOINT_POINT:
+        force = Length(constraintForce);
+        return true;
+    case AURA_JOINT_HINGE:
+    {
+        const float motor = b2RevoluteJoint_GetMotorTorque(joint.joint);
+        force = Length(constraintForce);
+        torque = std::abs(constraintTorque - motor);
+        motorLoad = std::abs(motor);
+        return true;
+    }
+    case AURA_JOINT_SLIDER:
+    {
+        const float motor = b2PrismaticJoint_GetMotorForce(joint.joint);
+        const b2Vec2 axis = b2RotateVector(b2Body_GetRotation(a->body), joint.localAxisA);
+        force = Length(b2Vec2{ constraintForce.x - axis.x * motor, constraintForce.y - axis.y * motor });
+        torque = std::abs(constraintTorque);
+        motorLoad = std::abs(motor);
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
+void Box2DWorld::Impl::ProcessJointBreaks()
+{
+    for (JointSlot& joint : jointSlots)
+    {
+        if (!joint.occupied || joint.broken)
+            continue;
+        if (joint.breakForce <= 0.0f && joint.breakTorque <= 0.0f)
+            continue;
+
+        float force, torque, motor;
+        JointLoads(joint, force, torque, motor);
+        const bool overForce = joint.breakForce > 0.0f && force > joint.breakForce;
+        const bool overTorque = joint.breakTorque > 0.0f && torque > joint.breakTorque;
+        if (!overForce && !overTorque)
+            continue;
+
+        joint.lastForce = force;
+        joint.lastTorque = torque;
+        joint.broken = true;
+        if (b2Joint_IsValid(joint.joint))
+            b2DestroyJoint(joint.joint);
+        joint.joint = b2_nullJointId;
+
+        for (const AuraBodyHandle handle : { joint.bodyA, joint.bodyB })
+        {
+            const Slot* body = Find(handle);
+            if (body != nullptr && b2Body_IsEnabled(body->body))
+                b2Body_SetAwake(body->body, true);
+        }
+    }
+}
+
+AuraResultCode Box2DWorld::SetJointMotor(uint64_t joint, const AuraJointMotorDesc& motor)
+{
+    Impl::JointSlot* slot = impl_->FindJoint(joint);
+    if (slot == nullptr || slot->broken)
+        return AURA_INVALID_HANDLE;
+    if (slot->type != AURA_JOINT_HINGE && slot->type != AURA_JOINT_SLIDER)
+        return AURA_UNSUPPORTED_OPERATION;
+    if (motor.mode < AURA_JOINT_MOTOR_OFF || motor.mode > AURA_JOINT_MOTOR_POSITION
+        || !IsFinite(motor.target) || !IsFinite(motor.maxForce) || !IsFinite(motor.springFrequency)
+        || !IsFinite(motor.springDamping) || motor.springFrequency < 0.0f || motor.springDamping < 0.0f)
+        return AURA_INVALID_DEFINITION;
+    if (motor.mode == AURA_JOINT_MOTOR_POSITION)
+        return AURA_UNSUPPORTED_OPERATION;
+    if (motor.mode != AURA_JOINT_MOTOR_OFF && motor.maxForce <= 0.0f)
+        return AURA_INVALID_DEFINITION;
+
+    const bool on = motor.mode == AURA_JOINT_MOTOR_VELOCITY;
+    if (slot->type == AURA_JOINT_HINGE)
+    {
+        if (on)
+        {
+            b2RevoluteJoint_SetMotorSpeed(slot->joint, motor.target);
+            b2RevoluteJoint_SetMaxMotorTorque(slot->joint, motor.maxForce);
+        }
+        b2RevoluteJoint_EnableMotor(slot->joint, on);
+    }
+    else
+    {
+        if (on)
+        {
+            b2PrismaticJoint_SetMotorSpeed(slot->joint, motor.target);
+            b2PrismaticJoint_SetMaxMotorForce(slot->joint, motor.maxForce);
+        }
+        b2PrismaticJoint_EnableMotor(slot->joint, on);
+    }
+
+    for (const AuraBodyHandle handle : { slot->bodyA, slot->bodyB })
+    {
+        const Impl::Slot* body = impl_->Find(handle);
+        if (body != nullptr && b2Body_IsEnabled(body->body))
+            b2Body_SetAwake(body->body, true);
+    }
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetJointLimits(uint64_t joint, bool enabled, float minLimit, float maxLimit)
+{
+    Impl::JointSlot* slot = impl_->FindJoint(joint);
+    if (slot == nullptr || slot->broken)
+        return AURA_INVALID_HANDLE;
+    if (slot->type != AURA_JOINT_HINGE && slot->type != AURA_JOINT_SLIDER)
+        return AURA_UNSUPPORTED_OPERATION;
+
+    const bool hinge = slot->type == AURA_JOINT_HINGE;
+    if (enabled)
+    {
+        if (!IsFinite(minLimit) || !IsFinite(maxLimit) || minLimit > 0.0f || maxLimit < 0.0f)
+            return AURA_INVALID_DEFINITION;
+        if (hinge && (minLimit < -kPi || maxLimit > kPi))
+            return AURA_INVALID_DEFINITION;
+    }
+
+    if (hinge)
+    {
+        if (enabled)
+            b2RevoluteJoint_SetLimits(slot->joint, minLimit, maxLimit);
+        b2RevoluteJoint_EnableLimit(slot->joint, enabled);
+    }
+    else
+    {
+        if (enabled)
+            b2PrismaticJoint_SetLimits(slot->joint, minLimit, maxLimit);
+        b2PrismaticJoint_EnableLimit(slot->joint, enabled);
+    }
+
+    /* A resting body would otherwise sleep through the changed limits. */
+    for (const AuraBodyHandle handle : { slot->bodyA, slot->bodyB })
+    {
+        const Impl::Slot* body = impl_->Find(handle);
+        if (body != nullptr)
+            Wake(body->body);
+    }
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::SetJointBreakThreshold(uint64_t joint, float maxForce, float maxTorque)
+{
+    Impl::JointSlot* slot = impl_->FindJoint(joint);
+    if (slot == nullptr || slot->broken)
+        return AURA_INVALID_HANDLE;
+
+    bool hasTorque = false;
+    switch (slot->type)
+    {
+    case AURA_JOINT_FIXED:
+    case AURA_JOINT_HINGE:
+    case AURA_JOINT_SLIDER:
+        hasTorque = true;
+        break;
+    case AURA_JOINT_POINT:
+    case AURA_JOINT_DISTANCE:
+    case AURA_JOINT_SPRING:
+        break;
+    default:
+        return AURA_UNSUPPORTED_OPERATION;
+    }
+
+    if (!IsFinite(maxForce) || !IsFinite(maxTorque) || maxForce < 0.0f || maxTorque < 0.0f)
+        return AURA_INVALID_DEFINITION;
+    if (!hasTorque && maxTorque > 0.0f)
+        return AURA_INVALID_DEFINITION;
+
+    slot->breakForce = maxForce;
+    slot->breakTorque = maxTorque;
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::IsJointBroken(uint64_t joint, bool* outBroken) const
+{
+    const Impl::JointSlot* slot = impl_->FindJoint(joint);
+    if (slot == nullptr || outBroken == nullptr)
+        return AURA_INVALID_HANDLE;
+    *outBroken = slot->broken;
+    return AURA_SUCCESS;
+}
+
+AuraResultCode Box2DWorld::GetJointFeedback(uint64_t joint, AuraJointFeedback* outFeedback) const
+{
+    const Impl::JointSlot* slot = impl_->FindJoint(joint);
+    if (slot == nullptr || outFeedback == nullptr)
+        return AURA_INVALID_HANDLE;
+
+    *outFeedback = AuraJointFeedback{};
+    outFeedback->isBroken = slot->broken ? 1 : 0;
+    if (slot->broken)
+    {
+        outFeedback->force = slot->lastForce;
+        outFeedback->torque = slot->lastTorque;
+        return AURA_SUCCESS;
+    }
+
+    impl_->JointLoads(*slot, outFeedback->force, outFeedback->torque, outFeedback->motorLoad);
+    if (slot->type == AURA_JOINT_HINGE)
+    {
+        outFeedback->position = b2RevoluteJoint_GetAngle(slot->joint);
+        outFeedback->motorMode = b2RevoluteJoint_IsMotorEnabled(slot->joint) ? AURA_JOINT_MOTOR_VELOCITY : AURA_JOINT_MOTOR_OFF;
+    }
+    else if (slot->type == AURA_JOINT_SLIDER)
+    {
+        outFeedback->position = b2PrismaticJoint_GetTranslation(slot->joint);
+        outFeedback->motorMode = b2PrismaticJoint_IsMotorEnabled(slot->joint) ? AURA_JOINT_MOTOR_VELOCITY : AURA_JOINT_MOTOR_OFF;
+    }
+    return AURA_SUCCESS;
 }
 
 } // namespace aura

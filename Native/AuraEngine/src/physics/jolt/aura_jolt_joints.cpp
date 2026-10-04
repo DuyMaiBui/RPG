@@ -198,6 +198,12 @@ AuraResultCode JoltWorld::CreateJoint(const AuraJointDesc& desc, uint64_t* outJo
     slot.constraint = constraint;
     slot.bodyA = desc.bodyA;
     slot.bodyB = desc.bodyB;
+    slot.type = static_cast<AuraJointType>(desc.type);
+    slot.breakForce = 0.0f;
+    slot.breakTorque = 0.0f;
+    slot.broken = false;
+    slot.lastForce = 0.0f;
+    slot.lastTorque = 0.0f;
     *outJoint = Impl::MakeJointHandle(slot, index);
     return AURA_SUCCESS;
 }
@@ -223,7 +229,8 @@ AuraResultCode JoltWorld::DestroyJoint(uint64_t joint)
 
 bool JoltWorld::HasJoint(uint64_t joint) const
 {
-    return impl_->FindJoint(joint) != nullptr;
+    const Impl::JointSlot* slot = impl_->FindJoint(joint);
+    return slot != nullptr && !slot->broken;
 }
 
 } // namespace aura

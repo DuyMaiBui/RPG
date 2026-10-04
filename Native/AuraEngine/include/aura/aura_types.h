@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 #ifndef AURA_ENGINE_ABI_VERSION
-#define AURA_ENGINE_ABI_VERSION 9u
+#define AURA_ENGINE_ABI_VERSION 10u
 #endif
 
 typedef uint32_t AuraEntityIndex;
@@ -30,7 +30,11 @@ typedef enum AuraResultCode
     AURA_INVALID_WORLD = 6,
     AURA_ABI_MISMATCH = 7,
     AURA_CAPACITY_EXCEEDED = 8,
-    AURA_BACKEND_FAILURE = 9
+    AURA_BACKEND_FAILURE = 9,
+    /* v10: the body is removed from the simulation (Aura_SetBodyEnabled). */
+    AURA_BODY_DISABLED = 10,
+    /* v10: the operation is valid but not available for this body/joint type or backend. */
+    AURA_UNSUPPORTED_OPERATION = 11
 } AuraResultCode;
 
 typedef enum AuraBodyType
@@ -205,6 +209,43 @@ typedef struct AuraJointDesc
     uint8_t _pad0[2];
 } AuraJointDesc;
 
+/* v10 runtime joint control. Motor modes: OFF, drive to a target relative
+   velocity (rad/s for hinge/revolute, m/s for slider/prismatic) or, on Jolt
+   only, drive to a target position (rad or m, relative to the creation pose). */
+typedef enum AuraJointMotorMode
+{
+    AURA_JOINT_MOTOR_OFF = 0,
+    AURA_JOINT_MOTOR_VELOCITY = 1,
+    AURA_JOINT_MOTOR_POSITION = 2
+} AuraJointMotorMode;
+
+typedef struct AuraJointMotorDesc
+{
+    int32_t mode;
+    float target;
+    /* Maximum motor force (slider/prismatic, N) or torque (hinge/revolute, N*m). Must be > 0 when mode != OFF. */
+    float maxForce;
+    /* Position mode spring tuning; 0 keeps the backend default. */
+    float springFrequency;
+    float springDamping;
+    uint32_t _pad0;
+} AuraJointMotorDesc;
+
+typedef struct AuraJointFeedback
+{
+    /* Reaction force magnitude (N) the joint applied during the last step, excluding motor drive and limit-axis load. */
+    float force;
+    /* Reaction torque magnitude (N*m) outside the joint's free axis, including limit torque, excluding motor drive. */
+    float torque;
+    /* Force (slider/prismatic) or torque (hinge/revolute) currently spent by the motor. */
+    float motorLoad;
+    /* Current hinge angle (rad) or slider translation (m) relative to the creation pose. */
+    float position;
+    int32_t motorMode;
+    uint8_t isBroken;
+    uint8_t _pad0[3];
+} AuraJointFeedback;
+
 typedef struct AuraContact
 {
     AuraBodyHandle bodyA;
@@ -244,6 +285,9 @@ typedef struct AuraWorldDesc
     const uint64_t* collisionMasks;
     uint32_t collisionMaskCount;
 } AuraWorldDesc;
+
+/* AuraBodyState::flags bits (v10). */
+#define AURA_BODY_FLAG_DISABLED 1u
 
 typedef struct AuraBodyState
 {

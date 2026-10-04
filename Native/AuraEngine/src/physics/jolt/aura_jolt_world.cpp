@@ -136,6 +136,24 @@ AuraResultCode JoltWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* o
     const uint32_t allowed = 0x3Fu & ~desc.freezeFlags;
     settings.mAllowedDOFs = static_cast<JPH::EAllowedDOFs>(allowed == 0 ? 0x3Fu : allowed);
 
+    /* Bodies made only of shapes that can be simulated dynamically keep Jolt
+       motion properties for every motion type so Aura_SetMotionType can promote
+       or demote them at runtime. Mesh, height field and plane shapes are static-only. */
+    bool canChangeMotion = true;
+    for (uint32_t i = 0; i < desc.shapeCount; ++i)
+    {
+        const AuraShapeType type = desc.shapes[i].type;
+        if (type == AURA_SHAPE_TRIANGLE_MESH || type == AURA_SHAPE_HEIGHT_FIELD || type == AURA_SHAPE_PLANE)
+            canChangeMotion = false;
+    }
+    if (canChangeMotion)
+    {
+        settings.mAllowDynamicOrKinematic = true;
+        settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
+        settings.mMassPropertiesOverride.mMass = desc.mass > 0.0f ? desc.mass : 1.0f;
+        settings.mInertiaMultiplier = desc.inertiaMultiplier > 0.0f ? desc.inertiaMultiplier : 1.0f;
+    }
+
     if (motion == JPH::EMotionType::Dynamic)
     {
         settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
@@ -166,6 +184,8 @@ AuraResultCode JoltWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* o
     slot.id = id;
     slot.body = body;
     slot.sensor = sensor;
+    slot.enabled = true;
+    slot.canChangeMotion = canChangeMotion;
     slot.shapeFilterGroup = desc.shapeCount > 0 && desc.shapes[0].shapeFilterGroup != 0u ? desc.shapes[0].shapeFilterGroup : 1u;
     slot.shapeFilterMask = desc.shapeCount > 0 && desc.shapes[0].shapeFilterMask != 0u ? desc.shapes[0].shapeFilterMask : ~0u;
     impl_->idToSlot[id.GetIndex()] = static_cast<uint32_t>(index);
@@ -176,6 +196,9 @@ AuraResultCode JoltWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* o
         impl_->simShapeFilterGroups.resize(id.GetIndex() + 1, 1u);
         impl_->simShapeFilterMasks.resize(id.GetIndex() + 1, ~0u);
     }
+    if (impl_->simBodyCollisionMasks.size() <= id.GetIndex())
+        impl_->simBodyCollisionMasks.resize(id.GetIndex() + 1, ~0ull);
+    impl_->simBodyCollisionMasks[id.GetIndex()] = ~0ull;
     impl_->simShapeFilterGroups[id.GetIndex()] = slot.shapeFilterGroup;
     impl_->simShapeFilterMasks[id.GetIndex()] = slot.shapeFilterMask;
 
@@ -231,7 +254,8 @@ AuraResultCode JoltWorld::DestroyBody(AuraBodyHandle body)
         }
     }
 
-    bi.RemoveBody(slot->id);
+    if (slot->enabled)
+        bi.RemoveBody(slot->id);
     bi.DestroyBody(slot->id);
     slot->occupied = false;
     slot->body = nullptr;
@@ -245,6 +269,9 @@ AuraResultCode JoltWorld::SetKinematicTarget(AuraBodyHandle body, const AuraPose
     Impl::Slot* slot = impl_->Find(body);
     if (slot == nullptr)
         return AURA_INVALID_HANDLE;
+
+    if (!slot->enabled)
+        return AURA_BODY_DISABLED;
 
     const JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
     const_cast<JPH::BodyInterface&>(bi).MoveKinematic(slot->id, ToRVec3(pose.position), ToQuat(pose.rotation), impl_->lastDelta);
@@ -299,12 +326,13 @@ void JoltWorld::Step(float deltaTime)
         JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
         for (uint32_t index : wake)
         {
-            if (index < impl_->slots.size() && impl_->slots[index].occupied)
+            if (index < impl_->slots.size() && impl_->slots[index].occupied && impl_->slots[index].enabled)
                 bi.ActivateBody(impl_->slots[index].id);
         }
     }
 
     impl_->physics.Update(deltaTime, 1, &impl_->tempAllocator, &impl_->jobSystem);
+    impl_->ProcessJointBreaks();
 }
 
 AuraResultCode JoltWorld::CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater)
@@ -341,7 +369,7 @@ AuraResultCode JoltWorld::ApplyWaterStep(AuraWaterHandle water, float deltaTime)
     const JPH::Vec3 gravity = ToVec3(impl_->gravity);
     for (const Impl::Slot& slot : impl_->slots)
     {
-        if (!slot.occupied || slot.body == nullptr || slot.body->GetMotionType() != JPH::EMotionType::Dynamic)
+        if (!slot.occupied || !slot.enabled || slot.body == nullptr || slot.body->GetMotionType() != JPH::EMotionType::Dynamic)
             continue;
         const JPH::AABox bounds = slot.body->GetWorldSpaceBounds();
         const float height = bounds.mMax.GetY() - bounds.mMin.GetY();
@@ -402,10 +430,17 @@ AuraResultCode JoltWorld::ApplyStates(const AuraBodyState* states, uint32_t coun
         if (slot == nullptr)
             return AURA_INVALID_HANDLE;
 
+        /* Snapshots carry the enabled flag: restore the pose with the body in the
+           simulation, then remove it again when it was disabled when captured. */
+        const bool wantEnabled = (state.flags & AURA_BODY_FLAG_DISABLED) == 0u;
+        if (!slot->enabled)
+            impl_->SetEnabledInternal(*slot, state.body, true);
         bi.SetPosition(slot->id, ToRVec3(state.pose.position), JPH::EActivation::Activate);
         bi.SetRotation(slot->id, ToQuat(state.pose.rotation), JPH::EActivation::Activate);
         bi.SetLinearVelocity(slot->id, ToVec3(state.linearVelocity));
         bi.SetAngularVelocity(slot->id, ToVec3(state.angularVelocity));
+        if (!wantEnabled)
+            impl_->SetEnabledInternal(*slot, state.body, false);
     }
     return AURA_SUCCESS;
 }

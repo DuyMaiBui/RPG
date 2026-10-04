@@ -51,6 +51,26 @@ public:
     AuraResultCode DestroyJoint(uint64_t joint) override;
     bool HasJoint(uint64_t joint) const override;
 
+    AuraResultCode SetLinearVelocity(AuraBodyHandle body, const AuraVec3& velocity) override;
+    AuraResultCode SetAngularVelocity(AuraBodyHandle body, const AuraVec3& velocity) override;
+    AuraResultCode AddForce(AuraBodyHandle body, const AuraVec3& force) override;
+    AuraResultCode AddImpulse(AuraBodyHandle body, const AuraVec3& impulse) override;
+    AuraResultCode AddTorque(AuraBodyHandle body, const AuraVec3& torque) override;
+    AuraResultCode AddAngularImpulse(AuraBodyHandle body, const AuraVec3& impulse) override;
+    AuraResultCode SetBodyPose(AuraBodyHandle body, const AuraPose& pose, bool zeroVelocity) override;
+    AuraResultCode SetGravityScale(AuraBodyHandle body, float gravityScale) override;
+    AuraResultCode SetFriction(AuraBodyHandle body, float friction) override;
+    AuraResultCode SetRestitution(AuraBodyHandle body, float restitution) override;
+    AuraResultCode SetMotionType(AuraBodyHandle body, AuraBodyType type) override;
+    AuraResultCode SetBodyLayer(AuraBodyHandle body, AuraLayer layer, uint64_t collisionMask) override;
+    AuraResultCode SetBodyEnabled(AuraBodyHandle body, bool enabled) override;
+    AuraResultCode IsBodyEnabled(AuraBodyHandle body, bool* outEnabled) const override;
+    AuraResultCode SetJointMotor(uint64_t joint, const AuraJointMotorDesc& motor) override;
+    AuraResultCode SetJointLimits(uint64_t joint, bool enabled, float minLimit, float maxLimit) override;
+    AuraResultCode SetJointBreakThreshold(uint64_t joint, float maxForce, float maxTorque) override;
+    AuraResultCode IsJointBroken(uint64_t joint, bool* outBroken) const override;
+    AuraResultCode GetJointFeedback(uint64_t joint, AuraJointFeedback* outFeedback) const override;
+
     AuraResultCode CreateCharacter(const AuraCharacterDesc& desc, uint64_t* outCharacter) override;
     AuraResultCode DestroyCharacter(uint64_t character) override;
     AuraResultCode GetCharacterState(uint64_t character, AuraCharacterState* outState) const override;

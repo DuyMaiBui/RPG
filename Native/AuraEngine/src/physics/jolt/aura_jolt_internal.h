@@ -150,10 +150,27 @@ class AuraSimShapeFilter final : public JPH::SimShapeFilter
 public:
     const std::vector<uint32_t>* groups = nullptr;
     const std::vector<uint32_t>* masks = nullptr;
+    /* Per-body layer collision masks set through Aura_SetBodyLayer (bit i = may collide with layer i). */
+    const std::vector<uint64_t>* bodyMasks = nullptr;
 
     bool ShouldCollide(const JPH::Body& body1, const JPH::Shape*, const JPH::SubShapeID&,
                        const JPH::Body& body2, const JPH::Shape*, const JPH::SubShapeID&) const override
     {
+        if (bodyMasks != nullptr)
+        {
+            const auto maskOf = [this](const JPH::Body& body)
+            {
+                const uint32_t index = static_cast<uint32_t>(body.GetUserData() >> 32);
+                return index < bodyMasks->size() ? (*bodyMasks)[index] : ~0ull;
+            };
+            const uint32_t layer1 = body1.GetObjectLayer();
+            const uint32_t layer2 = body2.GetObjectLayer();
+            if (layer2 < 64u && ((maskOf(body1) >> layer2) & 1ull) == 0ull)
+                return false;
+            if (layer1 < 64u && ((maskOf(body2) >> layer1) & 1ull) == 0ull)
+                return false;
+        }
+
         const auto get = [this](const JPH::Body& body, uint32_t& group, uint32_t& mask)
         {
             const uint32_t index = static_cast<uint32_t>(body.GetUserData() >> 32);
@@ -202,6 +219,10 @@ struct JoltWorld::Impl
         JPH::BodyID id;
         JPH::Body* body = nullptr;
         bool sensor = false;
+        /* False while the body is removed from the simulation (Aura_SetBodyEnabled). */
+        bool enabled = true;
+        /* True when the body was created with Jolt motion properties so Aura_SetMotionType can promote it. */
+        bool canChangeMotion = false;
         uint32_t shapeFilterGroup = 1u;
         uint32_t shapeFilterMask = ~0u;
     };
@@ -213,6 +234,13 @@ struct JoltWorld::Impl
         JPH::TwoBodyConstraint* constraint = nullptr;
         AuraBodyHandle bodyA{};
         AuraBodyHandle bodyB{};
+        AuraJointType type = AURA_JOINT_FIXED;
+        float breakForce = 0.0f;
+        float breakTorque = 0.0f;
+        bool broken = false;
+        /* Loads sampled the step the joint broke, reported by feedback afterwards. */
+        float lastForce = 0.0f;
+        float lastTorque = 0.0f;
     };
 
     struct CharacterSlot
@@ -261,6 +289,7 @@ struct JoltWorld::Impl
     std::unordered_map<uint32_t, uint32_t> shapeFilterMasks;
     std::vector<uint32_t> simShapeFilterGroups;
     std::vector<uint32_t> simShapeFilterMasks;
+    std::vector<uint64_t> simBodyCollisionMasks;
 
     /* Jolt calls contact callbacks from its worker threads, so the event buffer
        and the trigger bookkeeping must be synchronized. */
@@ -333,6 +362,7 @@ struct JoltWorld::Impl
         physics.SetContactListener(&listener);
         simShapeFilter.groups = &simShapeFilterGroups;
         simShapeFilter.masks = &simShapeFilterMasks;
+        simShapeFilter.bodyMasks = &simBodyCollisionMasks;
         physics.SetSimShapeFilter(&simShapeFilter);
 
         /* Smaller penetration slop so resting bodies do not visibly sink into
@@ -547,8 +577,22 @@ struct JoltWorld::Impl
         state.linearVelocity = ToAura(bi.GetLinearVelocity(slot.id));
         state.angularVelocity = ToAura(bi.GetAngularVelocity(slot.id));
         state.isAwake = bi.IsActive(slot.id) ? 1 : 0;
-        state.flags = 0;
+        state.flags = slot.enabled ? 0u : AURA_BODY_FLAG_DISABLED;
     }
+
+    /* Body control helpers (aura_jolt_body_control.cpp / aura_jolt_joint_control.cpp). */
+    enum : uint32_t
+    {
+        kNeedEnabled = 1u,  /* body must be in the simulation */
+        kNeedMovable = 2u,  /* body must be kinematic or dynamic */
+        kNeedDynamic = 4u   /* body must be dynamic */
+    };
+    Slot* Resolve(AuraBodyHandle handle, uint32_t requirements, AuraResultCode& result);
+    bool IsVehicleChassis(AuraBodyHandle handle) const;
+    void SetEnabledInternal(Slot& slot, AuraBodyHandle handle, bool enabled);
+    void RefreshJointsFor(AuraBodyHandle handle);
+    void ProcessJointBreaks();
+    bool JointLoads(const JointSlot& joint, float& force, float& torque, float& motorLoad) const;
 };
 
 } // namespace aura
