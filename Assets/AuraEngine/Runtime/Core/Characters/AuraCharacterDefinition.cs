@@ -9,7 +9,8 @@ namespace AuraEngine.Core
             AuraPhysicsLayer layer = default,
             AuraPhysicsLayerMask collisionMask = default,
             float mass = 0f,
-            float maxSlopeAngle = 0f)
+            float maxSlopeAngle = 0f,
+            float stepHeight = 0f)
         {
             Pose = pose;
             Radius = radius;
@@ -18,6 +19,7 @@ namespace AuraEngine.Core
             CollisionMask = collisionMask;
             Mass = mass;
             MaxSlopeAngle = maxSlopeAngle;
+            StepHeight = stepHeight;
         }
 
         public AuraPose Pose { get; }
@@ -27,5 +29,8 @@ namespace AuraEngine.Core
         public AuraPhysicsLayerMask CollisionMask { get; }
         public float Mass { get; }
         public float MaxSlopeAngle { get; }
+
+        /* Largest ledge the Plane2D mover steps up while walking; 0 disables stepping. The 3D backend ignores it. */
+        public float StepHeight { get; }
     }
 }

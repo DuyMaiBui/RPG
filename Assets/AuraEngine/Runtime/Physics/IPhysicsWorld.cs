@@ -18,6 +18,9 @@ namespace AuraEngine.Physics
 
         IPhysicsJointControl JointControl { get; }
 
+        /* World gravity and force field zones; check AuraPhysicsCapabilities.ForceFields. */
+        IPhysicsForceFields ForceFields { get; }
+
         IPhysicsCharacters Characters { get; }
         IPhysicsVehicles Vehicles { get; }
         IPhysicsSoftBodies SoftBodies { get; }

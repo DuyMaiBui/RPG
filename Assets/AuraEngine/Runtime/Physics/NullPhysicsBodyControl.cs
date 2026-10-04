@@ -26,6 +26,8 @@ namespace AuraEngine.Physics
         AuraResult IPhysicsBodyControl.SetLayer(PhysicsBodyId body, AuraPhysicsLayer layer, AuraPhysicsLayerMask collisionMask) => AuraResult.UnsupportedOperation;
         AuraResult IPhysicsBodyControl.SetEnabled(PhysicsBodyId body, bool enabled) => AuraResult.UnsupportedOperation;
 
+        AuraResult IPhysicsBodyControl.SetCollisionDetection(PhysicsBodyId body, AuraBodyCollisionDetection mode) => AuraResult.UnsupportedOperation;
+
         AuraResult IPhysicsBodyControl.IsEnabled(PhysicsBodyId body, out bool enabled)
         {
             enabled = false;

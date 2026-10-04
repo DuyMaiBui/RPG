@@ -4,7 +4,7 @@ namespace AuraEngine.Physics.Native
 {
     /* IPhysicsJointControl over the v10 C ABI. Owned by NativePhysicsWorld, which
        invalidates it on dispose so a stale control never reaches a freed world. */
-    internal sealed class NativeJointControl : IPhysicsJointControl
+    internal sealed partial class NativeJointControl : IPhysicsJointControl
     {
         private readonly NativeWorldHandle _world;
         private bool _invalid;

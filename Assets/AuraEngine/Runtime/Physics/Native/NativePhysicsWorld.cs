@@ -5,13 +5,14 @@ using AuraEngine.Core;
 
 namespace AuraEngine.Physics.Native
 {
-    public sealed class NativePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsHair, IPhysicsWater, IPhysicsContacts, IPhysicsSerialization
+    public sealed class NativePhysicsWorld : IPhysicsWorld, IPhysicsJoints, IPhysicsCharacters, IPhysicsVehicles, IPhysicsSoftBodies, IPhysicsRagdolls, IPhysicsHair, IPhysicsWater, IPhysicsContacts, IPhysicsSerialization, IPhysicsJointTarget
     {
         private readonly NativeWorldHandle _world;
         private readonly AuraPhysicsMode _mode;
         private readonly HashSet<PhysicsBodyId> _bodies = new HashSet<PhysicsBodyId>();
         private readonly NativeBodyControl _bodyControl;
         private readonly NativeJointControl _jointControl;
+        private readonly NativeForceFields _forceFields;
         private IntPtr _collisionMasks;
         private bool _disposed;
 
@@ -29,6 +30,7 @@ namespace AuraEngine.Physics.Native
             AuraException.ThrowIfFailed((AuraResult)NativeMethods.Aura_CreateWorld(ref desc, out _world), "Failed to create the native physics world.");
             _bodyControl = new NativeBodyControl(_world);
             _jointControl = new NativeJointControl(_world);
+            _forceFields = new NativeForceFields(_world);
         }
 
         AuraPhysicsMode IPhysicsWorld.Mode => _mode;
@@ -48,11 +50,13 @@ namespace AuraEngine.Physics.Native
                            AuraPhysicsCapabilities.SleepWake |
                            AuraPhysicsCapabilities.Joints |
                            AuraPhysicsCapabilities.BodyControl |
-                           AuraPhysicsCapabilities.JointControl;
+                           AuraPhysicsCapabilities.JointControl |
+                           AuraPhysicsCapabilities.ForceFields;
 
                 if (_mode == AuraPhysicsMode.Plane2D)
                     return body | AuraPhysicsCapabilities.ShapeBox | AuraPhysicsCapabilities.ShapeSphere |
-                           AuraPhysicsCapabilities.ShapeCapsule | AuraPhysicsCapabilities.Joints;
+                           AuraPhysicsCapabilities.ShapeCapsule | AuraPhysicsCapabilities.Joints |
+                           AuraPhysicsCapabilities.Characters;
 
                 return body | AuraPhysicsCapabilities.ShapeBox |
                        AuraPhysicsCapabilities.ShapeSphere |
@@ -181,6 +185,8 @@ namespace AuraEngine.Physics.Native
 
         IPhysicsJointControl IPhysicsWorld.JointControl => _jointControl;
 
+        IPhysicsForceFields IPhysicsWorld.ForceFields => _forceFields;
+
         AuraResult IPhysicsWorld.SetSurfaceVelocity(PhysicsBodyId body, AuraVector3 velocity)
         {
             var handle = NativeBodyHandle.From(body);
@@ -215,6 +221,14 @@ namespace AuraEngine.Physics.Native
                 return AuraResult.InvalidHandle;
             var handle = ((ulong)(uint)joint.Generation << 32) | (uint)joint.Index;
             return (AuraResult)NativeMethods.Aura_DestroyJoint(_world, handle);
+        }
+
+        AuraResult IPhysicsJointTarget.SetJointTarget(AuraJointId joint, AuraVector3 target)
+        {
+            if (!joint.IsValid)
+                return AuraResult.InvalidHandle;
+            var handle = ((ulong)(uint)joint.Generation << 32) | (uint)joint.Index;
+            return (AuraResult)NativeMethods.Aura_SetJointTarget(_world, handle, NativeVector3.From(target));
         }
 
         bool IPhysicsJoints.HasJoint(AuraJointId joint)
@@ -841,6 +855,7 @@ namespace AuraEngine.Physics.Native
             _disposed = true;
             _bodyControl.Invalidate();
             _jointControl.Invalidate();
+            _forceFields.Invalidate();
             NativeMethods.Aura_DestroyWorld(_world);
             if (_collisionMasks != IntPtr.Zero)
             {

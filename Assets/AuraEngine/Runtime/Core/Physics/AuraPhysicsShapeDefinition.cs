@@ -10,7 +10,8 @@ namespace AuraEngine.Core
             bool isTrigger,
             AuraPhysicsMaterialDefinition material,
             AuraPhysicsLayer layer,
-            AuraShapeGeometry geometry)
+            AuraShapeGeometry geometry,
+            bool isOneWay = false)
         {
             Type = type;
             LocalPose = localPose;
@@ -18,6 +19,7 @@ namespace AuraEngine.Core
             Material = material;
             Layer = layer;
             Geometry = geometry;
+            IsOneWay = isOneWay;
         }
 
         public AuraShapeType Type { get; }
@@ -26,6 +28,10 @@ namespace AuraEngine.Core
         public AuraPhysicsMaterialDefinition Material { get; }
         public AuraPhysicsLayer Layer { get; }
         public AuraShapeGeometry Geometry { get; }
+
+        /* Plane2D only: the shape is solid just for bodies and characters approaching from its local +Y side
+           (rotated by LocalPose); everything else passes through. The 3D backend ignores it. */
+        public bool IsOneWay { get; }
 
         public static AuraPhysicsShapeDefinition Box(AuraVector3 halfExtents, AuraPhysicsLayer layer = default) =>
             new AuraPhysicsShapeDefinition(
@@ -64,16 +70,19 @@ namespace AuraEngine.Core
                 AuraShapeGeometry.TriangleMesh(vertices, indices, meshAssetId));
 
         public AuraPhysicsShapeDefinition WithLocalPose(AuraPose localPose) =>
-            new AuraPhysicsShapeDefinition(Type, localPose, IsTrigger, Material, Layer, Geometry);
+            new AuraPhysicsShapeDefinition(Type, localPose, IsTrigger, Material, Layer, Geometry, IsOneWay);
 
         public AuraPhysicsShapeDefinition AsTrigger() =>
-            new AuraPhysicsShapeDefinition(Type, LocalPose, true, Material, Layer, Geometry);
+            new AuraPhysicsShapeDefinition(Type, LocalPose, true, Material, Layer, Geometry, IsOneWay);
 
         public AuraPhysicsShapeDefinition WithLayer(AuraPhysicsLayer layer) =>
-            new AuraPhysicsShapeDefinition(Type, LocalPose, IsTrigger, Material, layer, Geometry);
+            new AuraPhysicsShapeDefinition(Type, LocalPose, IsTrigger, Material, layer, Geometry, IsOneWay);
 
         public AuraPhysicsShapeDefinition WithMaterial(AuraPhysicsMaterialDefinition material) =>
-            new AuraPhysicsShapeDefinition(Type, LocalPose, IsTrigger, material, Layer, Geometry);
+            new AuraPhysicsShapeDefinition(Type, LocalPose, IsTrigger, material, Layer, Geometry, IsOneWay);
+
+        public AuraPhysicsShapeDefinition AsOneWay(bool isOneWay = true) =>
+            new AuraPhysicsShapeDefinition(Type, LocalPose, IsTrigger, Material, Layer, Geometry, isOneWay);
 
         public AuraResult Validate()
         {
@@ -89,12 +98,13 @@ namespace AuraEngine.Core
             IsTrigger == other.IsTrigger &&
             Material.Equals(other.Material) &&
             Layer == other.Layer &&
-            Geometry.Equals(other.Geometry);
+            Geometry.Equals(other.Geometry) &&
+            IsOneWay == other.IsOneWay;
 
         public override bool Equals(object obj) => obj is AuraPhysicsShapeDefinition other && ((IEquatable<AuraPhysicsShapeDefinition>)this).Equals(other);
 
         public override int GetHashCode() =>
-            HashCode.Combine((int)Type, LocalPose, IsTrigger, Material, Layer, Geometry);
+            HashCode.Combine((int)Type, LocalPose, IsTrigger, Material, Layer, Geometry, IsOneWay);
 
         public override string ToString() => $"{Type} trigger={IsTrigger} layer={Layer}";
 

@@ -10,7 +10,7 @@ namespace AuraEngine.Physics.Native
         public int Type;
         public NativePose LocalPose;
         public byte IsTrigger;
-        public byte Pad0;
+        public byte IsOneWay;
         public byte Pad1;
         public byte Pad2;
         public float Friction;
@@ -46,6 +46,7 @@ namespace AuraEngine.Physics.Native
                 Type = (int)shape.Type,
                 LocalPose = NativePose.From(shape.LocalPose),
                 IsTrigger = shape.IsTrigger ? (byte)1 : (byte)0,
+                IsOneWay = shape.IsOneWay ? (byte)1 : (byte)0,
                 Friction = shape.Material.Friction,
                 Restitution = shape.Material.Restitution,
                 Density = shape.Material.Density,

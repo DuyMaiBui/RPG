@@ -42,5 +42,9 @@ namespace AuraEngine.Physics
         AuraResult SetEnabled(PhysicsBodyId body, bool enabled);
 
         AuraResult IsEnabled(PhysicsBodyId body, out bool enabled);
+
+        /* Switches continuous collision detection for fast bodies (Jolt linear cast, Box2D bullet).
+           Static bodies are InvalidDefinition. */
+        AuraResult SetCollisionDetection(PhysicsBodyId body, AuraBodyCollisionDetection mode);
     }
 }

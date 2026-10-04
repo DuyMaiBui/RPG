@@ -18,7 +18,10 @@ namespace AuraEngine.Simulation
         private readonly AuraEventBuffer _events = new AuraEventBuffer();
         private AuraBodyState[] _stateScratch;
         private AuraPhysicsEvent[] _eventScratch = new AuraPhysicsEvent[64];
+        private readonly AuraTimeStepper _timeStepper = new AuraTimeStepper();
+        private AuraHitStop _hitStop;
         private SimulationTick _currentTick;
+        private bool _hasStepped;
         private bool _disposed;
 
         public AuraSimulationWorld(IPhysicsBackend backend, in AuraWorldDefinition definition)
@@ -65,6 +68,44 @@ namespace AuraEngine.Simulation
             {
                 ThrowIfDisposed();
                 return _physics.JointControl;
+            }
+        }
+
+        /* Per-axis joint control for SixDof and SwingTwist (Jolt 3D). Null when the backend has none. */
+        public IPhysicsJointAxisControl JointAxisControl
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _physics.JointControl as IPhysicsJointAxisControl;
+            }
+        }
+
+        /* World gravity and force field zones. Check Capabilities for AuraPhysicsCapabilities.ForceFields. */
+        public IPhysicsForceFields ForceFields
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _physics.ForceFields;
+            }
+        }
+
+        /* Time scale applied by Advance (1 = real time, 0 = paused, 0.1 = slow motion). The kernel's fixed step
+           never changes; see AuraTimeStepper for the accumulation rules. Step() itself always runs one step. */
+        public float TimeScale
+        {
+            get => _timeStepper.Scale;
+            set => _timeStepper.Scale = value;
+        }
+
+        /* Per-body freeze helper; ticked automatically before every physics step. */
+        public AuraHitStop HitStop
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _hitStop ?? (_hitStop = new AuraHitStop(_physics));
             }
         }
 
@@ -120,10 +161,33 @@ namespace AuraEngine.Simulation
             ThrowIfDisposed();
             _currentTick = step.Tick;
 
+            _hasStepped = true;
+
             DispatchCommands();
             RunSystems(step);
+            _hitStop?.Tick();
             _physics.Step(step.DeltaTime);
             CaptureEvents();
+        }
+
+        /* Advances by wall-clock time under TimeScale: runs zero or more fixed steps of stepDeltaTime each and
+           returns how many ran. Tick numbers continue from CurrentTick. Pass the fixed step the caller owns
+           (for example Definition.FixedDeltaTime) as stepDeltaTime; it is never rescaled. */
+        /* How many fixed steps of stepDeltaTime the wall time buys under TimeScale (see AuraTimeStepper). Callers
+           that interleave their own per-step work (character moves, water) use this and call Step themselves. */
+        public int PlanSteps(float wallDeltaTime, float stepDeltaTime)
+        {
+            ThrowIfDisposed();
+            return _timeStepper.Advance(wallDeltaTime, stepDeltaTime);
+        }
+
+        public int Advance(float wallDeltaTime, float stepDeltaTime)
+        {
+            var steps = PlanSteps(wallDeltaTime, stepDeltaTime);
+            for (var index = 0; index < steps; index++)
+                Step(new SimulationStep(_hasStepped ? _currentTick.Next() : _currentTick, stepDeltaTime));
+
+            return steps;
         }
 
         public SimulationEntityId CreateEntity()
@@ -168,26 +232,7 @@ namespace AuraEngine.Simulation
             if (!_entities.TryGetBody(entityA, out var bodyA) || !_entities.TryGetBody(entityB, out var bodyB))
                 return AuraJointId.Invalid;
 
-            var resolved = new AuraJointDefinition(
-                definition.Type,
-                bodyA,
-                bodyB,
-                definition.AnchorA,
-                definition.AnchorB,
-                definition.Distance,
-                definition.AxisA,
-                definition.AxisB,
-                definition.EnableLimit,
-                definition.MinLimit,
-                definition.MaxLimit,
-                definition.NormalAxisA,
-                definition.NormalAxisB,
-                definition.SwingLimit,
-                definition.MotorEnabled,
-                definition.MotorTargetVelocity,
-                definition.MaxMotorForce,
-                definition.SpringFrequency,
-                definition.SpringDamping);
+            var resolved = definition.WithBodies(bodyA, bodyB);
 
             return _physics.Joints.CreateJoint(resolved);
         }

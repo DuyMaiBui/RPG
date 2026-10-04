@@ -27,7 +27,8 @@ namespace AuraEngine.Physics.Native
             AuraPhysicsCapabilities.Contacts |
             AuraPhysicsCapabilities.SleepWake |
             AuraPhysicsCapabilities.BodyControl |
-            AuraPhysicsCapabilities.JointControl;
+            AuraPhysicsCapabilities.JointControl |
+            AuraPhysicsCapabilities.ForceFields;
 
         IPhysicsWorld IPhysicsBackend.CreateWorld(in AuraWorldDefinition definition) =>
             new NativePhysicsWorld(definition);

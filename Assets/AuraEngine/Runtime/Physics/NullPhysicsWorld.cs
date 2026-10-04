@@ -106,6 +106,8 @@ namespace AuraEngine.Physics
 
         IPhysicsJointControl IPhysicsWorld.JointControl => NullPhysicsJointControl.Instance;
 
+        IPhysicsForceFields IPhysicsWorld.ForceFields => NullPhysicsForceFields.Instance;
+
         IPhysicsCharacters IPhysicsWorld.Characters => this;
         IPhysicsVehicles IPhysicsWorld.Vehicles => this;
         IPhysicsSoftBodies IPhysicsWorld.SoftBodies => this;

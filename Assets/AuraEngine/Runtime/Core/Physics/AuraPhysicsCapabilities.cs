@@ -46,6 +46,10 @@ namespace AuraEngine.Core
         /* Runtime joint control: IPhysicsWorld.JointControl. */
         JointControl = 1 << 27,
 
+        /* World gravity setter and force field zones: IPhysicsWorld.ForceFields. Bit 30 keeps clear of the
+           bits parallel work packages append after JointControl. */
+        ForceFields = 1 << 30,
+
         All = ~0,
     }
 }

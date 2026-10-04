@@ -15,6 +15,8 @@ namespace AuraEngine.Physics.Native
         public uint Layer;
         public uint Pad0;
         public ulong CollisionMask;
+        public float StepHeight;
+        public uint Pad1;
 
         public static NativeCharacterDesc From(in AuraCharacterDefinition definition) =>
             new NativeCharacterDesc
@@ -26,6 +28,7 @@ namespace AuraEngine.Physics.Native
                 MaxSlopeAngle = definition.MaxSlopeAngle,
                 Layer = (uint)definition.Layer.Value,
                 CollisionMask = definition.CollisionMask.Bits,
+                StepHeight = definition.StepHeight,
             };
     }
 }

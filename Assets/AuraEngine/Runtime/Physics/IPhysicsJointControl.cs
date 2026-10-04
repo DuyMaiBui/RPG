@@ -3,8 +3,8 @@ using AuraEngine.Core;
 namespace AuraEngine.Physics
 {
     /* Runtime joint mutation. Support by joint type (other types return UnsupportedOperation):
-         SetMotor / SetLimits: Hinge, Slider. Box2D (2D) has no position motor.
-         SetBreakThreshold: Fixed, Point, Hinge, Slider, Distance, Spring (torque only for Fixed, Hinge, Slider).
+         SetMotor / SetLimits: Hinge, Slider, Wheel (2D only; travel limits, spin motor). Box2D (2D) has no position motor.
+         SetBreakThreshold: Fixed, Point, Hinge, Slider, Distance, Spring (torque only for Fixed, Hinge, Slider), plus 2D Wheel (with torque), Mouse, Rope.
          IsBroken / GetFeedback: every joint type.
        Stale ids return InvalidHandle; non-finite or out-of-range arguments return InvalidDefinition.
        Limits are relative to the creation pose: hinge -pi..pi, both ends around zero (min <= 0 <= max). */

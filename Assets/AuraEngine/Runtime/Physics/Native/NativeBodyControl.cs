@@ -61,6 +61,9 @@ namespace AuraEngine.Physics.Native
         AuraResult IPhysicsBodyControl.SetEnabled(PhysicsBodyId body, bool enabled) =>
             _invalid ? AuraResult.InvalidWorld : (AuraResult)NativeMethods.Aura_SetBodyEnabled(_world, NativeBodyHandle.From(body), (byte)(enabled ? 1 : 0));
 
+        AuraResult IPhysicsBodyControl.SetCollisionDetection(PhysicsBodyId body, AuraBodyCollisionDetection mode) =>
+            _invalid ? AuraResult.InvalidWorld : (AuraResult)NativeMethods.Aura_SetBodyCollisionDetection(_world, NativeBodyHandle.From(body), (int)mode);
+
         AuraResult IPhysicsBodyControl.IsEnabled(PhysicsBodyId body, out bool enabled)
         {
             enabled = false;
