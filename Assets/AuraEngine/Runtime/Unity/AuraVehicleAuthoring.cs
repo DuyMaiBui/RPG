@@ -51,6 +51,10 @@ namespace AuraEngine.Unity
         private float _maxSteerAngle = 30f;
 
         [SerializeField]
+        [Range(1f, 180f)]
+        private float _maxPitchRollAngle = AuraVehicleDefinition.DefaultMaxPitchRollAngle * Mathf.Rad2Deg;
+
+        [SerializeField]
         [Min(0f)]
         private float _maxEngineTorque = 800f;
 
@@ -118,7 +122,7 @@ namespace AuraEngine.Unity
                 _suspensionFrequency,
                 _suspensionDamping,
                 _maxSteerAngle * Mathf.Deg2Rad,
-                0f,
+                _maxPitchRollAngle * Mathf.Deg2Rad,
                 _maxEngineTorque);
 
             _vehicle = instance.AttachVehicle(_chassis.EntityId, definition);

@@ -55,6 +55,8 @@ namespace AuraEngine.KernelTests
                 ("sphere_cast_hits", SphereCast_Hits),
                 ("surface_velocity_roundtrip", SurfaceVelocity_RoundTrip),
                 ("water_buoyancy_lifts_box", Water_BuoyancyLiftsBox),
+                ("vehicle_authoring_defaults_create", Vehicle_AuthoringDefaultsCreate),
+                ("vehicle_rejects_zero_pitch_roll", Vehicle_RejectsZeroPitchRoll),
             };
 
             foreach (var (name, body) in cases)
@@ -633,6 +635,40 @@ namespace AuraEngine.KernelTests
             world.TryGetBodyState(box, out var state);
             Check(state.LinearVelocity.Y > 0f, $"water did not lift box, velocity={state.LinearVelocity.Y}.");
             Check(world.Physics.DestroyWater(water) == AuraResult.Success, "water destroy failed.");
+        }
+
+        /* Mirrors the serialized defaults of AuraVehicleAuthoring (the 'Car' in AuraDemoArticulation3D). */
+        private static AuraVehicleId TryCreateAuthoringVehicle(AuraSimulationWorld world, float maxPitchRollAngle)
+        {
+            var entity = world.CreateEntity();
+            world.AttachBody(entity, AuraPhysicsBodyDefinition.CreateDynamic(
+                new AuraPose(new AuraVector3(0f, 1f, 0f), AuraQuaternion.Identity),
+                AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All,
+                AuraPhysicsShapeDefinition.Box(new AuraVector3(0.9f, 0.3f, 1.8f))));
+            var wheels = new[]
+            {
+                new AuraVector3(-0.9f, -0.3f, 1.2f), new AuraVector3(0.9f, -0.3f, 1.2f),
+                new AuraVector3(-0.9f, -0.3f, -1.2f), new AuraVector3(0.9f, -0.3f, -1.2f),
+            };
+            var definition = new AuraVehicleDefinition(
+                PhysicsBodyId.Invalid, AuraVector3.UnitY, new AuraVector3(0f, 0f, 1f), wheels,
+                0.35f, 0.25f, 0.2f, 0.5f, 4f, 0.7f, 30f * (float)Math.PI / 180f, maxPitchRollAngle, 800f);
+            return world.CreateVehicle(entity, definition);
+        }
+
+        private static void Vehicle_AuthoringDefaultsCreate()
+        {
+            using var world = NewWorld();
+            Ground(world);
+            var vehicle = TryCreateAuthoringVehicle(world, AuraVehicleDefinition.DefaultMaxPitchRollAngle);
+            Check(vehicle.IsValid, "vehicle with authoring defaults failed to create.");
+        }
+
+        private static void Vehicle_RejectsZeroPitchRoll()
+        {
+            using var world = NewWorld();
+            Ground(world);
+            Check(!TryCreateAuthoringVehicle(world, 0f).IsValid, "kernel accepted a zero pitch/roll limit.");
         }
 
         private static void NetPrediction_MatchesServer()

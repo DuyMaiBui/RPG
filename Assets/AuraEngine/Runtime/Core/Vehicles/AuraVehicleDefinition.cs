@@ -4,6 +4,10 @@ namespace AuraEngine.Core
 {
     public readonly struct AuraVehicleDefinition
     {
+        /* Pitch/roll limit (60 degrees, in radians) at which the kernel stops driving wheels. The
+           kernel rejects a non-positive limit, so authoring must always supply a positive value. */
+        public const float DefaultMaxPitchRollAngle = 1.0471976f;
+
         public AuraVehicleDefinition(PhysicsBodyId chassis, AuraVector3 up, AuraVector3 forward, AuraVector3[] wheelPositions,
             float wheelRadius, float wheelWidth, float suspensionMinLength, float suspensionMaxLength,
             float suspensionFrequency, float suspensionDamping, float maxSteerAngle, float maxPitchRollAngle,
