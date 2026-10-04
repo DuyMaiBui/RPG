@@ -181,6 +181,115 @@ namespace AuraEngine.Simulation
             return _physics.Joints.HasJoint(joint);
         }
 
+        public AuraVehicleId CreateVehicle(SimulationEntityId chassisEntity, in AuraVehicleDefinition definition)
+        {
+            ThrowIfDisposed();
+            if (!_entities.TryGetBody(chassisEntity, out var chassis))
+                return AuraVehicleId.Invalid;
+
+            var resolved = new AuraVehicleDefinition(
+                chassis,
+                definition.Up,
+                definition.Forward,
+                definition.WheelPositions,
+                definition.WheelRadius,
+                definition.WheelWidth,
+                definition.SuspensionMinLength,
+                definition.SuspensionMaxLength,
+                definition.SuspensionFrequency,
+                definition.SuspensionDamping,
+                definition.MaxSteerAngle,
+                definition.MaxPitchRollAngle,
+                definition.MaxEngineTorque,
+                definition.WheelObjectLayer);
+
+            return _physics.Vehicles.CreateVehicle(resolved);
+        }
+
+        public AuraResult DestroyVehicle(AuraVehicleId vehicle)
+        {
+            ThrowIfDisposed();
+            return _physics.Vehicles.DestroyVehicle(vehicle);
+        }
+
+        public AuraResult SetVehicleInput(AuraVehicleId vehicle, float forward, float steering, float brake, float handBrake)
+        {
+            ThrowIfDisposed();
+            return _physics.Vehicles.SetVehicleInput(vehicle, forward, steering, brake, handBrake);
+        }
+
+        public bool TryGetWheelState(AuraVehicleId vehicle, int wheelIndex, out AuraVehicleWheelState state)
+        {
+            ThrowIfDisposed();
+            return _physics.Vehicles.TryGetWheelState(vehicle, wheelIndex, out state);
+        }
+
+        public AuraSoftBodyId CreateSoftBody(in AuraSoftBodyDefinition definition)
+        {
+            ThrowIfDisposed();
+            return _physics.SoftBodies.CreateSoftBody(definition);
+        }
+
+        public AuraResult DestroySoftBody(AuraSoftBodyId softBody)
+        {
+            ThrowIfDisposed();
+            return _physics.SoftBodies.DestroySoftBody(softBody);
+        }
+
+        public bool TryGetSoftBodyState(AuraSoftBodyId softBody, out AuraSoftBodyState state)
+        {
+            ThrowIfDisposed();
+            return _physics.SoftBodies.TryGetState(softBody, out state);
+        }
+
+        public AuraRagdollId CreateRagdoll(in AuraRagdollDefinition definition)
+        {
+            ThrowIfDisposed();
+            return _physics.Ragdolls.CreateRagdoll(definition);
+        }
+
+        public AuraResult DestroyRagdoll(AuraRagdollId ragdoll)
+        {
+            ThrowIfDisposed();
+            return _physics.Ragdolls.DestroyRagdoll(ragdoll);
+        }
+
+        public AuraResult GetRagdollPose(AuraRagdollId ragdoll, Span<AuraPose> poses)
+        {
+            ThrowIfDisposed();
+            return _physics.Ragdolls.GetPose(ragdoll, poses);
+        }
+
+        public AuraResult SetRagdollPose(AuraRagdollId ragdoll, ReadOnlySpan<AuraPose> poses)
+        {
+            ThrowIfDisposed();
+            return _physics.Ragdolls.SetPose(ragdoll, poses);
+        }
+
+        public AuraWaterId CreateWater(in AuraWaterDefinition definition)
+        {
+            ThrowIfDisposed();
+            return _physics.Water.CreateWater(definition);
+        }
+
+        public AuraResult DestroyWater(AuraWaterId water)
+        {
+            ThrowIfDisposed();
+            return _physics.Water.DestroyWater(water);
+        }
+
+        public AuraResult SetWaterParameters(AuraWaterId water, in AuraWaterDefinition definition)
+        {
+            ThrowIfDisposed();
+            return _physics.Water.SetWaterParameters(water, definition);
+        }
+
+        public AuraResult ApplyWaterStep(AuraWaterId water, float deltaTime)
+        {
+            ThrowIfDisposed();
+            return _physics.Water.ApplyWaterStep(water, deltaTime);
+        }
+
         public AuraCharacterId CreateCharacter(in AuraCharacterDefinition definition)
         {
             ThrowIfDisposed();

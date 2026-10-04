@@ -38,6 +38,11 @@ namespace AuraEngine.Unity
         private readonly List<AuraPhysicsBodyAuthoring> _authoring = new List<AuraPhysicsBodyAuthoring>();
         private readonly List<AuraJointAuthoring> _jointAuthoring = new List<AuraJointAuthoring>();
         private readonly List<AuraCharacterAuthoring> _characterAuthoring = new List<AuraCharacterAuthoring>();
+        private readonly List<AuraVehicleAuthoring> _vehicleAuthoring = new List<AuraVehicleAuthoring>();
+        private readonly List<AuraSoftBodyAuthoring> _softBodyAuthoring = new List<AuraSoftBodyAuthoring>();
+        private readonly List<AuraRagdollAuthoring> _ragdollAuthoring = new List<AuraRagdollAuthoring>();
+        private readonly List<AuraWaterAuthoring> _waterAuthoring = new List<AuraWaterAuthoring>();
+        private readonly List<AuraWaterId> _waters = new List<AuraWaterId>();
         private AuraSimulationWorld _world;
         private AuraViewRegistry _registry;
         private AuraEventDispatcher _dispatcher;
@@ -106,6 +111,21 @@ namespace AuraEngine.Unity
                 for (var index = 0; index < _characterAuthoring.Count; index++)
                     _characterAuthoring[index].BuildInto(this);
             }
+
+            if ((_world.Capabilities & AuraPhysicsCapabilities.Vehicles) != 0)
+            {
+                for (var index = 0; index < _vehicleAuthoring.Count; index++)
+                    _vehicleAuthoring[index].BuildInto(this);
+            }
+
+            for (var index = 0; index < _softBodyAuthoring.Count; index++)
+                _softBodyAuthoring[index].BuildInto(this);
+
+            for (var index = 0; index < _ragdollAuthoring.Count; index++)
+                _ragdollAuthoring[index].BuildInto(this);
+
+            for (var index = 0; index < _waterAuthoring.Count; index++)
+                _waterAuthoring[index].BuildInto(this);
 
             _tick = 0;
         }
@@ -187,6 +207,94 @@ namespace AuraEngine.Unity
             authoring.ReleaseFrom(this);
         }
 
+        public void Register(AuraVehicleAuthoring authoring)
+        {
+            if (authoring == null)
+                throw new ArgumentNullException(nameof(authoring));
+
+            if (_vehicleAuthoring.Contains(authoring))
+                return;
+
+            _vehicleAuthoring.Add(authoring);
+            if (_world != null && (_world.Capabilities & AuraPhysicsCapabilities.Vehicles) != 0)
+                authoring.BuildInto(this);
+        }
+
+        public void Unregister(AuraVehicleAuthoring authoring)
+        {
+            if (authoring == null)
+                return;
+
+            _vehicleAuthoring.Remove(authoring);
+            authoring.ReleaseFrom(this);
+        }
+
+        public void Register(AuraSoftBodyAuthoring authoring)
+        {
+            if (authoring == null)
+                throw new ArgumentNullException(nameof(authoring));
+
+            if (_softBodyAuthoring.Contains(authoring))
+                return;
+
+            _softBodyAuthoring.Add(authoring);
+            if (_world != null)
+                authoring.BuildInto(this);
+        }
+
+        public void Unregister(AuraSoftBodyAuthoring authoring)
+        {
+            if (authoring == null)
+                return;
+
+            _softBodyAuthoring.Remove(authoring);
+            authoring.ReleaseFrom(this);
+        }
+
+        public void Register(AuraRagdollAuthoring authoring)
+        {
+            if (authoring == null)
+                throw new ArgumentNullException(nameof(authoring));
+
+            if (_ragdollAuthoring.Contains(authoring))
+                return;
+
+            _ragdollAuthoring.Add(authoring);
+            if (_world != null)
+                authoring.BuildInto(this);
+        }
+
+        public void Unregister(AuraRagdollAuthoring authoring)
+        {
+            if (authoring == null)
+                return;
+
+            _ragdollAuthoring.Remove(authoring);
+            authoring.ReleaseFrom(this);
+        }
+
+        public void Register(AuraWaterAuthoring authoring)
+        {
+            if (authoring == null)
+                throw new ArgumentNullException(nameof(authoring));
+
+            if (_waterAuthoring.Contains(authoring))
+                return;
+
+            _waterAuthoring.Add(authoring);
+            if (_world != null)
+                authoring.BuildInto(this);
+        }
+
+        public void Unregister(AuraWaterAuthoring authoring)
+        {
+            if (authoring == null)
+                return;
+
+            _waterAuthoring.Remove(authoring);
+            authoring.ReleaseFrom(this);
+        }
+
         public AuraCharacterId AttachCharacter(in AuraCharacterDefinition definition)
         {
             if (_world == null)
@@ -201,6 +309,91 @@ namespace AuraEngine.Unity
                 return AuraResult.InvalidWorld;
 
             return _world.DestroyCharacter(character);
+        }
+
+        public AuraVehicleId AttachVehicle(SimulationEntityId chassis, in AuraVehicleDefinition definition)
+        {
+            if (_world == null)
+                throw new InvalidOperationException("The simulation world has not been created.");
+
+            return _world.CreateVehicle(chassis, definition);
+        }
+
+        public AuraResult DetachVehicle(AuraVehicleId vehicle)
+        {
+            if (_world == null)
+                return AuraResult.InvalidWorld;
+
+            return _world.DestroyVehicle(vehicle);
+        }
+
+        public AuraResult SetVehicleInput(AuraVehicleId vehicle, float forward, float steering, float brake, float handBrake)
+        {
+            if (_world == null)
+                return AuraResult.InvalidWorld;
+
+            return _world.SetVehicleInput(vehicle, forward, steering, brake, handBrake);
+        }
+
+        public AuraSoftBodyId AttachSoftBody(in AuraSoftBodyDefinition definition)
+        {
+            if (_world == null)
+                throw new InvalidOperationException("The simulation world has not been created.");
+
+            return _world.CreateSoftBody(definition);
+        }
+
+        public AuraResult DetachSoftBody(AuraSoftBodyId softBody)
+        {
+            if (_world == null)
+                return AuraResult.InvalidWorld;
+
+            return _world.DestroySoftBody(softBody);
+        }
+
+        public AuraRagdollId AttachRagdoll(in AuraRagdollDefinition definition)
+        {
+            if (_world == null)
+                throw new InvalidOperationException("The simulation world has not been created.");
+
+            return _world.CreateRagdoll(definition);
+        }
+
+        public AuraResult DetachRagdoll(AuraRagdollId ragdoll)
+        {
+            if (_world == null)
+                return AuraResult.InvalidWorld;
+
+            return _world.DestroyRagdoll(ragdoll);
+        }
+
+        public bool TryGetRagdollPose(AuraRagdollId ragdoll, Span<AuraPose> poses)
+        {
+            if (_world == null)
+                return false;
+
+            return _world.GetRagdollPose(ragdoll, poses) == AuraResult.Success;
+        }
+
+        public AuraWaterId AttachWater(in AuraWaterDefinition definition)
+        {
+            if (_world == null)
+                throw new InvalidOperationException("The simulation world has not been created.");
+
+            var water = _world.CreateWater(definition);
+            if (water.IsValid)
+                _waters.Add(water);
+
+            return water;
+        }
+
+        public AuraResult DetachWater(AuraWaterId water)
+        {
+            _waters.Remove(water);
+            if (_world == null)
+                return AuraResult.InvalidWorld;
+
+            return _world.DestroyWater(water);
         }
 
         public bool TryGetCharacterState(AuraCharacterId character, out AuraCharacterState state)
@@ -288,6 +481,9 @@ namespace AuraEngine.Unity
             var deltaTime = Time.fixedDeltaTime;
             for (var index = 0; index < _characterAuthoring.Count; index++)
                 _characterAuthoring[index].Tick(deltaTime);
+
+            for (var index = 0; index < _waters.Count; index++)
+                _world.ApplyWaterStep(_waters[index], deltaTime);
 
             _world.Step(new SimulationStep(new SimulationTick(_tick++), deltaTime));
             _dispatcher.Dispatch(_world, _registry);
