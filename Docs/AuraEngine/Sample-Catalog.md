@@ -35,11 +35,14 @@ moving platform.
 
 ## Known gaps (not demoed, not faked)
 
-- Constraints beyond distance/fixed/hinge: slider, six-DOF, cone, swing-twist
-  motors, pulley, gear, rack-and-pinion, path (no native joint ABI yet).
-- Runtime change of motion type, shape or layer; per-triangle friction; shape
-  filters; contact manifold access.
-- Tank and motorcycle vehicles; powered and soft-keyframed rigs.
+- Path constraint (Jolt) is not implemented; SixDof soft translation limits and per-axis
+  rotation position motors beyond X are untested.
+- Runtime change of shape or per-triangle friction; shape filters; contact manifold access
+  beyond the contact point and normal.
+- Tank and motorcycle vehicles; powered and soft-keyframed rigs; the kernel ragdoll prefabs
+  (`AuraRagdollAuthoring`) cannot take impulses, so hit reactions use body-authored limbs.
+- Box2D position motors, a box-shaped 2D character mover, and a launch boost when jumping off a
+  moving platform.
 - GPU hair/cloth backend (`IVerletSolverBackend` seam exists, CPU only).
 
 ## Demo validation
