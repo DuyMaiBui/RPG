@@ -335,7 +335,11 @@ MonoBehaviour:
   _segmentLength: 0.3
   _gravity: {x: 0, y: -9.81, z: 0}
   _wind: {x: 0, y: 0, z: 0}
+  _gustAmplitude: {x: 3, y: 0, z: 0}
+  _gustFrequency: 0.5
   _damping: 0.98
+  _colliderSource: {fileID: 1664438225}
+  _lockToPlane: 1
 --- !u!1 &920600925
 GameObject:
   m_ObjectHideFlags: 0
@@ -525,6 +529,7 @@ Transform:
   m_Children:
   - {fileID: 1905722989}
   - {fileID: 192341583}
+  - {fileID: 1412318763}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1008411389
@@ -858,6 +863,134 @@ LineRenderer:
   m_UseWorldSpace: 1
   m_Loop: 0
   m_ApplyActiveColorSpace: 1
+--- !u!1001 &1412318761
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1008411388}
+    m_Modifications:
+    - target: {fileID: 1107315942391419531, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: _type
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1114576431609807207, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_Name
+      value: Head
+      objectReference: {fileID: 0}
+    - target: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 2.45
+      objectReference: {fileID: 0}
+    - target: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+--- !u!114 &1412318762 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4363650631114238500, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+  m_PrefabInstance: {fileID: 1412318761}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 637e6a47d94aa40aeb9acda298cc356e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraCircleCollider2DAuthoring
+--- !u!4 &1412318763 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1761466511709923191, guid: 9218aa2e9c2d541d4b3eca1d1bd7c0fa, type: 3}
+  m_PrefabInstance: {fileID: 1412318761}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1664438224
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1664438226}
+  - component: {fileID: 1664438225}
+  m_Layer: 0
+  m_Name: VerletColliders
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1664438225
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1664438224}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 553b4e82997ed46c181b5a48fa4733b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AuraEngine.Unity::AuraEngine.Unity.AuraVerletColliderSource
+  _colliders3D: []
+  _colliders2D:
+  - {fileID: 1905722996}
+  - {fileID: 1412318762}
+  _transformShapes: []
+  _transformShapesPlanar: 0
+  _skin: 0.02
+--- !u!4 &1664438226
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1664438224}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1726018288
 GameObject:
   m_ObjectHideFlags: 0
@@ -1108,3 +1241,4 @@ SceneRoots:
   - {fileID: 1242631251}
   - {fileID: 1726018290}
   - {fileID: 1024447946}
+  - {fileID: 1664438226}
