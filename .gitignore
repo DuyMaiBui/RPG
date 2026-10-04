@@ -55,3 +55,6 @@ Native/AuraEngine/third_party/
 
 # Agent validation screenshots (pipeline capture output, never commit)
 Assets/Temp/aura_*.png
+
+# Agent-only Unity authoring helpers, created outside Assets to avoid imports
+/AgentScripts/
