@@ -69,3 +69,66 @@ tick-tagged format lives in `AuraEngine.Serialization.AuraStateSerializer`.
 
 
 
+
+## ABI v10: runtime body and joint control
+
+`AURA_ENGINE_ABI_VERSION` is 10 (mirrored by `NativeMethods.ExpectedAbiVersion`,
+checked by `NativePhysicsBackend.IsAvailable`). v10 is not backward compatible
+with v9 binaries: `AuraBodyState::flags` gains `AURA_BODY_FLAG_DISABLED`, two
+result codes are added and new structs/entry points are appended, so managed
+and native must be rebuilt together.
+
+Result codes: `AURA_BODY_DISABLED` (10, the body is removed from the
+simulation) and `AURA_UNSUPPORTED_OPERATION` (11, valid request the body, joint
+type or backend cannot perform; the kernel never silently ignores a control
+call). Every entry returns `AURA_INVALID_HANDLE` for stale handles and
+`AURA_INVALID_DEFINITION` for non-finite or out-of-range arguments and for
+operations that do not apply to the motion type (force on a static body,
+velocity on a static body). Backends without an override (the reference world)
+return `AURA_UNSUPPORTED_OPERATION`. Managed capability bits:
+`AuraPhysicsCapabilities.BodyControl` / `JointControl`.
+
+Body control (`IPhysicsBodyControl`, `IPhysicsWorld.BodyControl`,
+`AuraSimulationWorld.BodyControl`):
+
+| Entry point | Notes |
+| --- | --- |
+| `Aura_SetLinearVelocity`, `Aura_SetAngularVelocity` | Dynamic and kinematic bodies. |
+| `Aura_AddForce`, `Aura_AddTorque` | Dynamic bodies; act on the next step only. |
+| `Aura_AddImpulse`, `Aura_AddAngularImpulse` | Dynamic bodies; `IPhysicsWorld.ApplyImpulse` now routes here. |
+| `Aura_SetBodyPose(pose, zeroVelocity)` | Teleport; optionally clears both velocities. Allowed while disabled. |
+| `Aura_SetGravityScale`, `Aura_SetFriction`, `Aura_SetRestitution` | Friction/restitution must be >= 0; all wake a resting body. |
+| `Aura_SetMotionType` | Static/dynamic/kinematic. Bodies made only of triangle mesh, height field or plane shapes stay static (`UNSUPPORTED_OPERATION`); vehicle chassis are rejected. Jolt bodies keep motion properties so promotion works. |
+| `Aura_SetBodyLayer(layer, collisionMask)` | Layer < 64. The mask is applied on top of the world collision matrix. Jolt enforces it in the sim shape filter (default `~0`; creation still ignores `AuraBodyDesc::collisionMask` as before); Box2D rewrites the shape filters (`mask & matrix[layer]`, as at creation). |
+| `Aura_SetBodyEnabled`, `Aura_IsBodyEnabled` | Removes/adds the body to the simulation without destroying the handle; attached joints are disabled with it. Queries ignore disabled bodies. |
+
+2D worlds use only x/y of linear vectors and z of angular vectors. Velocity
+reads need no new entry: `AuraBodyState` already carries both velocities.
+
+Joint control (`IPhysicsJointControl`, `IPhysicsWorld.JointControl`,
+`AuraSimulationWorld.JointControl`):
+
+| Entry point | Hinge/revolute | Slider/prismatic | Fixed | Point | Distance/spring | Others |
+| --- | --- | --- | --- | --- | --- | --- |
+| `Aura_SetJointMotor(AuraJointMotorDesc)` | velocity; position on Jolt only | velocity; position on Jolt only | - | - | - | unsupported |
+| `Aura_SetJointLimits(enabled, min, max)` | yes | yes | - | - | - | unsupported |
+| `Aura_SetJointBreakThreshold(force, torque)` | force + torque | force + torque | force + torque | force | force | unsupported |
+| `Aura_IsJointBroken`, `Aura_GetJointFeedback` | yes | yes | yes | yes | yes | yes |
+
+Limits are relative to the creation pose with `min <= 0 <= max` (hinge also
+within +-pi); disabling restores the unlimited range. Box2D has no position
+motor, so `AURA_JOINT_MOTOR_POSITION` returns `UNSUPPORTED_OPERATION` there.
+A threshold of 0 means unbreakable. After each step a joint whose reaction
+force or torque exceeds a threshold is removed from the simulation and flagged
+broken; its handle stays valid (`Aura_IsJointBroken`, feedback reports the
+breaking load) until `Aura_DestroyJoint`, and `Aura_HasJoint` reports false.
+Feedback loads come from the last step; a sleeping joint reports the load of
+the step it fell asleep in. `AuraJointFeedback` excludes motor drive from
+force/torque and reports it as `motorLoad`. Constraints stay owned by Jolt's
+constraint manager (never `Release()` after `RemoveConstraint`).
+
+Snapshots: `AuraBodyState::flags` carries the disabled bit through
+`Aura_SerializeState` / `Aura_DeserializeState`. Gravity scale, motion type,
+material, layer/mask, motors, limits and break thresholds are configuration,
+not simulation state, and are not part of the byte stream; callers re-apply
+them after a restore. The state hash is unchanged.
