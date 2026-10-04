@@ -145,6 +145,19 @@ AuraResultCode Box2DWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* 
         }
     }
 
+    /* Honor the requested mass like the Jolt backend does: keep the centre of mass computed from
+       the shapes and scale the rotational inertia, instead of deriving the mass from density. */
+    if (desc.type == AURA_BODY_DYNAMIC && desc.mass > 0.0f)
+    {
+        b2MassData massData = b2Body_GetMassData(body);
+        if (massData.mass > 0.0f)
+        {
+            massData.rotationalInertia *= desc.mass / massData.mass;
+            massData.mass = desc.mass;
+            b2Body_SetMassData(body, massData);
+        }
+    }
+
     b2Body_EnableContactEvents(body, true);
 
     slot.occupied = true;

@@ -786,10 +786,10 @@ namespace AuraEngine.KernelTests
 
         private static AuraVector3 V(float x, float y, float z) => new AuraVector3(x, y, z);
 
-        /* Plane2D derives mass from density (1000 kg/m^3 * area); 3D uses the definition mass (1). */
-        private static float SphereMass(AuraPhysicsMode mode) => mode == AuraPhysicsMode.Full3D ? 1f : 1000f * MathF.PI * 0.25f;
+        /* Both backends honor the definition mass (Box2D used to derive it from a 1000 kg/m^3 density). */
+        private static float SphereMass(AuraPhysicsMode mode) => 1f;
 
-        private static float UnitBoxMass(AuraPhysicsMode mode, float mass) => mode == AuraPhysicsMode.Full3D ? mass : 1000f;
+        private static float UnitBoxMass(AuraPhysicsMode mode, float mass) => mass;
 
         private static PhysicsBodyId Dyn(AuraSimulationWorld world, AuraVector3 position, AuraPhysicsShapeDefinition shape,
             float gravityScale = 1f, float mass = 1f, int layer = 0, ulong mask = ulong.MaxValue) =>
@@ -1207,7 +1207,7 @@ namespace AuraEngine.KernelTests
             Ok(world.JointControl.GetFeedback(rig.Joint, out var feedback), "GetFeedback");
             Near(feedback.Position, 1f, 0.2f, "slider feedback position");
 
-            Ok(world.JointControl.SetMotor(rig.Joint, AuraJointMotorDefinition.Velocity(-2f, 1.0e5f)), "reverse motor");
+            Ok(world.JointControl.SetMotor(rig.Joint, AuraJointMotorDefinition.Velocity(-2f, 200f)), "reverse motor");
             Ok(world.JointControl.SetLimits(rig.Joint, true, -0.5f, 0.5f), "SetLimits");
             Step(world, 180, 60);
             Near(StateOf(world, rig.Cart).Pose.Position.X, -0.5f, 0.1f, "slider limit clamps travel");
