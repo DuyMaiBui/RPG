@@ -6,7 +6,8 @@
     "AuraEngine.Simulation",
     "AuraEngine.Serialization",
     "AuraEngine.Server",
-    "AuraEngine.Networking"
+    "AuraEngine.Networking",
+    "AuraEngine.Demo"
   ],
   "includePlatforms": [
     "Editor"

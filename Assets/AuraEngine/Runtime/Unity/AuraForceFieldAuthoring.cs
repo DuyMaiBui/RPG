@@ -103,6 +103,45 @@ namespace AuraEngine.Unity
 
         public AuraForceFieldId FieldId => _field;
 
+        public AuraForceFieldKind Kind => _kind;
+
+        public AuraForceFieldMode Mode => _mode;
+
+        public AuraForceFieldFalloff Falloff => _falloff;
+
+        public float Strength => _strength;
+
+        public float MinRadius => _minRadius;
+
+        public float MaxRadius => _maxRadius;
+
+        /* Sphere radius or the half diagonal of the box: the reach of a linear falloff when MaxRadius is 0. */
+        public float ZoneExtent => _shape == AuraForceFieldShape.Sphere ? _radius : _size.magnitude * 0.5f;
+
+        /* Runtime update of the Directional vector / Drag wind velocity (for example an animated gust). Before the
+           field exists the value is only stored and used when it is built. */
+        public void SetVector(Vector3 vector)
+        {
+            _vector = vector;
+            PushDefinition();
+        }
+
+        public void SetStrength(float strength)
+        {
+            _strength = strength;
+            PushDefinition();
+        }
+
+        private void PushDefinition()
+        {
+            if (!_field.IsValid || _instance == null || !_instance.IsCreated)
+                return;
+
+            var result = _instance.UpdateForceField(_field, BuildDefinition());
+            if (result != AuraResult.Success)
+                Debug.LogError($"{nameof(AuraForceFieldAuthoring)} on '{name}' could not update its field: {result}.", this);
+        }
+
         private void OnEnable()
         {
             _instance = GetComponentInParent<AuraSimulationInstance>();
