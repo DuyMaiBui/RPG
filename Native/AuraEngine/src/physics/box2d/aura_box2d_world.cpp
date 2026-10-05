@@ -87,6 +87,8 @@ AuraResultCode Box2DWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* 
     bodyDef.gravityScale = desc.gravityScale;
     bodyDef.isBullet = desc.collisionDetection == 1;
     bodyDef.enableSleep = desc.allowSleeping != 0;
+    bodyDef.linearDamping = desc.linearDamping;
+    bodyDef.angularDamping = desc.angularDamping;
     bodyDef.userData = Encode(handle);
 
     const b2BodyId body = b2CreateBody(impl_->world, &bodyDef);

@@ -18,15 +18,9 @@ namespace AuraEngine.KernelTests
             foreach (var entry in MBoth("m_free_fall_matches_half_g_t_squared_gravity_scale_set_at_runtime", MFreeFallRuntimeScale)) yield return entry;
             foreach (var entry in MBoth("m_projectile_apex_and_range_match_vy2_over_2g_and_2vxvy_over_g_a", mode => MProjectile(mode, 6f, 8f))) yield return entry;
             foreach (var entry in MBoth("m_projectile_apex_and_range_match_vy2_over_2g_and_2vxvy_over_g_b", mode => MProjectile(mode, 10f, 5f))) yield return entry;
-            /* KERNEL DEFECT, 2D variants disabled: Box2DWorld::CreateBody (src/physics/box2d/aura_box2d_world.cpp:82-92) never
-               copies desc.linearDamping / desc.angularDamping into the b2BodyDef, so Plane2D bodies are undamped. Repro:
-               zero-gravity circle with linearDamping 0.5 and v0 = 10 keeps vx = 10.0 after 120 steps (Jolt: 3.663). Re-enable
-               these entries once the kernel maps the fields; the Box2D exact form 1/(1 + d h) per sub-step is already coded.
-            //  m_linear_damping_matches_v0_exp_minus_d_t_2d, m_linear_damping_matches_v0_exp_minus_d_t_strong_2d,
-            //  m_angular_damping_matches_w0_exp_minus_d_t_2d */
-            yield return ("m_linear_damping_matches_v0_exp_minus_d_t_3d", () => MLinearDamping(AuraPhysicsMode.Full3D, 0.5f, 120));
-            yield return ("m_linear_damping_matches_v0_exp_minus_d_t_strong_3d", () => MLinearDamping(AuraPhysicsMode.Full3D, 2f, 90));
-            yield return ("m_angular_damping_matches_w0_exp_minus_d_t_3d", () => MAngularDamping(AuraPhysicsMode.Full3D));
+            foreach (var entry in MBoth("m_linear_damping_matches_v0_exp_minus_d_t", mode => MLinearDamping(mode, 0.5f, 120))) yield return entry;
+            foreach (var entry in MBoth("m_linear_damping_matches_v0_exp_minus_d_t_strong", mode => MLinearDamping(mode, 2f, 90))) yield return entry;
+            foreach (var entry in MBoth("m_angular_damping_matches_w0_exp_minus_d_t", MAngularDamping)) yield return entry;
             foreach (var entry in MBoth("m_impulse_changes_velocity_by_j_over_m", MImpulseOverMass)) yield return entry;
             foreach (var entry in MBoth("m_force_accelerates_body_by_f_over_m", MForceOverMass)) yield return entry;
             foreach (var entry in MBoth("m_free_spin_conserves_angular_velocity_and_advances_w_t", MFreeSpin)) yield return entry;
