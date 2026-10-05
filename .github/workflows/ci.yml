@@ -66,8 +66,8 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          # The suite is built by the previous step; the .NET host from setup-dotnet is not hardened,
-          # so DYLD_INSERT_LIBRARIES reaches the process.
+          # run_kernel_tests.sh re-signs a copy of the .NET host (the hardened runtime makes dyld ignore
+          # DYLD_INSERT_LIBRARIES) and fails when the Guard Malloc banner is missing.
           AURA_GMALLOC=1 ./Native/AuraEngine/run_kernel_tests.sh
 
   mobile:

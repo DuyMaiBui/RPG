@@ -7,6 +7,14 @@ namespace AuraEngine.KernelTests
     {
         public static int Main(string[] args)
         {
+            // Opt-in randomized soak: `managed_kernel_tests.dll soak [seconds] [seed] [episode]`.
+            if (args.Length > 0 && args[0] == "soak")
+            {
+                var rest = new string[args.Length - 1];
+                Array.Copy(args, 1, rest, 0, rest.Length);
+                return SoakRunner.Run(rest);
+            }
+
             var runner = new KernelTestSuite();
             var failures = runner.RunAll();
             Console.WriteLine();
