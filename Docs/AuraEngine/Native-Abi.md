@@ -179,3 +179,44 @@ SwingTwist axes are 0 twist, 1 normal swing, 2 plane swing. Gear: A = -ratio * B
   snapshots or the state hash: recreate them after a rollback. Box2D bodies now honor the bullet flag.
 - Time control is managed-level (`AuraTimeStepper`, `AuraHitStop`): the kernel's fixed dt never
   changes; time scale 0.5 runs a step every second tick.
+
+
+## Contracts added after the soak work
+
+### Events and world handles
+- **Event order.** Pending events are sorted after every step by (type, bodyA.index, bodyA.generation, bodyB.index,
+  bodyB.generation), so `Aura_CopyEvents` returns the same order for every run and every Jolt thread count
+  (`AURA_JOLT_THREADS`, 0 to 64, overrides the worker count for testing). `Aura_CopyContacts` is ordered by body pair.
+- **World handles** are `(generation << 32) | (slot + 1)` in a fixed table of 4096 slots; the public struct is
+  unchanged. Zero, garbage, stale and double-destroyed handles return `AURA_INVALID_WORLD`; creating beyond 4096 live
+  worlds returns `AURA_CAPACITY_EXCEEDED`. `Aura_CreateWorld`/`Aura_DestroyWorld` are serialized by one mutex (Box2D keeps
+  a process-global world array). Calling a world function while another thread destroys that same world is still a
+  caller error. `Aura_LiveWorldCount` reports worlds created and not destroyed.
+
+### Joints
+- **Broken joints keep their handle** until `Aura_DestroyJoint`: `HasJoint` stays true, `Aura_IsJointBroken` and feedback
+  keep working, and motor/limit/target/break-threshold calls return `AURA_UNSUPPORTED_OPERATION`.
+  `AURA_INVALID_HANDLE` means destroyed, stale or garbage.
+- **Rejected at creation:** a joint on a disabled body (`AURA_BODY_DISABLED`); a joint between two non-dynamic bodies and a
+  Box2D mouse joint whose body B is not dynamic (`AURA_INVALID_DEFINITION`); in Box2D also negative distance or spring
+  parameters, limit min > max, a hinge limit outside +-pi, a slider axis with no in-plane component, and anchors too
+  far from a light body (lever ratio r^2*m/I above 16 for distance, spring and rope, above 500 for slider and wheel).
+  Authoring a rope or spring anchor several metres from a small body therefore fails with an error: move the anchor
+  closer or enlarge the body.
+- **Box2D stability.** Limits and lengths are eased toward their targets (at most 8 m/s * dt per step) because
+  Box2D v3.1 corrects violations with an uncapped soft bias; spring, wheel and mouse hertz are capped to 0.5/dt; limits are
+  relative to the creation pose (`referenceAngle`). Joints whose anchors drift more than 6 m apart are torn off and
+  reported as broken.
+- `SetKinematicTarget` requires a kinematic body (`AURA_UNSUPPORTED_OPERATION` otherwise) and a target is consumed by the
+  step that reaches it; a zero-length step no longer erases the last valid delta. Box2D honors `allowSleeping`.
+
+### Snapshots (format version 3)
+- `Aura_DeserializeState` validates the whole buffer before applying anything: size, magic, version (2 or 3), exact
+  length, body and character counts, finite and bounded values (position 1e6, velocity 1e5, unit quaternions), flag and enum
+  ranges, live matching handles, no duplicates. `AURA_INVALID_WORLD`, `AURA_INVALID_DEFINITION`,
+  `AURA_CAPACITY_EXCEEDED` or `AURA_INVALID_HANDLE` is returned and nothing changes. The managed
+  `RestoreState` now throws `AuraException` for a rejected snapshot.
+- Version 3 adds a 16-byte `BodyExtra` per body: sleep state, motion type, kinematic-target-pending and the exact `b2Rot`.
+  Version 2 buffers still restore (without extras). Free flight, kinematic 3D and most 2D scenarios, and both
+  character movers restore bit-exactly; piles, joints with warm starting and Jolt sleep timers do not (contact and joint
+  warm-start caches cannot be captured through the public API).

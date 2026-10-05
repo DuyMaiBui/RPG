@@ -59,8 +59,10 @@ namespace AuraEngine.Tests
             var bodyA = Harness.AddBody2D(Harness.NewChild("A", null, new Vector3(0f, 5f, 0f), new Vector3(0f, 0f, 30f), new Vector3(2f, 3f, 1f)));
             var bodyB = Harness.AddBody2D(Harness.NewChild("B", null, new Vector3(3f, 5f, 0f), new Vector3(0f, 0f, -20f), new Vector3(0.5f, 1.5f, 1f)));
             var joint = Harness.Root.AddComponent<AuraJoint2DAuthoring>();
-            var localA = new Vector2(1f, 0.5f);
-            var localB = new Vector2(-1f, 2f);
+            // Anchors stay close to the body centres: Box2D joints reject anchors far from a light body (lever ratio rule),
+            // and this test is about the local-to-world conversion, which the scale (2,3) and (0.5,1.5) still shifts.
+            var localA = new Vector2(0.2f, 0.1f);
+            var localB = new Vector2(-0.2f, 0.3f);
             AuraSerializedFields.SetReference(joint, "_bodyA", bodyA);
             AuraSerializedFields.SetReference(joint, "_bodyB", bodyB);
             AuraSerializedFields.SetEnum(joint, "_type", type);

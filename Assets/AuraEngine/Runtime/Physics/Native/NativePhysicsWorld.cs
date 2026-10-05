@@ -579,7 +579,8 @@ namespace AuraEngine.Physics.Native
             try
             {
                 Marshal.Copy(state, 0, buffer, state.Length);
-                NativeMethods.Aura_DeserializeState(_world, buffer, (uint)state.Length);
+                // The kernel validates the whole buffer and applies nothing when it is rejected; surface that to the caller.
+                AuraException.ThrowIfFailed((AuraResult)NativeMethods.Aura_DeserializeState(_world, buffer, (uint)state.Length), "The native physics world rejected the state snapshot.");
             }
             finally
             {

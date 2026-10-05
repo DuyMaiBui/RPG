@@ -193,3 +193,19 @@ work on Linux or CI; UBSan ran clean apart from the known float-to-uint32 conver
 
 **Scene-level checks after the fixes:** 23/23 assertions, 23/23 safety bounds at 8 fps, 25/25 lifecycle cycles
 (memory flat, -131 MB).
+
+### Bug and improvement pass (after P1)
+- Soak findings fixed with regression tests: Box2D joint stability (root cause: uncapped soft limit bias), atomic and
+  validated snapshot restore, deterministic event order, joint-broken contract on both backends, safe world handles,
+  concurrent world creation (Box2D crashed 15 of 15 runs), `allowSleeping` in Box2D. 323 kernel tests pass normally and
+  under real Guard Malloc.
+- Soak after the fixes (60 s per seed): 2D explosion/NaN findings fell from about 700 to 21-31 per seed with
+  `AURA_SOAK_CONTINUE=1`; strict mode still stops on a rare exploding 2D body (seed 7). Not resolved: the rare Box2D
+  `b2Solve` memset crash (episode 847, seed 1) did not reproduce in 8 runs.
+- Phase 2 additions: visual guard in the smoke run (23 rules; fails on the old invisible-cloth captures), a Jolt/Box2D
+  step-time benchmark with CI budgets (`bench --check`; 3D 1000 bodies about 1.1 ms, 2D 1000 bodies about 0.25 ms per
+  step), and the kernel test project is now tracked (the CI job could not have built it before).
+- Phase 2 not done: platform builds beyond macOS (Windows, Linux, Android, iOS are only declared in CI), ThreadSanitizer
+  (the Apple runtime crashes at startup here).
+- Scene-level checks after the pass: 23/23 assertions and visual checks, 23/23 safety bounds at 8 fps, 25/25 lifecycle
+  cycles; 224 EditMode tests.

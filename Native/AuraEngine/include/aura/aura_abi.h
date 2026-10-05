@@ -17,6 +17,10 @@ uint32_t Aura_LiveWorldCount(void);
 /* Returns AURA_ABI_MISMATCH when the caller's expected version differs. */
 AuraResultCode Aura_CheckAbi(uint32_t callerAbiVersion);
 
+/* A world handle is a generation-tagged table index, not a pointer: after Aura_DestroyWorld (or for a zero or garbage
+   value) every entry point returns AURA_INVALID_WORLD. Create/destroy are serialised process-wide and may be called
+   from any thread; calling a world function while another thread destroys that same world is still a caller error.
+   Aura_CreateWorld returns AURA_CAPACITY_EXCEEDED beyond 4096 live worlds. */
 AuraResultCode Aura_CreateWorld(const AuraWorldDesc* desc, AuraWorldHandle* outWorld);
 AuraResultCode Aura_DestroyWorld(AuraWorldHandle world);
 AuraResultCode Aura_WorldBodyCount(AuraWorldHandle world, uint32_t* outCount);
@@ -81,6 +85,8 @@ AuraResultCode Aura_ShapeCast(AuraWorldHandle world, const AuraShapeDesc* shape,
 
 AuraResultCode Aura_CreateJoint(AuraWorldHandle world, const AuraJointDesc* desc, uint64_t* outJoint);
 AuraResultCode Aura_DestroyJoint(AuraWorldHandle world, uint64_t joint);
+/* outHas is 1 from CreateJoint until DestroyJoint, including after the joint broke (see Aura_IsJointBroken); 0 for a
+   destroyed, stale or invalid handle. Control calls on a broken joint return AURA_UNSUPPORTED_OPERATION. */
 AuraResultCode Aura_HasJoint(AuraWorldHandle world, uint64_t joint, uint8_t* outHas);
 
 /* v10 joint control. Support matrix (everything else returns AURA_UNSUPPORTED_OPERATION):

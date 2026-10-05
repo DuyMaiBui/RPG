@@ -463,6 +463,40 @@ namespace AuraEngine.Tests
         }
 
         [Test]
+        public void NativeBackend_RestoreState_RejectsAHostileSnapshotAndKeepsTheWorldUnchanged()
+        {
+            using var world = CreateWorld(out _);
+            var body = world.AttachBody(
+                world.CreateEntity(),
+                AuraPhysicsBodyDefinition.CreateDynamic(
+                    new AuraPose(new AuraVector3(0f, 5f, 0f), AuraQuaternion.Identity),
+                    AuraPhysicsLayer.Default,
+                    AuraPhysicsLayerMask.All,
+                    AuraPhysicsShapeDefinition.Sphere(0.5f)));
+            for (var tick = 1; tick <= 30; tick++)
+                world.Step(new SimulationStep(new SimulationTick((uint)tick), 1f / 60f));
+
+            Assert.IsTrue(world.TryGetBodyState(body, out var before));
+            var saved = world.SaveState();
+
+            // A valid snapshot with a body position poisoned by NaN must be refused as a whole.
+            var poisoned = (byte[])saved.Clone();
+            for (var offset = poisoned.Length / 2; offset < poisoned.Length - 4; offset += 4)
+            {
+                poisoned[offset] = 0x00;
+                poisoned[offset + 1] = 0x00;
+                poisoned[offset + 2] = 0xC0;
+                poisoned[offset + 3] = 0x7F;
+            }
+
+            Assert.Throws<AuraException>(() => world.RestoreState(poisoned), "a snapshot full of NaN must be rejected");
+            Assert.Throws<AuraException>(() => world.RestoreState(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 }), "garbage must be rejected");
+
+            Assert.IsTrue(world.TryGetBodyState(body, out var after));
+            Assert.AreEqual(before.Pose.Position.Y, after.Pose.Position.Y, 1e-6f, "a rejected restore must not change the world");
+        }
+
+        [Test]
         public void NativeBackend_SaveState_RestoresBodyState()
         {
             using var world = CreateWorld(out _);
