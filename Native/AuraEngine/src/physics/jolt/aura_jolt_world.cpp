@@ -268,6 +268,10 @@ AuraResultCode JoltWorld::SetKinematicTarget(AuraBodyHandle body, const AuraPose
     if (!slot->enabled)
         return AURA_BODY_DISABLED;
 
+    /* MoveKinematic needs motion properties; plane, mesh and height-field bodies have none and crash Jolt. */
+    if (slot->body == nullptr || slot->body->GetMotionType() != JPH::EMotionType::Kinematic)
+        return AURA_UNSUPPORTED_OPERATION;
+
     const JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
     const_cast<JPH::BodyInterface&>(bi).MoveKinematic(slot->id, ToRVec3(pose.position), ToQuat(pose.rotation), impl_->lastDelta);
     slot->kinematicTargetPending = true;
@@ -309,7 +313,8 @@ uint32_t JoltWorld::BodyCount() const
 
 void JoltWorld::Step(float deltaTime)
 {
-    impl_->lastDelta = deltaTime;
+    if (deltaTime > 0.0f)
+        impl_->lastDelta = deltaTime;
     std::vector<uint32_t> wake;
     {
         std::lock_guard<std::mutex> lock(impl_->eventMutex);

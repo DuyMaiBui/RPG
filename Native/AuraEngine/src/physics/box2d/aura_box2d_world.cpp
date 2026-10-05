@@ -204,6 +204,8 @@ AuraResultCode Box2DWorld::SetKinematicTarget(AuraBodyHandle body, const AuraPos
 
     if (!b2Body_IsEnabled(slot->body))
         return AURA_BODY_DISABLED;
+    if (b2Body_GetType(slot->body) != b2_kinematicBody)
+        return AURA_UNSUPPORTED_OPERATION;
 
     b2Transform target;
     target.p = ToVec2(pose.position);
@@ -248,7 +250,8 @@ uint32_t Box2DWorld::BodyCount() const
 
 void Box2DWorld::Step(float deltaTime)
 {
-    impl_->lastDelta = deltaTime;
+    if (deltaTime > 0.0f)
+        impl_->lastDelta = deltaTime;
     impl_->ApplyForceFields(deltaTime);
     b2World_Step(impl_->world, deltaTime, 4);
 

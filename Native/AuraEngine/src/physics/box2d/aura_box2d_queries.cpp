@@ -70,6 +70,10 @@ struct OverlapCollector
 bool CollectOverlap(b2ShapeId shape, void* context)
 {
     auto* collector = static_cast<OverlapCollector*>(context);
+    /* Box2D keeps calling for the remaining broad-phase trees after the callback asked to stop, so the
+       capacity must be checked on entry, not only when returning. */
+    if (collector->count >= collector->capacity)
+        return false;
     AuraBodyHandle handle;
     if (!Accepts(collector->state, shape, handle))
         return true;

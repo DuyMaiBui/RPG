@@ -98,6 +98,9 @@ AuraResultCode JoltWorld::CreateJoint(const AuraJointDesc& desc, uint64_t* outJo
         return AURA_INVALID_HANDLE;
     if (slotA == slotB)
         return AURA_INVALID_DEFINITION;
+    /* A constraint on a body that is not in the simulation corrupts Jolt's broad phase on the next step. */
+    if (!slotA->enabled || !slotB->enabled)
+        return AURA_BODY_DISABLED;
 
     JPH::Body& bodyA = *slotA->body;
     JPH::Body& bodyB = *slotB->body;

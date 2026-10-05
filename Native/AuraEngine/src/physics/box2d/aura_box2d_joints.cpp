@@ -15,6 +15,8 @@ AuraResultCode Box2DWorld::CreateJoint(const AuraJointDesc& desc, uint64_t* outJ
         return AURA_INVALID_HANDLE;
     if (slotA == slotB)
         return AURA_INVALID_DEFINITION;
+    if ((slotA != nullptr && !b2Body_IsEnabled(slotA->body)) || !b2Body_IsEnabled(slotB->body))
+        return AURA_BODY_DISABLED;
     if (!IsFinite(desc.anchorA) || !IsFinite(desc.anchorB) || !IsFinite(desc.axisA) || !IsFinite(desc.distance)
         || !IsFinite(desc.minLimit) || !IsFinite(desc.maxLimit) || !IsFinite(desc.motorTargetVelocity)
         || !IsFinite(desc.maxMotorForce) || !IsFinite(desc.springFrequency) || !IsFinite(desc.springDamping))

@@ -102,7 +102,7 @@ namespace AuraEngine.KernelTests
             };
 
             // Per-package cases live in KernelTestSuite.Package*.cs so parallel work does not collide here.
-            cases = cases.Concat(PackageBTests()).Concat(PackageCTests()).Concat(PackageDTests()).Concat(PackageETests()).Concat(PackageFTests()).Concat(PackageGTests()).ToArray();
+            cases = cases.Concat(PackageBTests()).Concat(PackageCTests()).Concat(PackageDTests()).Concat(PackageETests()).Concat(PackageFTests()).Concat(PackageGTests()).Concat(PackageHTests()).ToArray();
 
             foreach (var (name, body) in cases)
             {
