@@ -76,6 +76,7 @@ AuraResultCode Box2DWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* 
     }
 
     Impl::Slot& slot = impl_->slots[index];
+    slot.area = 0.0f;
     const AuraBodyHandle handle{ static_cast<uint32_t>(index), slot.generation };
 
     b2BodyDef bodyDef = b2DefaultBodyDef();
@@ -119,6 +120,8 @@ AuraResultCode Box2DWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* 
             {
                 const b2Circle circle{ b2Vec2{ source.localPose.position.x, source.localPose.position.y }, source.radius };
                 const b2ShapeId shape = b2CreateCircleShape(body, &shapeDef, &circle);
+                if (!shapeDef.isSensor)
+                    slot.area += b2Shape_GetMassData(shape).mass / shapeDef.density;
                 b2Shape_EnableSensorEvents(shape, true);
                 break;
             }
@@ -131,6 +134,8 @@ AuraResultCode Box2DWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* 
                 const b2Vec2 halfAxis = b2RotateVector(rotation, b2Vec2{ 0.0f, half });
                 const b2Capsule capsule{ b2Sub(center, halfAxis), b2Add(center, halfAxis), source.radius };
                 const b2ShapeId shape = b2CreateCapsuleShape(body, &shapeDef, &capsule);
+                if (!shapeDef.isSensor)
+                    slot.area += b2Shape_GetMassData(shape).mass / shapeDef.density;
                 b2Shape_EnableSensorEvents(shape, true);
                 break;
             }
@@ -140,6 +145,8 @@ AuraResultCode Box2DWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* 
                 const b2Rot localRotation = b2MakeRot(AngleFromQuat(source.localPose.rotation));
                 const b2Polygon polygon = b2MakeOffsetBox(source.halfExtents.x, source.halfExtents.y, localCenter, localRotation);
                 const b2ShapeId shape = b2CreatePolygonShape(body, &shapeDef, &polygon);
+                if (!shapeDef.isSensor)
+                    slot.area += b2Shape_GetMassData(shape).mass / shapeDef.density;
                 b2Shape_EnableSensorEvents(shape, true);
                 break;
             }
@@ -309,11 +316,23 @@ AuraResultCode Box2DWorld::ApplyWaterStep(AuraWaterHandle water, float deltaTime
     {
         if (!slot.occupied || !b2Body_IsValid(slot.body) || !b2Body_IsEnabled(slot.body) || b2Body_GetType(slot.body) != b2_dynamicBody)
             continue;
-        const float fraction = std::clamp((impl_->water.surfaceHeight - b2Body_GetPosition(slot.body).y + 0.5f) / 1.0f, 0.0f, 1.0f);
-        const b2Vec2 impulse{ -impl_->gravity.x * impl_->water.density * fraction * deltaTime * b2Body_GetMass(slot.body) / 1000.0f,
-                              -impl_->gravity.y * impl_->water.density * fraction * deltaTime * b2Body_GetMass(slot.body) / 1000.0f };
-        if (fraction > 0.0f)
-            b2Body_ApplyLinearImpulseToCenter(slot.body, impulse, true);
+        /* Archimedes: the fluid weight of the submerged part, estimated from the body's AABB (exact for boxes), with the
+           body's displaced area as the 2D volume per metre of depth. */
+        const b2AABB bounds = b2Body_ComputeAABB(slot.body);
+        const float height = bounds.upperBound.y - bounds.lowerBound.y;
+        const float fraction = height > 0.0f ? std::clamp((impl_->water.surfaceHeight - bounds.lowerBound.y) / height, 0.0f, 1.0f) : 0.0f;
+        if (fraction <= 0.0f)
+            continue;
+        /* Drag first (implicit damping at linearDrag (1/s) at full submersion), then the buoyancy impulse: the world step
+           that follows adds gravity, so a neutrally buoyant body keeps zero velocity instead of sinking at g*dt. */
+        const float damping = 1.0f / (1.0f + std::max(0.0f, impl_->water.linearDrag) * fraction * deltaTime);
+        const b2Vec2 velocity = b2Body_GetLinearVelocity(slot.body);
+        b2Body_SetLinearVelocity(slot.body, b2Vec2{ velocity.x * damping, velocity.y * damping });
+        b2Body_SetAngularVelocity(slot.body, b2Body_GetAngularVelocity(slot.body) * damping);
+        /* A force, not an impulse: Box2D integrates in sub-steps, and a force is applied in every sub-step together with
+           gravity, so the two cancel exactly for a neutrally buoyant body (an impulse at the start of the step made it creep). */
+        const float displaced = impl_->water.density * slot.area * fraction;
+        b2Body_ApplyForceToCenter(slot.body, b2Vec2{ -impl_->gravity.x * displaced, -impl_->gravity.y * displaced }, true);
     }
     return AURA_SUCCESS;
 }

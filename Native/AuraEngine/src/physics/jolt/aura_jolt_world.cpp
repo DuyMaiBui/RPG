@@ -405,7 +405,13 @@ AuraResultCode JoltWorld::ApplyWaterStep(AuraWaterHandle water, float deltaTime)
         const float height = bounds.mMax.GetY() - bounds.mMin.GetY();
         const float submerged = height > 0.0f ? std::clamp((impl_->water.surfaceHeight - bounds.mMin.GetY()) / height, 0.0f, 1.0f) : 0.0f;
         if (submerged > 0.0f)
+        {
+            /* Drag first (implicit damping at linearDrag (1/s) at full submersion), then the buoyancy impulse: the world
+               step that follows adds gravity, so a neutrally buoyant body keeps zero velocity instead of sinking at g*dt. */
+            const float damping = 1.0f / (1.0f + std::max(0.0f, impl_->water.linearDrag) * submerged * deltaTime);
+            bi.SetLinearAndAngularVelocity(slot.id, bi.GetLinearVelocity(slot.id) * damping, bi.GetAngularVelocity(slot.id) * damping);
             bi.AddImpulse(slot.id, -gravity * (impl_->water.density * slot.body->GetShape()->GetVolume() * submerged * deltaTime));
+        }
     }
     return AURA_SUCCESS;
 }

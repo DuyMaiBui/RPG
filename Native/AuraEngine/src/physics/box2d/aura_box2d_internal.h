@@ -75,6 +75,8 @@ struct Box2DWorld::Impl
         b2BodyId body = b2_nullBodyId;
         /* Set by SetKinematicTarget; the velocity it produced is cleared after the step that reached the target. */
         bool kinematicTargetPending = false;
+        /* Area of the solid (non-sensor) shapes: the 2D "volume" displaced in water, per metre of depth. */
+        float area = 0.0f;
     };
 
     struct JointSlot
