@@ -1,18 +1,19 @@
 # AuraEngine feature test plan
 
-Status as of the ABI 11 integration. Counts come from the repository: 171 kernel cases,
-155 EditMode tests, 23 demo scenes, one smoke script. Nothing here is a claim that a layer
+Status after P0 (ABI 12). Counts come from the repository: 172 kernel cases,
+223 EditMode tests (including 20 in-Editor native backend tests and 8 authoring fixtures),
+23 demo scenes with 45+ assertions, a 25-cycle lifecycle check. Nothing here is a claim that a layer
 is already covered; the "Gap" column says what is missing.
 
 ## 1. Test layers
 
 | Layer | What it proves | How to run | Today |
 |---|---|---|---|
-| L1 Kernel suite | C ABI, Jolt and Box2D behavior, determinism, handles | `Native/AuraEngine/run_kernel_tests.sh`, or build to a private dir (it copies the dylib into `Assets/`), plus `AURA_GMALLOC=1` | 171 cases, pass normally and under Guard Malloc |
-| L2 EditMode | Engine-free Core, managed contracts, pure demo helpers | `unity command run_tests --mode editor --filter AuraEngine.Tests --filter_type assembly` | 155 pass; native backend tests are disabled (`AURA_NATIVE`) |
-| L3 Authoring | Each `Aura*Authoring` builds the right definition and registers/unregisters cleanly | EditMode or PlayMode tests that instantiate the component under an `AuraSimulationInstance` | none |
-| L4 Scene assertions | Each demo scene does what its name says | extend `Tools/AuraSmoke` with per-scene assertions | only "moving or static" and console errors |
-| L5 Lifecycle and soak | Repeated play/stop, enable/disable, scene reload, long runs | PlayMode tests and a soak script | none |
+| L1 Kernel suite | C ABI, Jolt and Box2D behavior, determinism, handles | `Native/AuraEngine/run_kernel_tests.sh`, or build to a private dir (it copies the dylib into `Assets/`), plus `AURA_GMALLOC=1` | 172 cases, pass normally and under Guard Malloc |
+| L2 EditMode | Engine-free Core, managed contracts, pure demo helpers | `unity command run_tests --mode editor --filter AuraEngine.Tests --filter_type assembly` | 223 pass; native backend tests re-enabled and stable over 10 runs |
+| L3 Authoring | Each `Aura*Authoring` builds the right definition and registers/unregisters cleanly | EditMode tests that instantiate the component under an `AuraSimulationInstance` (explicit `CreateWorld()`, `OnEnable` called by reflection) | 8 fixtures; `Start`/`FixedUpdate`/view sync still untested |
+| L4 Scene assertions | Each demo scene does what its name says | `Tools/AuraSmoke/aura_smoke.sh` evaluates `expectations.json` | 23 scenes pass; rules for rest scenes are generic |
+| L5 Lifecycle and soak | Repeated play/stop, enable/disable, scene reload, long runs | `Tools/AuraSmoke/aura_lifecycle.sh` (25 cycles, `Aura_LiveWorldCount`) | lifecycle done; soak/fuzz still open |
 | L6 Platform and perf | Builds on every target, frame-time and body-count budgets | CI and `run_bench.sh` | macOS dylib only; Android/iOS scripts unverified |
 
 Rules for every layer: a new test must fail on the code it guards (prove it by running it
@@ -120,3 +121,22 @@ unity command run_tests --mode editor --filter AuraEngine.Tests --filter_type as
 # Scenes (Editor running, display awake)
 Tools/AuraSmoke/aura_smoke.sh /tmp/aura_smoke
 ```
+
+## 7. Progress log
+
+### P0 (done)
+1. Native backend tests re-enabled in the Editor: 20 tests, 10 consecutive runs, 0 failures, no abort.
+2. Per-scene assertions: all 23 scenes pass. Writing them exposed two scene defects (balls leaving the
+   Demo2D ground; Space3D dust crossing an orbit) and one harness lesson: editing C# or bumping the ABI while
+   a smoke run is in progress invalidates it.
+3. Authoring fixtures: exposed three missing mode guards (fixed), a zero-gravity bug in `AuraWorldDefinition`
+   (a zero vector was replaced by -9.81; fixed, with tests) and pinned two behaviors to review:
+   collider geometry ignores `lossyScale` while joint anchors apply it, and a joint enabled before its bodies
+   after the world exists logs an error and is never retried.
+4. Lifecycle: 25 Play/Stop cycles over four scenes: exactly one native world while playing, none after stopping,
+   0 console errors, Editor memory flat (-72 MB). `Aura_LiveWorldCount` (ABI 12) makes this checkable.
+
+### Open items found while doing P0
+- Decide whether collider geometry should follow `lossyScale` like joint anchors do.
+- Retry a joint whose bodies register after the world exists.
+- `AuraSimulationInstance.Register` silently skips authoring when the backend lacks the capability.
