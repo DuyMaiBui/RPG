@@ -28,8 +28,102 @@ namespace AuraEngine.KernelTests
             ("2d_1000", AuraPhysicsMode.Plane2D, 1000, 2.0, 4.0),
         };
 
+        /* `bench --scale`: report-only stress at 2k to 50k bodies. A dense pile (boxes touching in columns) is held
+           awake, then every body is checked for NaN or for having fallen through the ground. */
+        private static readonly int[] ScaleBodyCounts = { 2000, 5000, 10000, 20000, 50000 };
+
+        private static int RunScale()
+        {
+            if (!NativePhysicsBackend.IsAvailable())
+            {
+                Console.WriteLine("BENCH_FAIL libaura is not loadable.");
+                return 2;
+            }
+
+            var bad = 0;
+            foreach (var mode in new[] { AuraPhysicsMode.Full3D, AuraPhysicsMode.Plane2D })
+            {
+                foreach (var count in ScaleBodyCounts)
+                {
+                    var is3D = mode == AuraPhysicsMode.Full3D;
+                    using var world = new AuraSimulationWorld(new NativePhysicsBackend(), new AuraWorldDefinition(mode, initialBodyCapacity: count + 16));
+                    world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateStatic(
+                        new AuraPose(new AuraVector3(0f, -0.5f, 0f), AuraQuaternion.Identity),
+                        AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All,
+                        AuraPhysicsShapeDefinition.Box(new AuraVector3(400f, 0.5f, is3D ? 400f : 1f))));
+                    var entities = new List<SimulationEntityId>(count);
+                    var columns = is3D ? 40 : 100;
+                    for (var index = 0; index < count; index++)
+                    {
+                        float x, z = 0f, y;
+                        if (is3D)
+                        {
+                            x = (index % columns) * 1.02f - columns * 0.51f;
+                            z = ((index / columns) % columns) * 1.02f - columns * 0.51f;
+                            y = 0.5f + (index / (columns * columns)) * 1.02f;
+                        }
+                        else
+                        {
+                            x = (index % columns) * 1.02f - columns * 0.51f;
+                            y = 0.5f + (index / columns) * 1.02f;
+                        }
+
+                        var entity = world.CreateEntity();
+                        entities.Add(entity);
+                        world.AttachBody(entity, new AuraPhysicsBodyDefinition(
+                            AuraBodyType.Dynamic,
+                            new AuraPose(new AuraVector3(x, y, z), AuraQuaternion.Identity),
+                            AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All,
+                            new[] { AuraPhysicsShapeDefinition.Box(new AuraVector3(0.5f, 0.5f, 0.5f)) },
+                            allowSleeping: false));
+                    }
+
+                    var times = new List<double>();
+                    var stopwatch = new Stopwatch();
+                    uint tick = 0;
+                    for (var step = 0; step < 120; step++)
+                    {
+                        stopwatch.Restart();
+                        world.Step(new SimulationStep(new SimulationTick(++tick), Dt));
+                        stopwatch.Stop();
+                        times.Add(stopwatch.Elapsed.TotalMilliseconds);
+                    }
+
+                    var nan = 0;
+                    var fell = 0;
+                    var maxY = 0f;
+                    foreach (var entity in entities)
+                    {
+                        if (!world.TryGetBodyState(entity, out var state))
+                            continue;
+                        var p = state.Pose.Position;
+                        if (float.IsNaN(p.X) || float.IsNaN(p.Y) || float.IsNaN(p.Z))
+                            nan++;
+                        else if (p.Y < -0.6f)
+                            fell++;
+                        maxY = Math.Max(maxY, p.Y);
+                    }
+
+                    times.Sort();
+                    var avg = 0.0;
+                    foreach (var t in times)
+                        avg += t;
+                    avg /= times.Count;
+                    if (nan > 0 || fell > 0)
+                        bad++;
+                    Console.WriteLine($"scale {(is3D ? "3d" : "2d")} bodies={count} avg_ms={avg:F2} p95_ms={times[(int)(times.Count * 0.95) - 1]:F2} max_ms={times[times.Count - 1]:F2} nan={nan} fell_through={fell} max_y={maxY:F1}");
+                }
+            }
+
+            Console.WriteLine(bad == 0 ? "SCALE_OK" : $"SCALE_FAIL ({bad} scenarios with invalid bodies)");
+            return bad == 0 ? 0 : 1;
+        }
+
         public static int Run(string[] args)
         {
+            if (Array.IndexOf(args, "--scale") >= 0)
+                return RunScale();
+
             var check = Array.IndexOf(args, "--check") >= 0;
             var scale = 1.0;
             var env = Environment.GetEnvironmentVariable("AURA_BENCH_BUDGET_SCALE");

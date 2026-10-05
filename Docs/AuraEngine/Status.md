@@ -126,6 +126,55 @@ Bugs found by the edge-case suite and fixed:
   instead of the 2D renderer, so 3D Lit materials receive lighting and shadows
   instead of rendering unlit.
 
+## Safety and scale (priority, 2026-10-05)
+
+Priority order: a physics system that cannot corrupt memory or silently misbehave, then as many simulated
+objects as possible. Everything below was measured with `managed_kernel_tests.dll bench --scale` (Apple
+silicon, release, 120 steps of a dense, never-sleeping pile of unit boxes on a ground plane, all workers).
+
+| Bodies | 3D avg step | 2D avg step |
+|---|---|---|
+| 2,000 | 2.6 ms | 1.1 ms |
+| 5,000 | 7.5 ms | 3.4 ms |
+| 10,000 | 24.7 ms | 8.5 ms |
+| 20,000 | 59 ms | 18 ms |
+| 50,000 | 187 ms | 44 ms |
+
+- No NaN and no body below the ground in any of these runs (`SCALE_OK`). A sleeping pile costs far less than
+  this worst case; real scenes should keep `allowSleeping` on.
+- **Fixed (found by the scale bench):** Jolt's body-pair and contact-constraint caches were 8192, so from about
+  5,000 touching bodies Jolt dropped contacts and 25 to 70 percent of the boxes sank through the floor while
+  `PhysicsSystem::Update` returned an error that the kernel ignored. Both caches are now 2^20 (`kMaxBodyPairs`,
+  `kMaxContactConstraints`). The fixed 64 MB `TempAllocatorImpl` aborted the process once the caches grew, so it
+  is now `TempAllocatorMalloc`.
+- Hard limits: 65,536 bodies per Jolt world (`kMaxBodies`); `AttachBody` then returns an invalid body id, a freed
+  slot can be reused (test `o_body_limit_fails_cleanly_and_world_keeps_stepping_3d`), 4,096 live worlds.
+  Box2D has no fixed body limit and ran 50,000 bodies.
+- Regression tests: package O (dense pile 6,000 boxes 3D, 12,000 boxes 2D, body limit). Kernel suite 459 cases.
+- Still open for safety: `Aura_Step` does not report a Jolt update error (the caches are now large enough that
+  it should not occur); `RestoreState` is not bit-exact for 3D; a rare Box2D `b2Solve` crash (soak seed 1,
+  episode 847) is unresolved; no ThreadSanitizer run; 3D step time past 10,000 awake bodies needs spatial
+  sleeping or islands tuned per game.
+
+## Feature status (not the current priority)
+
+Verified by analytic oracle tests (packages L, M, N): buoyancy and drag, free fall, projectile, restitution,
+friction, collisions, stacking, torque, sleeping, pendulum, spring, pulley, gear, rack and pinion, hinge and
+slider motors and limits, fixed and distance joints, orbit, directional and drag fields, characters, CCD,
+kinematic bodies, vehicle throttle and steering.
+
+Known kernel defects found by those oracles, not fixed yet:
+
+- Jolt contact impulse is always 0 (`aura_jolt_contacts.cpp:54`); Box2D reports only the first manifold point
+  and emits a (box, box) self-contact for a resting box.
+- 3D character: after a fall `Velocity.Y` stays negative (about -6 m/s after 2.1 m) and slope climb speed depends
+  on the earlier fall (3 m/s becomes 0 after a 2.1 m drop); a moving platform does not carry the character.
+- A sleeping vehicle chassis ignores `Aura_SetVehicleInput` because the body is never activated.
+- Box2D joints are softer than Jolt (10 kg cantilever sags 1.6 cm against 0.64 cm).
+
+Demo scenes: see `Sample-Catalog.md`. Open scene issues: `AuraDemoVehicle2D` is undriven, the kernel ragdoll
+scenes are rigid or collapse, `AuraDemoCore3D` is static, `AuraDemoArticulation2D` arm is cropped.
+
 ## Not yet implemented
 
 - Platform builds of `libaura`: `build_plugin.sh` covers the desktop hosts;

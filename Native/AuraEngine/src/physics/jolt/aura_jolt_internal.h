@@ -66,6 +66,11 @@ namespace aura
 
 constexpr uint32_t kMaxLayers = 64;
 constexpr uint32_t kMaxBodies = 65536;
+/* Jolt silently drops contacts once these caches fill (bodies then sink through each other), so they are sized for a
+   fully loaded world of kMaxBodies rather than Jolt's tutorial default of 8192. The cache memory is only touched as
+   contacts appear. */
+constexpr uint32_t kMaxBodyPairs = 1u << 20;
+constexpr uint32_t kMaxContactConstraints = 1u << 20;
 
 inline JPH::Vec3 ToVec3(const AuraVec3& v) { return JPH::Vec3(v.x, v.y, v.z); }
 inline JPH::RVec3 ToRVec3(const AuraVec3& v) { return JPH::RVec3(v.x, v.y, v.z); }
@@ -318,7 +323,7 @@ struct JoltWorld::Impl
     BroadPhaseLayerInterfaceImpl broadPhase;
     ObjectVsBroadPhaseLayerFilterImpl objectVsBroadPhase;
     ObjectLayerPairFilterImpl objectVsObject;
-    JPH::TempAllocatorImpl tempAllocator{ 64 * 1024 * 1024 };
+    JPH::TempAllocatorMalloc tempAllocator;
     JPH::JobSystemThreadPool jobSystem{ JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, AuraJoltWorkerCount() };
     JPH::PhysicsSystem physics;
     /* Declared after physics so vehicles are destroyed before the Jolt system. */
@@ -378,7 +383,7 @@ struct JoltWorld::Impl
         objectVsObject.Matrix = matrix;
         listener.owner = this;
 
-        physics.Init(kMaxBodies, 0, 8192, 8192, broadPhase, objectVsBroadPhase, objectVsObject);
+        physics.Init(kMaxBodies, 0, kMaxBodyPairs, kMaxContactConstraints, broadPhase, objectVsBroadPhase, objectVsObject);
         physics.SetGravity(ToVec3(gravity));
         physics.SetContactListener(&listener);
         simShapeFilter.groups = &simShapeFilterGroups;
