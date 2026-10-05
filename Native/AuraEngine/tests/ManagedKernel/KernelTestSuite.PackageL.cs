@@ -26,6 +26,7 @@ namespace AuraEngine.KernelTests
                 ("l_water_dropped_box_settles_without_bouncing_3d", () => L_DroppedBoxSettles(AuraPhysicsMode.Full3D)),
                 ("l_water_dropped_box_settles_without_bouncing_2d", () => L_DroppedBoxSettles(AuraPhysicsMode.Plane2D)),
                 ("l_water_without_drag_keeps_oscillating_3d", () => L_WithoutDragKeepsOscillating(AuraPhysicsMode.Full3D)),
+                ("l_softbody_vertices_are_world_space_and_free_fall_with_the_body_3d", L_SoftBodyVerticesAreWorldSpace),
             };
         }
 
@@ -166,6 +167,42 @@ namespace AuraEngine.KernelTests
 
                 Check(lateAmplitude > 0.3f, $"without drag the box should still oscillate after 10 s (amplitude {lateAmplitude:F3}).");
             }
+        }
+
+        /* Jolt keeps soft body vertices relative to the body's centre of mass; the kernel must report world space so a
+           view follows the body. A cube released at y = 5 free-falls: centroid y(t) = 5 - g t^2 / 2 until it lands. */
+        private static void L_SoftBodyVerticesAreWorldSpace()
+        {
+            using var world = NewWorld(AuraPhysicsMode.Full3D);
+            var corners = new[]
+            {
+                V(-0.5f, -0.5f, -0.5f), V(0.5f, -0.5f, -0.5f), V(0.5f, 0.5f, -0.5f), V(-0.5f, 0.5f, -0.5f),
+                V(-0.5f, -0.5f, 0.5f), V(0.5f, -0.5f, 0.5f), V(0.5f, 0.5f, 0.5f), V(-0.5f, 0.5f, 0.5f),
+            };
+            var faces = new uint[] { 0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 2, 3, 7, 2, 7, 6, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5 };
+            var soft = world.CreateSoftBody(new AuraSoftBodyDefinition(new AuraPose(V(0f, 5f, 0f), AuraQuaternion.Identity), AuraPhysicsLayer.Default, corners, faces));
+            Check(soft.IsValid, "soft body creation failed.");
+
+            Check(world.TryGetSoftBodyState(soft, out var start), "soft body state unavailable.");
+            Near(Centroid(start).Y, 5f, 0.02f, "centroid at the start (world space)");
+            Step(world, 30);
+            Check(world.TryGetSoftBodyState(soft, out var later), "soft body state unavailable.");
+            var t = 30f * Dt;
+            Near(Centroid(later).Y, 5f - 9.81f * t * t / 2f, 0.12f, "centroid after 0.5 s of free fall (world space)");
+        }
+
+        private static AuraVector3 Centroid(AuraSoftBodyState state)
+        {
+            float x = 0f, y = 0f, z = 0f;
+            foreach (var vertex in state.Vertices)
+            {
+                x += vertex.X;
+                y += vertex.Y;
+                z += vertex.Z;
+            }
+
+            var n = state.Vertices.Length;
+            return V(x / n, y / n, z / n);
         }
     }
 }

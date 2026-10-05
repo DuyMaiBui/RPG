@@ -136,9 +136,12 @@ bool AuraJoltSoftBodyOwner::CopyVertexPositions(float* output, uint32_t capacity
     const auto* motion = static_cast<const JPH::SoftBodyMotionProperties*>(lock.GetBody().GetMotionProperties());
     if (motion == nullptr || capacity < motion->GetVertices().size())
         return false;
+    /* Jolt keeps soft body vertices relative to the body's centre of mass; report them in world space so a view
+       follows the body as it falls and rotates. */
+    const JPH::RMat44 centerOfMass = lock.GetBody().GetCenterOfMassTransform();
     for (uint32_t index = 0; index < motion->GetVertices().size(); ++index)
     {
-        const JPH::Vec3 position = motion->GetVertices()[index].mPosition;
+        const JPH::Vec3 position = JPH::Vec3(centerOfMass * motion->GetVertices()[index].mPosition);
         output[index * 3u] = position.GetX();
         output[index * 3u + 1u] = position.GetY();
         output[index * 3u + 2u] = position.GetZ();
