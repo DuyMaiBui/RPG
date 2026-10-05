@@ -9,7 +9,7 @@ is already covered; the "Gap" column says what is missing.
 
 | Layer | What it proves | How to run | Today |
 |---|---|---|---|
-| L1 Kernel suite | C ABI, Jolt and Box2D behavior, determinism, handles | `Native/AuraEngine/run_kernel_tests.sh`, or build to a private dir (it copies the dylib into `Assets/`), plus `AURA_GMALLOC=1` | 172 cases, pass normally and under Guard Malloc |
+| L1 Kernel suite | C ABI, Jolt and Box2D behavior, determinism, handles | `Native/AuraEngine/run_kernel_tests.sh`, or build to a private dir (it copies the dylib into `Assets/`), plus `AURA_GMALLOC=1` | 291 cases, pass normally and under real Guard Malloc (`AURA_GMALLOC=1`, banner verified) |
 | L2 EditMode | Engine-free Core, managed contracts, pure demo helpers | `unity command run_tests --mode editor --filter AuraEngine.Tests --filter_type assembly` | 223 pass; native backend tests re-enabled and stable over 10 runs |
 | L3 Authoring | Each `Aura*Authoring` builds the right definition and registers/unregisters cleanly | EditMode tests that instantiate the component under an `AuraSimulationInstance` (explicit `CreateWorld()`, `OnEnable` called by reflection) | 8 fixtures; `Start`/`FixedUpdate`/view sync still untested |
 | L4 Scene assertions | Each demo scene does what its name says | `Tools/AuraSmoke/aura_smoke.sh` evaluates `expectations.json` | 23 scenes pass; rules for rest scenes are generic |
@@ -154,3 +154,42 @@ Tools/AuraSmoke/aura_smoke.sh /tmp/aura_smoke
 - Performance baseline (P2.10, for reference only): `run_bench.sh` builds the reference backend, not Jolt. On this
   machine: 512 bodies, 600 ticks in 1.34 s (about 2.2 ms per step) and about 177,000 raycasts per second. A Jolt
   budget still needs to be measured and agreed.
+
+### P1 results (soak, thread safety, Guard Malloc correction)
+
+**Correction.** Until this point "passes under Guard Malloc" for the managed kernel suite was not true: the .NET host
+shipped with Unity has the hardened runtime, so dyld ignores `DYLD_INSERT_LIBRARIES` and the suite ran as an
+ordinary run (no `GuardMalloc[` banner). The C++ repro for the joint use-after-free did run under Guard Malloc and
+that fix stands. `run_kernel_tests.sh` with `AURA_GMALLOC=1` now runs an ad-hoc re-signed copy of the host and exits
+with an error when the banner is missing; the suite passes under it (291 cases).
+
+**Soak runner** (`dotnet managed_kernel_tests.dll soak [seconds] [seed] [episode|first-last]`): 1,500 seeded random
+operations per episode, run twice, digests must match. It found four crashes or memory errors, all fixed with
+regression tests that fail on the old kernel (`KernelTestSuite.PackageH.cs`):
+1. Box2D overlap queries wrote past the caller's capacity (only visible under real Guard Malloc).
+2. A joint on a disabled body crashed Jolt on the next step.
+3. `SetKinematicTarget` on plane/mesh/height-field or non-kinematic bodies crashed Jolt.
+4. A zero-length step left `lastDelta` at 0 so the next kinematic target produced inf/NaN.
+5. A mouse joint (or any joint) between two non-dynamic bodies crashed Box2D's solver.
+
+**Still open** (repros in `Native/AuraEngine/tests/stress/repro`):
+- Box2D slider with a limit enabled goes NaN when a dynamic body starts far outside the limits (about 27% of random
+  configurations); Box2D distance and rope joints reach 1e7 to 1e20 m/s in random configurations; spring joints
+  exploded at dt = 0.25. With `AURA_SOAK_CONTINUE=1` about a third of the random 2D episodes still report an explosion:
+  they are chaotic (dozens of random joints and velocities per world) so they are not proof of a product bug, but the
+  slider and distance repros are minimal.
+- `Aura_CopyEvents` order depends on Jolt worker timing (state digests are deterministic; event order is not).
+- `HasJoint` is false and control calls return `INVALID_HANDLE` for a broken joint, while the header says the handle
+  stays valid.
+- `DeserializeState` is not atomic and accepts huge or non-finite values before reporting an error.
+- A rare Box2D `b2Solve` memset crash (episode 847 of `soak 25 1` with `AURA_SOAK_ORDER=1`) is unresolved and does not
+  reproduce under Guard Malloc or in isolation.
+- `JoltGlobal::Ensure` has no once-guard (possible double initialisation if two threads create the first world).
+- World handles are raw pointers; calling on a destroyed world is undefined behaviour.
+
+**Thread safety (P1.6): not done.** Apple's ThreadSanitizer runtime crashes at startup on this machine even for a
+trivial program (macOS 26, clang 17). `tests/stress/run_stress.sh` builds the driver with TSan and UBSan and should
+work on Linux or CI; UBSan ran clean apart from the known float-to-uint32 conversion in `ComputeStateHash`.
+
+**Scene-level checks after the fixes:** 23/23 assertions, 23/23 safety bounds at 8 fps, 25/25 lifecycle cycles
+(memory flat, -131 MB).
