@@ -100,6 +100,12 @@ namespace AuraEngine.Unity
 
         public void BuildInto(AuraSimulationInstance instance)
         {
+            if (instance.World.Definition.Mode != AuraPhysicsMode.Plane2D)
+            {
+                Debug.LogError($"{nameof(AuraCharacter2DAuthoring)} on '{name}' requires Plane2D mode.", this);
+                return;
+            }
+
             if ((instance.World.Capabilities & AuraPhysicsCapabilities.Characters) == 0)
             {
                 Debug.LogError($"{nameof(AuraCharacter2DAuthoring)} on '{name}' needs a backend that supports characters (Plane2D).", this);

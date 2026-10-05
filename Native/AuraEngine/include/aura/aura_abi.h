@@ -11,6 +11,8 @@ extern "C" {
    version/query-count helpers) and validates handles and ABI compatibility. */
 
 uint32_t Aura_AbiVersion(void);
+/* Diagnostic: number of worlds created and not yet destroyed in this process. */
+uint32_t Aura_LiveWorldCount(void);
 
 /* Returns AURA_ABI_MISMATCH when the caller's expected version differs. */
 AuraResultCode Aura_CheckAbi(uint32_t callerAbiVersion);

@@ -1,3 +1,4 @@
+#include <atomic>
 #include "aura_capi_internal.h"
 
 #include <cstring>
@@ -14,11 +15,22 @@ AuraResultCode Aura_CheckAbi(uint32_t callerAbiVersion)
     return callerAbiVersion == AURA_ENGINE_ABI_VERSION ? AURA_SUCCESS : AURA_ABI_MISMATCH;
 }
 
+/* Diagnostic: worlds created and not yet destroyed, so hosts can assert they do not leak across play sessions. */
+static std::atomic<uint32_t> g_liveWorlds{ 0 };
+
+uint32_t Aura_LiveWorldCount(void)
+{
+    return g_liveWorlds.load();
+}
+
 AuraResultCode Aura_CreateWorld(const AuraWorldDesc* desc, AuraWorldHandle* outWorld)
 {
     if (desc == nullptr || outWorld == nullptr)
         return AURA_INVALID_DEFINITION;
-    outWorld->opaque = reinterpret_cast<uint64_t>(aura::CreateWorldImpl(*desc));
+    auto* created = aura::CreateWorldImpl(*desc);
+    outWorld->opaque = reinterpret_cast<uint64_t>(created);
+    if (created != nullptr)
+        g_liveWorlds.fetch_add(1);
     return AURA_SUCCESS;
 }
 
@@ -28,6 +40,7 @@ AuraResultCode Aura_DestroyWorld(AuraWorldHandle world)
     if (instance == nullptr)
         return AURA_INVALID_WORLD;
     delete instance;
+    g_liveWorlds.fetch_sub(1);
     return AURA_SUCCESS;
 }
 

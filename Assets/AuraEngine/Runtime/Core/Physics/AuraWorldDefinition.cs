@@ -6,14 +6,15 @@ namespace AuraEngine.Core
     {
         public AuraWorldDefinition(
             AuraPhysicsMode mode = AuraPhysicsMode.Full3D,
-            AuraVector3 gravity = default,
+            AuraVector3? gravity = null,
             AuraCollisionMatrix collisionMatrix = null,
             int initialBodyCapacity = 256,
             float fixedDeltaTime = 1f / 60f,
             AuraSolverSettings solverSettings = null)
         {
             Mode = mode;
-            Gravity = gravity == default ? new AuraVector3(0f, -9.81f, 0f) : gravity;
+            // null means "not specified"; an explicit zero vector is a valid zero-gravity world.
+            Gravity = gravity ?? new AuraVector3(0f, -9.81f, 0f);
             CollisionMatrix = collisionMatrix ?? AuraCollisionMatrix.CreateAllCollide();
             InitialBodyCapacity = initialBodyCapacity;
             FixedDeltaTime = fixedDeltaTime;

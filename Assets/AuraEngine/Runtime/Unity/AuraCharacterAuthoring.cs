@@ -77,6 +77,12 @@ namespace AuraEngine.Unity
 
         public void BuildInto(AuraSimulationInstance instance)
         {
+            if (instance.World.Definition.Mode != AuraPhysicsMode.Full3D)
+            {
+                Debug.LogError($"{nameof(AuraCharacterAuthoring)} on '{name}' requires Full3D mode.", this);
+                return;
+            }
+
             if ((instance.World.Capabilities & AuraPhysicsCapabilities.Characters) == 0)
             {
                 Debug.LogError($"{nameof(AuraCharacterAuthoring)} on '{name}' needs a backend that supports characters.", this);

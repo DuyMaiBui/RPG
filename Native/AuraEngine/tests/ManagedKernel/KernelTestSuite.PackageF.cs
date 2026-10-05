@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using AuraEngine.Core;
 using AuraEngine.Physics;
+using AuraEngine.Physics.Native;
 
 namespace AuraEngine.KernelTests
 {
@@ -14,7 +15,20 @@ namespace AuraEngine.KernelTests
             {
                 ("kinematic_target_is_consumed_by_one_step_3d", () => KinematicTarget_IsConsumedByOneStep(AuraPhysicsMode.Full3D)),
                 ("kinematic_target_is_consumed_by_one_step_2d", () => KinematicTarget_IsConsumedByOneStep(AuraPhysicsMode.Plane2D)),
+                ("live_world_count_tracks_create_and_destroy", LiveWorldCount_TracksCreateAndDestroy),
             };
+        }
+
+        private static void LiveWorldCount_TracksCreateAndDestroy()
+        {
+            var before = NativePhysicsDiagnostics.LiveWorldCount();
+            var first = NewWorld(AuraPhysicsMode.Full3D);
+            var second = NewWorld(AuraPhysicsMode.Plane2D);
+            Check(NativePhysicsDiagnostics.LiveWorldCount() == before + 2, "two live worlds expected.");
+            ((IDisposable)first).Dispose();
+            Check(NativePhysicsDiagnostics.LiveWorldCount() == before + 1, "one world should remain after disposing the first.");
+            ((IDisposable)second).Dispose();
+            Check(NativePhysicsDiagnostics.LiveWorldCount() == before, "the counter must return to its start after disposal.");
         }
 
         /* A slow frame runs several fixed steps per kinematic target. The body must stop at the target instead of

@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 #ifndef AURA_ENGINE_ABI_VERSION
-#define AURA_ENGINE_ABI_VERSION 11u
+#define AURA_ENGINE_ABI_VERSION 12u
 #endif
 
 typedef uint32_t AuraEntityIndex;

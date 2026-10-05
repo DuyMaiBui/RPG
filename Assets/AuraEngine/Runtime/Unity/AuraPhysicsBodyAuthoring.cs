@@ -192,6 +192,12 @@ namespace AuraEngine.Unity
 
         public void BuildInto(AuraSimulationInstance instance)
         {
+            if (instance.World.Definition.Mode != AuraPhysicsMode.Full3D)
+            {
+                Debug.LogError($"{nameof(AuraPhysicsBodyAuthoring)} on '{name}' requires Full3D mode.", this);
+                return;
+            }
+
             var view = GetComponent<AuraPhysicsView>();
             if (view == null)
             {

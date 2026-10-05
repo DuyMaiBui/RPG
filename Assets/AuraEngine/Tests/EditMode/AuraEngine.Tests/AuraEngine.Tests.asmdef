@@ -8,7 +8,8 @@
     "AuraEngine.Server",
     "AuraEngine.Networking",
     "AuraEngine.Demo",
-    "AuraEngine.Physics.Native"
+    "AuraEngine.Physics.Native",
+    "AuraEngine.Unity"
   ],
   "includePlatforms": [
     "Editor"
