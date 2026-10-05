@@ -1,4 +1,3 @@
-#if AURA_NATIVE
 using System;
 using AuraEngine.Core;
 using AuraEngine.Physics.Native;
@@ -623,4 +622,3 @@ namespace AuraEngine.Tests
         }
     }
 }
-#endif
