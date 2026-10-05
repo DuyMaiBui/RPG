@@ -15,6 +15,14 @@ namespace AuraEngine.KernelTests
                 return SoakRunner.Run(rest);
             }
 
+            // Opt-in step-time benchmark: `managed_kernel_tests.dll bench [--check]`.
+            if (args.Length > 0 && args[0] == "bench")
+            {
+                var rest = new string[args.Length - 1];
+                Array.Copy(args, 1, rest, 0, rest.Length);
+                return BenchRunner.Run(rest);
+            }
+
             var runner = new KernelTestSuite();
             var failures = runner.RunAll();
             Console.WriteLine();

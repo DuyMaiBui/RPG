@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Standalone runner for the C++ physics kernel. Compiles the engine-free
+       AuraEngine.* sources directly (they have no UnityEngine dependency) and
+       runs the kernel tests against the locally built libaura. This replaces
+       the in-Editor native test suite, which crashes mono's JIT when a managed
+       method calls into the P/Invoke boundary under the test runner. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>9.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>managed_kernel_tests</AssemblyName>
+    <RootNamespace>AuraEngine.KernelTests</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseOutputPath>bin/</BaseOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)../../../../Assets/AuraEngine/Runtime/Core/**/*.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../../../Assets/AuraEngine/Runtime/Physics/**/*.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../../../Assets/AuraEngine/Runtime/Simulation/**/*.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../../../Assets/AuraEngine/Runtime/Serialization/**/*.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../../../Assets/AuraEngine/Runtime/Server/**/*.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../../../Assets/AuraEngine/Runtime/Networking/**/*.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="KernelTestSuite*.cs" />
+    <Compile Include="BenchRunner.cs" />
+    <Compile Include="Soak*.cs" />
+  </ItemGroup>
+
+</Project>
