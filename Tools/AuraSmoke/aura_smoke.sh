@@ -32,9 +32,11 @@ open('$OUT/$n.png','wb').write(base64.b64decode(m.group(1)))" 2>/dev/null
   [ -n "$FPS" ] && unity command run_script --file Temp/AuraFpsControl.cs --entry AuraFpsControl.Reset >/dev/null 2>&1
   unity command editor_stop >/dev/null 2>&1; sleep 1
   res=$(python3 Tools/AuraSmoke/evaluate.py "$OUT/$n.jsonl" Tools/AuraSmoke/expectations.json "$n" $SAFETY)
+  vis=$(python3 Tools/AuraSmoke/visual_check.py "$OUT/$n.png" Tools/AuraSmoke/expectations.json "$n" 2>&1 | tail -1)
   echo "$res" | head -1 | tee -a "$OUT/report.txt"; echo "$res" | tail -n +2 | tee -a "$OUT/report.txt"
+  echo "   $vis" | tee -a "$OUT/report.txt"; case "$vis" in *FAIL*|*Traceback*|*rror*) failed=1; echo "   - visual check failed" | tee -a "$OUT/report.txt";; esac
   case "$c" in *'"error":0,'*) ;; *) echo "   - console errors: $c $e" | tee -a "$OUT/report.txt"; failed=1;; esac
   case "$res" in *FAIL*) failed=1;; esac
 done
-echo "---"; grep -c PASS "$OUT/report.txt" | sed 's/^/passed scenes: /'; grep -c FAIL "$OUT/report.txt" | sed 's/^/failed scenes: /'
+echo "---"; grep -E " samples, " "$OUT/report.txt" | grep -c PASS | sed 's/^/passed scenes: /'; grep -E " samples, " "$OUT/report.txt" | grep -c FAIL | sed 's/^/failed scenes: /'; grep -c "visual check failed" "$OUT/report.txt" | sed 's/^/failed visual checks: /'
 exit $failed

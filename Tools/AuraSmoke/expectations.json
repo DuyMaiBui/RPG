@@ -544,5 +544,74 @@
    "op": "<",
    "value": 8
   }
- ]
+ ],
+ "AuraDemo2D:visual": {
+  "actor_min": 0.0258
+ },
+ "AuraDemo3D:visual": {
+  "actor_min": 0.0136
+ },
+ "AuraDemoAdvancedRagdoll3D:visual": {
+  "actor_min": 0.0022
+ },
+ "AuraDemoAdvancedSoftBody3D:visual": {
+  "actor_min": 0.0009
+ },
+ "AuraDemoAdvancedWater3D:visual": {
+  "actor_min": 0.0007
+ },
+ "AuraDemoArticulation2D:visual": {
+  "actor_min": 0.0055
+ },
+ "AuraDemoArticulation3D:visual": {
+  "actor_min": 0.0266
+ },
+ "AuraDemoChainRagdoll2D:visual": {
+  "actor_min": 0.0011
+ },
+ "AuraDemoCharacter3D:visual": {
+  "actor_min": 0.0171
+ },
+ "AuraDemoCloth2D:visual": {
+  "actor_min": 0.0096
+ },
+ "AuraDemoCloth3D:visual": {
+  "actor_min": 0.0129
+ },
+ "AuraDemoConstraints3D:visual": {
+  "actor_min": 0.0085
+ },
+ "AuraDemoCore2D:visual": {
+  "actor_min": 0.0015
+ },
+ "AuraDemoCore3D:visual": {
+  "actor_min": 0.0056
+ },
+ "AuraDemoHair2D:visual": {
+  "actor_min": 0.003
+ },
+ "AuraDemoHair3D:visual": {
+  "actor_min": 0.0029
+ },
+ "AuraDemoHumanoid3D:visual": {
+  "actor_min": 0.0023
+ },
+ "AuraDemoPlatformer2D:visual": {
+  "actor_min": 0.0184
+ },
+ "AuraDemoRagdollHit3D:visual": {
+  "actor_min": 0.0052
+ },
+ "AuraDemoSandbox2D:visual": {
+  "actor_min": 0.0153
+ },
+ "AuraDemoSpace3D:visual": {
+  "actor_min": 0.0038
+ },
+ "AuraDemoVehicle2D:visual": {
+  "actor_min": 0.0067
+ },
+ "AuraDemoWater2D:visual": {
+  "actor_min": 0.0017
+ }
 }
