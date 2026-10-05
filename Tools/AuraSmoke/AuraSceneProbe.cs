@@ -40,6 +40,7 @@ public static class AuraSceneProbe
             extent = Mathf.Max(extent, Mathf.Abs(p.x) + Mathf.Abs(p.y) + Mathf.Abs(p.z));
         }
 
+        M("dt", Time.unscaledDeltaTime);
         M("n", transforms.Length); M("nan", nan); M("minY", minY); M("extent", extent); M("sig", signature);
 
         Transform T(string n) { var g = GameObject.Find("AuraSimulation/" + n); return g == null ? null : g.transform; }

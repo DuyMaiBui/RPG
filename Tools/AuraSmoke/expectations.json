@@ -311,5 +311,238 @@
    "op": ">",
    "value": 0.05
   }
+ ],
+ "*:fps": [],
+ "AuraDemo2D:safety": [
+  {
+   "metric": "platformX",
+   "stat": "max",
+   "op": "<",
+   "value": 20
+  },
+  {
+   "metric": "platformX",
+   "stat": "min",
+   "op": ">",
+   "value": -20
+  }
+ ],
+ "AuraDemo3D:safety": [
+  {
+   "metric": "platformX",
+   "stat": "max",
+   "op": "<",
+   "value": 20
+  },
+  {
+   "metric": "platformX",
+   "stat": "min",
+   "op": ">",
+   "value": -20
+  }
+ ],
+ "AuraDemoCore2D:safety": [
+  {
+   "metric": "platformX",
+   "stat": "max",
+   "op": "<",
+   "value": 20
+  },
+  {
+   "metric": "platformX",
+   "stat": "min",
+   "op": ">",
+   "value": -20
+  }
+ ],
+ "AuraDemoArticulation3D:safety": [
+  {
+   "metric": "carX",
+   "stat": "max",
+   "op": "<",
+   "value": 17
+  },
+  {
+   "metric": "carX",
+   "stat": "min",
+   "op": ">",
+   "value": -17
+  },
+  {
+   "metric": "carZ",
+   "stat": "max",
+   "op": "<",
+   "value": 17
+  },
+  {
+   "metric": "carZ",
+   "stat": "min",
+   "op": ">",
+   "value": -17
+  }
+ ],
+ "AuraDemoCharacter3D:safety": [
+  {
+   "metric": "stairsY",
+   "stat": "max",
+   "op": "<",
+   "value": 4
+  },
+  {
+   "metric": "jumperY",
+   "stat": "max",
+   "op": "<",
+   "value": 8
+  },
+  {
+   "metric": "gentleY",
+   "stat": "max",
+   "op": "<",
+   "value": 4
+  },
+  {
+   "metric": "steepY",
+   "stat": "max",
+   "op": "<",
+   "value": 2
+  },
+  {
+   "metric": "platformY",
+   "stat": "max",
+   "op": "<",
+   "value": 4
+  }
+ ],
+ "AuraDemoPlatformer2D:safety": [
+  {
+   "metric": "heroX",
+   "stat": "max",
+   "op": "<",
+   "value": 17
+  },
+  {
+   "metric": "heroX",
+   "stat": "min",
+   "op": ">",
+   "value": -17
+  },
+  {
+   "metric": "heroY",
+   "stat": "max",
+   "op": "<",
+   "value": 14
+  }
+ ],
+ "AuraDemoSandbox2D:safety": [
+  {
+   "metric": "chassisX",
+   "stat": "max",
+   "op": "<",
+   "value": 17
+  },
+  {
+   "metric": "chassisX",
+   "stat": "min",
+   "op": ">",
+   "value": -17
+  },
+  {
+   "metric": "crateY",
+   "stat": "max",
+   "op": "<",
+   "value": 12
+  }
+ ],
+ "AuraDemoConstraints3D:safety": [
+  {
+   "metric": "rackX",
+   "stat": "max",
+   "op": "<",
+   "value": 5
+  },
+  {
+   "metric": "rackX",
+   "stat": "min",
+   "op": ">",
+   "value": -8
+  },
+  {
+   "metric": "heavyY",
+   "stat": "min",
+   "op": ">",
+   "value": -1
+  },
+  {
+   "metric": "lightY",
+   "stat": "max",
+   "op": "<",
+   "value": 8
+  }
+ ],
+ "AuraDemoSpace3D:safety": [
+  {
+   "metric": "orbit0",
+   "stat": "max",
+   "op": "<",
+   "value": 30
+  },
+  {
+   "metric": "orbit1",
+   "stat": "max",
+   "op": "<",
+   "value": 30
+  },
+  {
+   "metric": "orbit2",
+   "stat": "max",
+   "op": "<",
+   "value": 30
+  },
+  {
+   "metric": "orbit3",
+   "stat": "max",
+   "op": "<",
+   "value": 30
+  },
+  {
+   "metric": "orbit4",
+   "stat": "max",
+   "op": "<",
+   "value": 30
+  },
+  {
+   "metric": "orbit5",
+   "stat": "max",
+   "op": "<",
+   "value": 30
+  }
+ ],
+ "AuraDemoRagdollHit3D:safety": [
+  {
+   "metric": "pelvisZ",
+   "stat": "min",
+   "op": ">",
+   "value": -10
+  },
+  {
+   "metric": "pelvisY",
+   "stat": "max",
+   "op": "<",
+   "value": 10
+  }
+ ],
+ "AuraDemoWater2D:safety": [
+  {
+   "metric": "ballY",
+   "stat": "min",
+   "op": ">",
+   "value": -1
+  },
+  {
+   "metric": "ballY",
+   "stat": "max",
+   "op": "<",
+   "value": 8
+  }
  ]
 }

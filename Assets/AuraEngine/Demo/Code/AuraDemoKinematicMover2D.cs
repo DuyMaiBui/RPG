@@ -16,12 +16,13 @@ namespace AuraEngine.Demo
 
         private void Start() => _origin = transform.position;
 
-        private void Update()
+        // Targets are set once per fixed simulation step so a slow frame cannot turn them into large jumps.
+        private void FixedUpdate()
         {
             if (_instance == null || !_instance.IsCreated || _body == null || _body.EntityId.IsNone)
                 return;
 
-            _time += Time.deltaTime * _speed;
+            _time += Time.fixedDeltaTime * _speed;
             var position = _origin + _amplitude * Mathf.Sin(_time);
             _instance.World.SetKinematicTarget(
                 _body.EntityId,

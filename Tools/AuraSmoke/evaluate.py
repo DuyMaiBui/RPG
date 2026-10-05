@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Evaluate per-scene smoke expectations against sampled probe metrics.
 
-usage: evaluate.py SAMPLES.jsonl EXPECTATIONS.json SCENE
+usage: evaluate.py SAMPLES.jsonl EXPECTATIONS.json SCENE [--safety]
+--safety evaluates the generic rules plus the "<scene>:safety" rules (bounds that must hold at any frame rate)
 Each rule: {"metric": name, "stat": min|max|range|first|last, "op": "<"|">"|"=="|"<=", ">=", "value": number}
 or {"ratio": [metricA, metricB], "min": x, "max": y} comparing unwrapped angle deltas (degrees).
 Exit code 0 when every rule passes.
@@ -18,7 +19,7 @@ def unwrap(values):
         out.append(v + offset); prev = v
     return out
 
-def main(samples_path, exp_path, scene):
+def main(samples_path, exp_path, scene, safety=False):
     samples = []
     for line in open(samples_path):
         line = line.strip()
@@ -26,7 +27,7 @@ def main(samples_path, exp_path, scene):
             try: samples.append(json.loads(line)['m'])
             except Exception: pass
     exp = json.load(open(exp_path))
-    rules = exp.get('*', []) + exp.get(scene, [])
+    rules = exp.get('*', []) + (exp.get(scene + ':safety', []) if safety else exp.get(scene, []))
     failures = []
     if len(samples) < 3: failures.append(f'only {len(samples)} usable samples')
     def series(name):
@@ -56,4 +57,4 @@ def main(samples_path, exp_path, scene):
     return 1 if failures else 0
 
 if __name__ == '__main__':
-    sys.exit(main(*sys.argv[1:4]))
+    sys.exit(main(*sys.argv[1:4], safety=len(sys.argv) > 4 and sys.argv[4] == '--safety'))
