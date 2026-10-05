@@ -15,6 +15,9 @@ namespace AuraEngine.KernelTests
                 ("h_overlap_never_exceeds_capacity_2d", H_OverlapNeverExceedsCapacity2D),
                 ("h_joint_on_disabled_body_is_rejected_3d", () => H_JointOnDisabledBodyIsRejected(AuraPhysicsMode.Full3D)),
                 ("h_joint_on_disabled_body_is_rejected_2d", () => H_JointOnDisabledBodyIsRejected(AuraPhysicsMode.Plane2D)),
+                ("h_joint_between_non_dynamic_bodies_is_rejected_3d", () => H_JointBetweenNonDynamicBodiesIsRejected(AuraPhysicsMode.Full3D)),
+                ("h_joint_between_non_dynamic_bodies_is_rejected_2d", () => H_JointBetweenNonDynamicBodiesIsRejected(AuraPhysicsMode.Plane2D)),
+                ("h_mouse_joint_needs_a_dynamic_body_2d", H_MouseJointNeedsADynamicBody2D),
                 ("h_kinematic_target_on_non_kinematic_body_is_safe_3d", H_KinematicTargetOnNonKinematicBodyIsSafe3D),
                 ("h_kinematic_target_after_zero_dt_stays_finite_3d", () => H_KinematicTargetAfterZeroDtStaysFinite(AuraPhysicsMode.Full3D)),
                 ("h_kinematic_target_after_zero_dt_stays_finite_2d", () => H_KinematicTargetAfterZeroDtStaysFinite(AuraPhysicsMode.Plane2D)),
@@ -62,6 +65,52 @@ namespace AuraEngine.KernelTests
             }
 
             Check(!accepted, "a joint on a disabled body must be rejected.");
+            Step(world, 5);
+        }
+
+        /* A constraint between a static and a kinematic body has no effective mass: the soak run crashed Box2D's solver
+           (mouse joint) and produced NaN. It must be rejected at creation. */
+        private static void H_JointBetweenNonDynamicBodiesIsRejected(AuraPhysicsMode mode)
+        {
+            using var world = NewWorld(mode);
+            var half = V(0.5f, 0.5f, 0.5f);
+            var fixedBody = world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateStatic(
+                new AuraPose(V(0f, 5f, 0f), AuraQuaternion.Identity), AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, AuraPhysicsShapeDefinition.Box(half)));
+            var moving = world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateKinematic(
+                new AuraPose(V(2f, 5f, 0f), AuraQuaternion.Identity), AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, AuraPhysicsShapeDefinition.Box(half)));
+            var accepted = false;
+            try
+            {
+                accepted = world.CreateJoint(FindEntity(world, fixedBody), FindEntity(world, moving),
+                    AuraJointDefinition.CreateDistance(fixedBody, moving, V(0f, 5f, 0f), V(2f, 5f, 0f), 2f)).IsValid;
+            }
+            catch (AuraException)
+            {
+            }
+
+            Check(!accepted, "a joint between two non-dynamic bodies must be rejected.");
+            Step(world, 5);
+        }
+
+        private static void H_MouseJointNeedsADynamicBody2D()
+        {
+            using var world = NewWorld(AuraPhysicsMode.Plane2D);
+            var half = V(0.5f, 0.5f, 0.5f);
+            var anchor = world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateStatic(
+                new AuraPose(V(0f, 0f, 0f), AuraQuaternion.Identity), AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, AuraPhysicsShapeDefinition.Box(half)));
+            var kinematic = world.AttachBody(world.CreateEntity(), AuraPhysicsBodyDefinition.CreateKinematic(
+                new AuraPose(V(2f, 2f, 0f), AuraQuaternion.Identity), AuraPhysicsLayer.Default, AuraPhysicsLayerMask.All, AuraPhysicsShapeDefinition.Box(half)));
+            var accepted = false;
+            try
+            {
+                accepted = world.CreateJoint(FindEntity(world, anchor), FindEntity(world, kinematic),
+                    AuraJointDefinition.CreateMouse(anchor, kinematic, V(2f, 2f, 0f), 5f, 0.7f, 1000f)).IsValid;
+            }
+            catch (AuraException)
+            {
+            }
+
+            Check(!accepted, "a mouse joint on a kinematic body must be rejected.");
             Step(world, 5);
         }
 

@@ -17,6 +17,11 @@ AuraResultCode Box2DWorld::CreateJoint(const AuraJointDesc& desc, uint64_t* outJ
         return AURA_INVALID_DEFINITION;
     if ((slotA != nullptr && !b2Body_IsEnabled(slotA->body)) || !b2Body_IsEnabled(slotB->body))
         return AURA_BODY_DISABLED;
+    /* Box2D divides by the joint's effective mass: it needs a dynamic body (a mouse joint needs body B dynamic). */
+    const bool dynamicA = slotA != nullptr && b2Body_GetType(slotA->body) == b2_dynamicBody;
+    const bool dynamicB = b2Body_GetType(slotB->body) == b2_dynamicBody;
+    if (isMouse ? !dynamicB : (!dynamicA && !dynamicB))
+        return AURA_INVALID_DEFINITION;
     if (!IsFinite(desc.anchorA) || !IsFinite(desc.anchorB) || !IsFinite(desc.axisA) || !IsFinite(desc.distance)
         || !IsFinite(desc.minLimit) || !IsFinite(desc.maxLimit) || !IsFinite(desc.motorTargetVelocity)
         || !IsFinite(desc.maxMotorForce) || !IsFinite(desc.springFrequency) || !IsFinite(desc.springDamping))

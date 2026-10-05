@@ -101,6 +101,9 @@ AuraResultCode JoltWorld::CreateJoint(const AuraJointDesc& desc, uint64_t* outJo
     /* A constraint on a body that is not in the simulation corrupts Jolt's broad phase on the next step. */
     if (!slotA->enabled || !slotB->enabled)
         return AURA_BODY_DISABLED;
+    /* A constraint between two bodies that cannot move has no effective mass and is invalid for the solver. */
+    if (slotA->body->GetMotionType() != JPH::EMotionType::Dynamic && slotB->body->GetMotionType() != JPH::EMotionType::Dynamic)
+        return AURA_INVALID_DEFINITION;
 
     JPH::Body& bodyA = *slotA->body;
     JPH::Body& bodyB = *slotB->body;
