@@ -87,7 +87,10 @@ public static class AuraSceneProbe
                 break;
             }
             case "AuraDemoRagdollHit3D": Pos("Pelvis", "pelvis", y: true, z: true); break;
-            case "AuraDemoWater2D": Pos("DropBall", "ball", y: true); break;
+            case "AuraDemoWater2D":
+            case "AuraDemoAdvancedWater3D":
+                Pos("Cork", "cork", y: true); Pos("Wood", "wood", y: true); Pos("Neutral", "neutral", y: true);
+                Pos("Stone", "stone", y: true); Pos("Ball", "ball", y: true); break;
             case "AuraDemoCloth2D":
             case "AuraDemoCloth3D":
             {
