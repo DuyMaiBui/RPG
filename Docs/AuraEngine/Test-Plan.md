@@ -140,3 +140,17 @@ Tools/AuraSmoke/aura_smoke.sh /tmp/aura_smoke
 - Decide whether collider geometry should follow `lossyScale` like joint anchors do.
 - Retry a joint whose bodies register after the world exists.
 - `AuraSimulationInstance.Register` silently skips authoring when the backend lacks the capability.
+
+### P1 (in progress)
+- Frame-rate independence (7): `AURA_TARGET_FPS=8 Tools/AuraSmoke/aura_smoke.sh` runs every scene at about 8 fps
+  (measured frame time 0.12 s) and checks per-scene safety bounds. It exposed that kinematic movers set one large
+  target per slow frame; movers now run in `FixedUpdate`. 23/23 scenes pass at 8 fps and at 60 fps.
+- Determinism (8): `KernelTestSuite.PackageG.cs`, 282 kernel cases pass normally and under Guard Malloc; no
+  non-determinism found. `RestoreState` is not bit-exact (Jolt `ApplyStates` wakes sleeping bodies; Box2D rebuilds
+  rotations with the approximate `b2MakeRot`), so restore tests use a tolerance; `AURA_DET_STRICT_RESTORE=1` shows the
+  26 cases that would need exact restore.
+- CI: `.github/workflows/ci.yml` now has a `kernel-tests` job (Ubuntu and macOS, Guard Malloc on macOS). It has only
+  been syntax-checked, not run on GitHub.
+- Performance baseline (P2.10, for reference only): `run_bench.sh` builds the reference backend, not Jolt. On this
+  machine: 512 bodies, 600 ticks in 1.34 s (about 2.2 ms per step) and about 177,000 raycasts per second. A Jolt
+  budget still needs to be measured and agreed.
