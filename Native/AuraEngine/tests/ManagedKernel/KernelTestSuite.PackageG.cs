@@ -344,7 +344,7 @@ namespace AuraEngine.KernelTests
         private static AuraQuaternion DetAngleZ(float angle) => new AuraQuaternion(0f, 0f, MathF.Sin(angle * 0.5f), MathF.Cos(angle * 0.5f));
 
         private static DetScenario DetCase(string name, AuraPhysicsMode mode, int steps, Func<AuraSimulationWorld, DetCtx, Action<int>> setup,
-            bool expectsBreak = false, int lastConfigStep = -1, float restoreTolerance = 0.05f) =>
+            bool expectsBreak = false, int lastConfigStep = -1, float restoreTolerance = 1e-5f) =>
             new DetScenario { Name = name, Mode = mode, Steps = steps, Setup = setup, ExpectsBreak = expectsBreak, LastConfigStep = lastConfigStep, RestoreTolerance = restoreTolerance };
 
         private static string DetSuffix(AuraPhysicsMode mode) => mode == AuraPhysicsMode.Full3D ? "3d" : "2d";
@@ -355,35 +355,35 @@ namespace AuraEngine.KernelTests
             {
                 var m = mode;
                 var suffix = DetSuffix(m);
-                yield return DetCase("pile_" + suffix, m, 240, DetPile);
-                yield return DetCase("free_flight_" + suffix, m, 240, DetFreeFlight, false, 150, m == AuraPhysicsMode.Full3D ? 1e-4f : 5e-3f);
+                yield return DetCase("pile_" + suffix, m, 240, DetPile, false, -1, m == AuraPhysicsMode.Full3D ? 2e-2f : 1e-2f);
+                yield return DetCase("free_flight_" + suffix, m, 240, DetFreeFlight, false, 150, m == AuraPhysicsMode.Full3D ? 1e-6f : 0f);
                 yield return DetCase("fields_" + suffix, m, 220, DetFields, false, 170);
-                yield return DetCase("body_control_" + suffix, m, 180, DetBodyControl, false, 130);
-                yield return DetCase("kinematic_targets_" + suffix, m, 240, DetKinematic, false, 150, m == AuraPhysicsMode.Full3D ? 0.05f : 0.15f);
-                yield return DetCase("ccd_" + suffix, m, 60, DetCcd, false, 20);
+                yield return DetCase("body_control_" + suffix, m, 180, DetBodyControl, false, 130, m == AuraPhysicsMode.Full3D ? 2e-3f : 1e-5f);
+                yield return DetCase("kinematic_targets_" + suffix, m, 240, DetKinematic, false, 150, 1e-5f);
+                yield return DetCase("ccd_" + suffix, m, 60, DetCcd, false, 20, m == AuraPhysicsMode.Full3D ? 1e-5f : 0f);
                 yield return DetCase("joint_hinge_motor_limits_" + suffix, m, 200, DetHingeMotorLimits, false, 150);
                 yield return DetCase("joint_hinge_break_" + suffix, m, 120, DetHingeBreak, true);
                 yield return DetCase("joint_fixed_break_" + suffix, m, 90, DetFixedBreak, true);
-                yield return DetCase("joint_slider_motor_limits_" + suffix, m, 240, DetSliderMotorLimits, false, 150);
+                yield return DetCase("joint_slider_motor_limits_" + suffix, m, 240, DetSliderMotorLimits, false, 150, 0f);
             }
 
             yield return DetCase("joint_hinge_position_motor_3d", AuraPhysicsMode.Full3D, 200, DetHingePositionMotor, false, 100);
             yield return DetCase("joint_sixdof_break_3d", AuraPhysicsMode.Full3D, 90, DetSixDofBreak, true);
-            yield return DetCase("joint_sixdof_3d", AuraPhysicsMode.Full3D, 240, DetSixDof, false, 160);
+            yield return DetCase("joint_sixdof_3d", AuraPhysicsMode.Full3D, 240, DetSixDof, false, 160, 8e-3f);
             yield return DetCase("joint_cone_3d", AuraPhysicsMode.Full3D, 180, DetCone, false, 90);
-            yield return DetCase("joint_swingtwist_3d", AuraPhysicsMode.Full3D, 300, DetSwingTwist, false, 160);
+            yield return DetCase("joint_swingtwist_3d", AuraPhysicsMode.Full3D, 300, DetSwingTwist, false, 160, 5e-3f);
             yield return DetCase("joint_pulley_3d", AuraPhysicsMode.Full3D, 180, DetPulley, false, 100);
             yield return DetCase("joint_gear_3d", AuraPhysicsMode.Full3D, 180, DetGear, false, 100);
             yield return DetCase("joint_rack_and_pinion_3d", AuraPhysicsMode.Full3D, 180, DetRack, false, 100);
             yield return DetCase("joint_wheel_car_2d", AuraPhysicsMode.Plane2D, 240, DetWheelCar, false, 200);
-            yield return DetCase("joint_mouse_2d", AuraPhysicsMode.Plane2D, 300, DetMouse, false, 160);
+            yield return DetCase("joint_mouse_2d", AuraPhysicsMode.Plane2D, 300, DetMouse, false, 160, 0f);
             yield return DetCase("joint_rope_2d", AuraPhysicsMode.Plane2D, 240, DetRope, false, 20);
-            yield return DetCase("char2d_walk_jump_ledge", AuraPhysicsMode.Plane2D, 320, DetChar2DWalkJump);
-            yield return DetCase("char2d_slope", AuraPhysicsMode.Plane2D, 260, DetChar2DSlope);
-            yield return DetCase("char2d_oneway", AuraPhysicsMode.Plane2D, 260, DetChar2DOneWay);
-            yield return DetCase("char2d_moving_platform", AuraPhysicsMode.Plane2D, 300, DetChar2DPlatform, false, 180);
+            yield return DetCase("char2d_walk_jump_ledge", AuraPhysicsMode.Plane2D, 320, DetChar2DWalkJump, false, -1, 0f);
+            yield return DetCase("char2d_slope", AuraPhysicsMode.Plane2D, 260, DetChar2DSlope, false, -1, 0f);
+            yield return DetCase("char2d_oneway", AuraPhysicsMode.Plane2D, 260, DetChar2DOneWay, false, -1, 0f);
+            yield return DetCase("char2d_moving_platform", AuraPhysicsMode.Plane2D, 300, DetChar2DPlatform, false, 180, 0f);
             yield return DetCase("char3d_walk_jump_push", AuraPhysicsMode.Full3D, 360, DetChar3D);
-            yield return DetCase("char3d_slope_platform", AuraPhysicsMode.Full3D, 300, DetChar3DSlopePlatform, false, 200);
+            yield return DetCase("char3d_slope_platform", AuraPhysicsMode.Full3D, 300, DetChar3DSlopePlatform, false, 200, 0f);
         }
 
         // ---- shared body scenes ---------------------------------------------------------------

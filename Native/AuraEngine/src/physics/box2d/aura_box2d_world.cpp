@@ -85,6 +85,7 @@ AuraResultCode Box2DWorld::CreateBody(const AuraBodyDesc& desc, AuraBodyHandle* 
     bodyDef.rotation = b2MakeRot(AngleFromQuat(desc.initialPose.rotation));
     bodyDef.gravityScale = desc.gravityScale;
     bodyDef.isBullet = desc.collisionDetection == 1;
+    bodyDef.enableSleep = desc.allowSleeping != 0;
     bodyDef.userData = Encode(handle);
 
     const b2BodyId body = b2CreateBody(impl_->world, &bodyDef);
@@ -253,6 +254,8 @@ void Box2DWorld::Step(float deltaTime)
     if (deltaTime > 0.0f)
         impl_->lastDelta = deltaTime;
     impl_->ApplyForceFields(deltaTime);
+    /* Joint limits and lengths are eased toward their targets for this step's dt before the solver runs. */
+    impl_->EaseJoints(deltaTime);
     b2World_Step(impl_->world, deltaTime, 4);
 
     /* See JoltWorld::Step: a kinematic target is consumed by one step. */
@@ -393,6 +396,32 @@ uint64_t Box2DWorld::ComputeStateHash() const
 
 AuraResultCode Box2DWorld::ApplyStates(const AuraBodyState* states, uint32_t count)
 {
+    return ApplyStatesWithExtras(states, nullptr, count);
+}
+
+uint32_t Box2DWorld::CopyBodyExtras(BodyExtra* buffer, uint32_t capacity) const
+{
+    uint32_t written = 0;
+    for (size_t index = 0; index < impl_->slots.size() && written < capacity; ++index)
+    {
+        const Impl::Slot& slot = impl_->slots[index];
+        if (!slot.occupied)
+            continue;
+        const b2Rot rotation = b2Body_GetRotation(slot.body);
+        const b2BodyType type = b2Body_GetType(slot.body);
+        BodyExtra extra{};
+        extra.rotationA = rotation.c;
+        extra.rotationB = rotation.s;
+        extra.motionType = type == b2_staticBody ? AURA_BODY_STATIC : (type == b2_kinematicBody ? AURA_BODY_KINEMATIC : AURA_BODY_DYNAMIC);
+        extra.flags = kBodyExtraHasRotation | kBodyExtraHasMotionType | (slot.kinematicTargetPending ? kBodyExtraKinematicPending : 0u);
+        buffer[written++] = extra;
+    }
+    return written;
+}
+
+/* The caller (Aura_DeserializeState) has validated every handle and value, so this cannot fail half way. */
+AuraResultCode Box2DWorld::ApplyStatesWithExtras(const AuraBodyState* states, const BodyExtra* extras, uint32_t count)
+{
     for (uint32_t i = 0; i < count; ++i)
     {
         const AuraBodyState& state = states[i];
@@ -404,14 +433,43 @@ AuraResultCode Box2DWorld::ApplyStates(const AuraBodyState* states, uint32_t cou
            simulation, then disable it again when it was disabled when captured. */
         if (!b2Body_IsEnabled(slot->body))
             b2Body_Enable(slot->body);
+
+        const bool hasExtra = extras != nullptr;
+        if (hasExtra && (extras[i].flags & kBodyExtraHasMotionType) != 0u)
+        {
+            const b2BodyType wanted = extras[i].motionType == AURA_BODY_STATIC ? b2_staticBody
+                : (extras[i].motionType == AURA_BODY_KINEMATIC ? b2_kinematicBody : b2_dynamicBody);
+            if (b2Body_GetType(slot->body) != wanted)
+                b2Body_SetType(slot->body, wanted);
+        }
+
+        /* The world holds the rotation as a (cos, sin) pair; restoring that pair avoids the approximate b2MakeRot. */
         b2Transform transform;
         transform.p = ToVec2(state.pose.position);
-        transform.q = b2MakeRot(AngleFromQuat(state.pose.rotation));
+        if (hasExtra && (extras[i].flags & kBodyExtraHasRotation) != 0u)
+            transform.q = b2Rot{ extras[i].rotationA, extras[i].rotationB };
+        else
+            transform.q = b2MakeRot(AngleFromQuat(state.pose.rotation));
         b2Body_SetTransform(slot->body, transform.p, transform.q);
+        if (state.isAwake != 0 && !b2Body_IsAwake(slot->body))
+            b2Body_SetAwake(slot->body, true);
         b2Body_SetLinearVelocity(slot->body, ToVec2(state.linearVelocity));
         b2Body_SetAngularVelocity(slot->body, state.angularVelocity.z);
+        slot->kinematicTargetPending = hasExtra && (extras[i].flags & kBodyExtraKinematicPending) != 0u;
         if ((state.flags & AURA_BODY_FLAG_DISABLED) != 0u)
             b2Body_Disable(slot->body);
+    }
+
+    /* Second pass: put the bodies that slept when captured back to sleep. Done after every body is awake and placed
+       because sleeping is per island and a later body of the same island would otherwise wake it again. */
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        const AuraBodyState& state = states[i];
+        if (state.isAwake != 0 || (state.flags & AURA_BODY_FLAG_DISABLED) != 0u)
+            continue;
+        const Impl::Slot* slot = impl_->Find(state.body);
+        if (slot != nullptr && b2Body_IsEnabled(slot->body))
+            b2Body_SetAwake(slot->body, false);
     }
     return AURA_SUCCESS;
 }

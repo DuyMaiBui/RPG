@@ -1,5 +1,9 @@
 #include "aura_jolt_internal.h"
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
 namespace aura
 {
 
@@ -117,13 +121,17 @@ void JoltWorld::Impl::OnContactRemoved(const JPH::SubShapeIDPair& pair)
 uint32_t JoltWorld::CopyContacts(AuraContact* buffer, uint32_t capacity) const
 {
     std::lock_guard<std::mutex> lock(impl_->eventMutex);
-    uint32_t written = 0;
+    /* unordered_map iteration order depends on insertion history, which depends on worker thread timing:
+       emit contacts by ascending body-pair key instead. */
+    std::vector<std::pair<uint64_t, const AuraContact*>> ordered;
+    ordered.reserve(impl_->contacts.size());
     for (const auto& entry : impl_->contacts)
-    {
-        if (written >= capacity)
-            break;
-        buffer[written++] = entry.second;
-    }
+        ordered.emplace_back(entry.first, &entry.second);
+    std::sort(ordered.begin(), ordered.end(), [](const auto& l, const auto& r) { return l.first < r.first; });
+
+    const uint32_t written = std::min(static_cast<uint32_t>(ordered.size()), capacity);
+    for (uint32_t i = 0; i < written; ++i)
+        buffer[i] = *ordered[i].second;
     return written;
 }
 

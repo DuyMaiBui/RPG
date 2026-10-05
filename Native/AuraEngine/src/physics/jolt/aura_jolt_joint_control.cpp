@@ -191,8 +191,10 @@ void JoltWorld::Impl::ProcessJointBreaks()
 AuraResultCode JoltWorld::SetJointMotor(uint64_t joint, const AuraJointMotorDesc& motor)
 {
     Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr || slot->broken || slot->constraint == nullptr)
+    if (slot == nullptr)
         return AURA_INVALID_HANDLE;
+    if (slot->broken || slot->constraint == nullptr)
+        return AURA_UNSUPPORTED_OPERATION; /* the handle is valid but the constraint is gone */
     if (slot->type != AURA_JOINT_HINGE && slot->type != AURA_JOINT_SLIDER)
         return AURA_UNSUPPORTED_OPERATION;
     if (motor.mode < AURA_JOINT_MOTOR_OFF || motor.mode > AURA_JOINT_MOTOR_POSITION
@@ -250,8 +252,10 @@ AuraResultCode JoltWorld::SetJointMotor(uint64_t joint, const AuraJointMotorDesc
 AuraResultCode JoltWorld::SetJointLimits(uint64_t joint, bool enabled, float minLimit, float maxLimit)
 {
     Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr || slot->broken || slot->constraint == nullptr)
+    if (slot == nullptr)
         return AURA_INVALID_HANDLE;
+    if (slot->broken || slot->constraint == nullptr)
+        return AURA_UNSUPPORTED_OPERATION; /* the handle is valid but the constraint is gone */
     if (slot->type != AURA_JOINT_HINGE && slot->type != AURA_JOINT_SLIDER
         && slot->type != AURA_JOINT_PULLEY && slot->type != AURA_JOINT_SWING_TWIST)
         return AURA_UNSUPPORTED_OPERATION;
@@ -323,8 +327,10 @@ AuraResultCode JoltWorld::SetJointLimits(uint64_t joint, bool enabled, float min
 AuraResultCode JoltWorld::SetJointBreakThreshold(uint64_t joint, float maxForce, float maxTorque)
 {
     Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr || slot->broken || slot->constraint == nullptr)
+    if (slot == nullptr)
         return AURA_INVALID_HANDLE;
+    if (slot->broken || slot->constraint == nullptr)
+        return AURA_UNSUPPORTED_OPERATION; /* the handle is valid but the constraint is gone */
 
     bool hasTorque = false;
     switch (slot->type)
@@ -405,8 +411,10 @@ AuraResultCode JoltWorld::GetJointFeedback(uint64_t joint, AuraJointFeedback* ou
 AuraResultCode JoltWorld::SetJointAxisLimits(uint64_t joint, uint32_t axis, const AuraJointAxisLimit& limit)
 {
     Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr || slot->broken || slot->constraint == nullptr)
+    if (slot == nullptr)
         return AURA_INVALID_HANDLE;
+    if (slot->broken || slot->constraint == nullptr)
+        return AURA_UNSUPPORTED_OPERATION; /* the handle is valid but the constraint is gone */
     if (slot->type != AURA_JOINT_SIX_DOF && slot->type != AURA_JOINT_SWING_TWIST)
         return AURA_UNSUPPORTED_OPERATION;
     if (axis > 5 || limit.mode > AURA_JOINT_AXIS_LIMITED || !IsFinite(limit.maxFriction) || limit.maxFriction < 0.0f)
@@ -496,8 +504,10 @@ AuraResultCode JoltWorld::SetJointAxisLimits(uint64_t joint, uint32_t axis, cons
 AuraResultCode JoltWorld::SetJointAxisMotor(uint64_t joint, uint32_t axis, const AuraJointMotorDesc& motor)
 {
     Impl::JointSlot* slot = impl_->FindJoint(joint);
-    if (slot == nullptr || slot->broken || slot->constraint == nullptr)
+    if (slot == nullptr)
         return AURA_INVALID_HANDLE;
+    if (slot->broken || slot->constraint == nullptr)
+        return AURA_UNSUPPORTED_OPERATION; /* the handle is valid but the constraint is gone */
     if (slot->type != AURA_JOINT_SIX_DOF && slot->type != AURA_JOINT_SWING_TWIST)
         return AURA_UNSUPPORTED_OPERATION;
     if (axis > 5 || motor.mode < AURA_JOINT_MOTOR_OFF || motor.mode > AURA_JOINT_MOTOR_POSITION

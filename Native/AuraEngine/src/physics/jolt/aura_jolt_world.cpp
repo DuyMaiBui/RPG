@@ -5,6 +5,10 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
+#include <mutex>
+
+#include "aura_event_order.h"
 
 namespace aura
 {
@@ -28,13 +32,17 @@ bool AuraJoltAssertFailed(const char* expression, const char* message, const cha
 
 struct JoltGlobal
 {
-    bool initialized = false;
+    std::once_flag once;
 
+    /* Several threads may create their first world at once; call_once makes the one-time registration race-free
+       and blocks the others until it has finished. */
     void Ensure()
     {
-        if (initialized)
-            return;
+        std::call_once(once, []() { Initialize(); });
+    }
 
+    static void Initialize()
+    {
         JPH::Trace = &AuraJoltTrace;
 #ifdef JPH_ENABLE_ASSERTS
         JPH::AssertFailed = &AuraJoltAssertFailed;
@@ -43,7 +51,6 @@ struct JoltGlobal
         JPH::RegisterDefaultAllocator();
         JPH::Factory::sInstance = new JPH::Factory();
         JPH::RegisterTypes();
-        initialized = true;
     }
 };
 
@@ -335,6 +342,12 @@ void JoltWorld::Step(float deltaTime)
     impl_->ApplyForceFields(deltaTime);
     impl_->physics.Update(deltaTime, 1, &impl_->tempAllocator, &impl_->jobSystem);
 
+    /* Jolt reports contacts from several worker threads in timing-dependent order; make the sequence deterministic. */
+    {
+        std::lock_guard<std::mutex> lock(impl_->eventMutex);
+        SortEventsDeterministic(impl_->events);
+    }
+
     /* A kinematic target is reached within one step. Without this the velocity set by MoveKinematic keeps
        carrying the body past the target on every further step of the same frame and the error compounds. */
     {
@@ -439,6 +452,31 @@ uint64_t JoltWorld::ComputeStateHash() const
 
 AuraResultCode JoltWorld::ApplyStates(const AuraBodyState* states, uint32_t count)
 {
+    return ApplyStatesWithExtras(states, nullptr, count);
+}
+
+uint32_t JoltWorld::CopyBodyExtras(BodyExtra* buffer, uint32_t capacity) const
+{
+    const JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
+    uint32_t written = 0;
+    for (size_t index = 0; index < impl_->slots.size() && written < capacity; ++index)
+    {
+        const Impl::Slot& slot = impl_->slots[index];
+        if (!slot.occupied)
+            continue;
+        BodyExtra extra{};
+        const JPH::EMotionType motion = bi.GetMotionType(slot.id);
+        extra.motionType = motion == JPH::EMotionType::Static ? AURA_BODY_STATIC
+            : (motion == JPH::EMotionType::Kinematic ? AURA_BODY_KINEMATIC : AURA_BODY_DYNAMIC);
+        extra.flags = kBodyExtraHasMotionType | (slot.kinematicTargetPending ? kBodyExtraKinematicPending : 0u);
+        buffer[written++] = extra;
+    }
+    return written;
+}
+
+/* The caller (Aura_DeserializeState) has validated every handle and value, so this cannot fail half way. */
+AuraResultCode JoltWorld::ApplyStatesWithExtras(const AuraBodyState* states, const BodyExtra* extras, uint32_t count)
+{
     JPH::BodyInterface& bi = impl_->physics.GetBodyInterface();
     for (uint32_t i = 0; i < count; ++i)
     {
@@ -452,10 +490,30 @@ AuraResultCode JoltWorld::ApplyStates(const AuraBodyState* states, uint32_t coun
         const bool wantEnabled = (state.flags & AURA_BODY_FLAG_DISABLED) == 0u;
         if (!slot->enabled)
             impl_->SetEnabledInternal(*slot, state.body, true);
-        bi.SetPosition(slot->id, ToRVec3(state.pose.position), JPH::EActivation::Activate);
-        bi.SetRotation(slot->id, ToQuat(state.pose.rotation), JPH::EActivation::Activate);
+
+        /* Restore the motion type when the body can still switch to it (static is always reachable). */
+        if (extras != nullptr && (extras[i].flags & kBodyExtraHasMotionType) != 0u && !impl_->IsVehicleChassis(state.body))
+        {
+            const JPH::EMotionType wanted = extras[i].motionType == AURA_BODY_STATIC ? JPH::EMotionType::Static
+                : (extras[i].motionType == AURA_BODY_KINEMATIC ? JPH::EMotionType::Kinematic : JPH::EMotionType::Dynamic);
+            if (bi.GetMotionType(slot->id) != wanted && (wanted == JPH::EMotionType::Static || slot->canChangeMotion))
+                bi.SetMotionType(slot->id, wanted, JPH::EActivation::DontActivate);
+        }
+
+        bi.SetPositionAndRotation(slot->id, ToRVec3(state.pose.position), ToQuat(state.pose.rotation), JPH::EActivation::DontActivate);
         bi.SetLinearVelocity(slot->id, ToVec3(state.linearVelocity));
         bi.SetAngularVelocity(slot->id, ToVec3(state.angularVelocity));
+
+        slot->kinematicTargetPending = extras != nullptr && (extras[i].flags & kBodyExtraKinematicPending) != 0u;
+
+        /* Keep sleeping bodies asleep (and awake ones awake) as captured; the velocity setters above wake on non-zero. */
+        if (bi.GetMotionType(slot->id) != JPH::EMotionType::Static)
+        {
+            if (state.isAwake != 0)
+                bi.ActivateBody(slot->id);
+            else
+                bi.DeactivateBody(slot->id);
+        }
         if (!wantEnabled)
             impl_->SetEnabledInternal(*slot, state.body, false);
     }

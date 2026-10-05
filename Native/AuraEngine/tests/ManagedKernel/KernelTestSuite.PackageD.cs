@@ -383,7 +383,7 @@ namespace AuraEngine.KernelTests
                 {
                     Ok(world.JointControl.IsBroken(rig.Gear, out var broken), "gear IsBroken");
                     Check(broken, $"order {order}: gear survived the loss of a referenced joint.");
-                    Check(!world.HasJoint(rig.Gear), $"order {order}: dissolved gear still reports live.");
+                    Check(world.HasJoint(rig.Gear), $"order {order}: dissolved gear handle must stay valid until DestroyJoint.");
                     Ok(world.DestroyJoint(rig.Gear), "destroy the dissolved gear");
                 }
 

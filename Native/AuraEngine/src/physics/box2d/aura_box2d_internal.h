@@ -4,6 +4,7 @@
 
 #include "aura_box2d_world.h"
 #include "aura_force_fields.h"
+#include "aura_event_order.h"
 #include "aura_box2d_character.h"
 #include "aura_box2d_oneway.h"
 
@@ -90,6 +91,13 @@ struct Box2DWorld::Impl
         bool broken = false;
         float lastForce = 0.0f;
         float lastTorque = 0.0f;
+        /* Requested limits (hinge angle, slider/wheel translation, rope length range) and rest length (distance/spring).
+           The constraint itself is fed an eased copy, see Box2DWorld::Impl::EaseJoint. */
+        bool limitEnabled = false;
+        float limitMin = 0.0f;
+        float limitMax = 0.0f;
+        float restLength = 0.0f;
+        float springHertz = 0.0f; /* requested spring frequency, capped to the step rate by EaseJoint */
     };
 
     b2WorldId world = b2_nullWorldId;
@@ -204,6 +212,9 @@ struct Box2DWorld::Impl
     /* Joint loads of the last step (aura_box2d_world.cpp, joint control section). */
     bool JointLoads(const JointSlot& joint, float& force, float& torque, float& motorLoad) const;
     void ProcessJointBreaks();
+    void EaseJoint(JointSlot& joint, float deltaTime);
+    bool WellConditioned(const JointSlot& joint) const;
+    void EaseJoints(float deltaTime);
     void ApplyForceFields(float deltaTime); /* aura_box2d_fields.cpp */
 
     void GatherEvents()
@@ -261,6 +272,8 @@ struct Box2DWorld::Impl
             event.bodyB = visitor;
             events.push_back(event);
         }
+
+        SortEventsDeterministic(events);
     }
 };
 

@@ -40,6 +40,8 @@ public:
 
     uint64_t ComputeStateHash() const override;
     AuraResultCode ApplyStates(const AuraBodyState* states, uint32_t count) override;
+    uint32_t CopyBodyExtras(BodyExtra* buffer, uint32_t capacity) const override;
+    AuraResultCode ApplyStatesWithExtras(const AuraBodyState* states, const BodyExtra* extras, uint32_t count) override;
     uint32_t CopyContacts(AuraContact* buffer, uint32_t capacity) const override;
     AuraResultCode SetSurfaceVelocity(AuraBodyHandle body, const AuraVec3& velocity) override;
     AuraResultCode CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater) override;

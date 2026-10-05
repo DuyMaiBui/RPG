@@ -1,6 +1,7 @@
 #pragma once
 
 #include "aura/aura_types.h"
+#include "aura_body_extra.h"
 
 #include <cstdint>
 
@@ -51,6 +52,18 @@ public:
 
     virtual uint64_t ComputeStateHash() const = 0;
     virtual AuraResultCode ApplyStates(const AuraBodyState* states, uint32_t count) = 0;
+    /* Snapshot v3: backend-specific per-body state (exact rotation, motion type, kinematic target). The defaults
+       carry nothing, so a backend without extras round-trips through ApplyStates only. Callers validate handles first. */
+    virtual uint32_t CopyBodyExtras(BodyExtra* buffer, uint32_t capacity) const
+    {
+        uint32_t count = BodyCount();
+        if (count > capacity)
+            count = capacity;
+        for (uint32_t i = 0; i < count; ++i)
+            buffer[i] = BodyExtra{};
+        return count;
+    }
+    virtual AuraResultCode ApplyStatesWithExtras(const AuraBodyState* states, const BodyExtra*, uint32_t count) { return ApplyStates(states, count); }
 
     virtual AuraResultCode CreateJoint(const AuraJointDesc& desc, uint64_t* outJoint) = 0;
     virtual AuraResultCode DestroyJoint(uint64_t joint) = 0;

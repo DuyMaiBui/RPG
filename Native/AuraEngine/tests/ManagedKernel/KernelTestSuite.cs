@@ -1250,15 +1250,15 @@ namespace AuraEngine.KernelTests
             Step(world, 10, 60);
             Ok(world.JointControl.IsBroken(rig.Joint, out var broken), "IsBroken");
             Check(broken, "joint did not break above its threshold.");
-            Check(!world.HasJoint(rig.Joint), "broken joint is still reported as live.");
+            Check(world.HasJoint(rig.Joint), "broken joint handle must stay valid (HasJoint true) until DestroyJoint.");
             Ok(world.JointControl.GetFeedback(rig.Joint, out feedback), "GetFeedback broken");
             Check(feedback.IsBroken && feedback.Force > rig.Newtons * 0.5f, "broken feedback lost the breaking load.");
 
             Step(world, 60, 70);
             Check(StateOf(world, rig.Weight).Pose.Position.Y < 3f, "weight did not fall after the joint broke.");
 
-            Expect(world.JointControl.SetMotor(rig.Joint, AuraJointMotorDefinition.Off), AuraResult.InvalidHandle, "motor on broken joint");
-            Expect(world.JointControl.SetBreakThreshold(rig.Joint, 1f, 0f), AuraResult.InvalidHandle, "threshold on broken joint");
+            Expect(world.JointControl.SetMotor(rig.Joint, AuraJointMotorDefinition.Off), AuraResult.UnsupportedOperation, "motor on broken joint");
+            Expect(world.JointControl.SetBreakThreshold(rig.Joint, 1f, 0f), AuraResult.UnsupportedOperation, "threshold on broken joint");
             Ok(world.DestroyJoint(rig.Joint), "DestroyJoint releases the broken handle");
             Expect(world.DestroyJoint(rig.Joint), AuraResult.InvalidHandle, "double destroy");
             Expect(world.JointControl.IsBroken(rig.Joint, out _), AuraResult.InvalidHandle, "IsBroken after destroy");

@@ -16,6 +16,7 @@
 #include "aura_jolt_vehicle.h"
 #include "aura_jolt_softbody.h"
 
+#include <cstdlib>
 #include <Jolt/Jolt.h>
 
 #include <Jolt/Core/Factory.h>
@@ -211,6 +212,19 @@ public:
    aura_jolt_shapes.cpp so shape work stays in one feature unit. */
 JPH::RefConst<JPH::Shape> MakeShape(const AuraShapeDesc& shape, bool& sensor);
 
+/* Worker threads for the Jolt job system: hardware threads minus one, or AURA_JOLT_THREADS (0..64 workers) when set.
+   The override exists to test that results and event order do not depend on the thread count. */
+inline int AuraJoltWorkerCount()
+{
+    if (const char* text = std::getenv("AURA_JOLT_THREADS"))
+    {
+        const int value = std::atoi(text);
+        if (value >= 0 && value <= 64)
+            return value;
+    }
+    return static_cast<int>(std::max(1u, std::thread::hardware_concurrency()) - 1u);
+}
+
 struct JoltWorld::Impl
 {
     struct Slot
@@ -305,7 +319,7 @@ struct JoltWorld::Impl
     ObjectVsBroadPhaseLayerFilterImpl objectVsBroadPhase;
     ObjectLayerPairFilterImpl objectVsObject;
     JPH::TempAllocatorImpl tempAllocator{ 64 * 1024 * 1024 };
-    JPH::JobSystemThreadPool jobSystem{ JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, static_cast<int>(std::max(1u, std::thread::hardware_concurrency()) - 1u) };
+    JPH::JobSystemThreadPool jobSystem{ JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, AuraJoltWorkerCount() };
     JPH::PhysicsSystem physics;
     /* Declared after physics so vehicles are destroyed before the Jolt system. */
     std::vector<VehicleSlot> vehicleSlots;

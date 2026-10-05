@@ -388,10 +388,11 @@ AuraResultCode JoltWorld::DestroyJoint(uint64_t joint)
     return AURA_SUCCESS;
 }
 
+/* True while the handle is live, i.e. from CreateJoint until DestroyJoint, including after the joint broke
+   (use IsJointBroken to tell). False for a destroyed, stale or invalid handle. */
 bool JoltWorld::HasJoint(uint64_t joint) const
 {
-    const Impl::JointSlot* slot = impl_->FindJoint(joint);
-    return slot != nullptr && !slot->broken;
+    return impl_->FindJoint(joint) != nullptr;
 }
 
 } // namespace aura
