@@ -44,6 +44,32 @@ jobs:
             Native/AuraEngine/build/plugin/aura.dll
           if-no-files-found: warn
 
+  kernel-tests:
+    name: Kernel test suite (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cmake + ninja
+        uses: lukka/get-cmake@latest
+      - name: Install .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Build libaura and run the kernel suite
+        shell: bash
+        run: ./Native/AuraEngine/run_kernel_tests.sh
+      - name: Run the kernel suite again under Guard Malloc (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          # The suite is built by the previous step; the .NET host from setup-dotnet is not hardened,
+          # so DYLD_INSERT_LIBRARIES reaches the process.
+          AURA_GMALLOC=1 ./Native/AuraEngine/run_kernel_tests.sh
+
   mobile:
     name: Mobile plugin (${{ matrix.target }})
     runs-on: macos-latest
