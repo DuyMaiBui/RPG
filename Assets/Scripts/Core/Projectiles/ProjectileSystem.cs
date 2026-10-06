@@ -1,4 +1,5 @@
 using RPG.Core.Actors;
+using RPG.Core.Physics;
 using RPG.Simulation.Contracts;
 using RPG.Simulation.Runtime;
 
@@ -25,12 +26,21 @@ namespace RPG.Core.Projectiles
                 var difference = targetPosition - projectile.Position;
                 var distance = System.MathF.Sqrt(difference.LengthSquared);
                 var travel = projectile.Speed * context.FixedDeltaTime;
-                var combinedRadius = projectile.Radius + target.Components.Get<BodyComponent>().Radius;
                 var endPosition = distance <= travel
                     ? targetPosition
                     : projectile.Position + difference.Normalized() * travel;
-                if (DistanceSquaredToSegment(targetPosition, projectile.Position, endPosition) >
-                    combinedRadius * combinedRadius)
+
+                // Swept circle against the target circle: an exact contact test, so a fast projectile cannot skip the
+                // target between ticks. A projectile already sitting on the target counts as a contact.
+                var contact = distance <= 0.0001f ||
+                    CollisionShapeQueries.SweepCircle(
+                        projectile.Radius,
+                        projectile.Position,
+                        endPosition,
+                        CollisionShape.Circle(target.Components.Get<BodyComponent>().Radius),
+                        targetPosition,
+                        out _);
+                if (!contact)
                 {
                     projectile.Position = endPosition;
                     continue;
@@ -51,22 +61,6 @@ namespace RPG.Core.Projectiles
 
                 projectiles.Destroy(projectile.Id);
             }
-        }
-
-        private static float DistanceSquaredToSegment(
-            SimulationVector2 point,
-            SimulationVector2 start,
-            SimulationVector2 end)
-        {
-            var segment = end - start;
-            var lengthSquared = segment.LengthSquared;
-            if (lengthSquared <= 0.000001f)
-                return (point - start).LengthSquared;
-
-            var projection = ((point.X - start.X) * segment.X + (point.Y - start.Y) * segment.Y) / lengthSquared;
-            projection = System.MathF.Max(0f, System.MathF.Min(1f, projection));
-            var closest = start + segment * projection;
-            return (point - closest).LengthSquared;
         }
     }
 }

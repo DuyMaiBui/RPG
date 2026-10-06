@@ -112,6 +112,21 @@ namespace RPG.Core.Navigation
             return true;
         }
 
+        /// <summary>Returns true when a circle of <paramref name="radius"/> can travel from <paramref name="from"/> to
+        /// <paramref name="to"/> without touching a static obstacle. Uses the swept query, so a fast-moving observer
+        /// cannot see through a wall by skipping it between ticks.</summary>
+        public bool HasLineOfSight(SimulationVector2 from, SimulationVector2 to, float radius)
+        {
+            for (var index = 0; index < _obstacles.Count; index++)
+            {
+                var obstacle = _obstacles[index];
+                if (CollisionShapeQueries.SweepCircle(radius, from, to, obstacle.Shape, obstacle.Center, out _))
+                    return false;
+            }
+
+            return true;
+        }
+
         public SimulationVector2 ResolveMovement(
             SimulationVector2 start,
             SimulationVector2 destination,

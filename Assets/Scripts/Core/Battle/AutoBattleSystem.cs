@@ -223,16 +223,13 @@ namespace RPG.Core.Actors
                         continue;
 
                     var otherPosition = other.Components.Get<PositionComponent>().Position;
-                    var difference = candidate - otherPosition;
-                    var minimumDistance = movingRadius + other.Components.Get<ColliderComponent>().Compound.BoundingRadius;
-                    var distanceSquared = difference.LengthSquared;
-                    if (distanceSquared >= minimumDistance * minimumDistance)
-                        continue;
-
-                    var direction = distanceSquared <= 0.000001f
-                        ? new SimulationVector2(movingActor.Id.Index < other.Id.Index ? -1f : 1f, 0f)
-                        : difference.Normalized();
-                    candidate = otherPosition + direction * minimumDistance;
+                    var otherRadius = other.Components.Get<ColliderComponent>().Compound.BoundingRadius;
+                    candidate = CollisionResolver.SeparateCircles(
+                        candidate,
+                        movingRadius,
+                        otherPosition,
+                        otherRadius,
+                        movingActor.Id.Index < other.Id.Index ? -1f : 1f);
                 }
             }
 
