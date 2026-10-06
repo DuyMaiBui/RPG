@@ -7,6 +7,7 @@ namespace RPG.Core.Actors
     public sealed class RpgSimulationApplication : ISimulationApplication<RpgSimulationState>
     {
         private readonly AutoBattleSystem _autoBattle = new();
+        private readonly StatusEffectSystem _statusEffects = new();
 
         void ISimulationApplication<RpgSimulationState>.BeginTick(SimulationContext<RpgSimulationState> context, SimulationTick tick) => context.State.BeginTick();
 
@@ -24,8 +25,11 @@ namespace RPG.Core.Actors
             manualMovement.Direction = move.Direction.Normalized();
         }
 
-        void ISimulationApplication<RpgSimulationState>.Tick(SimulationContext<RpgSimulationState> context, SimulationTick tick) =>
+        void ISimulationApplication<RpgSimulationState>.Tick(SimulationContext<RpgSimulationState> context, SimulationTick tick)
+        {
+            _statusEffects.Tick(context);
             _autoBattle.Tick(context);
+        }
 
         void ISimulationApplication<RpgSimulationState>.HandleEvents(
             SimulationContext<RpgSimulationState> context,

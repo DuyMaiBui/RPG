@@ -37,7 +37,7 @@ namespace RPG.Core.Navigation
             var position = actor.Components.Get<PositionComponent>().Position;
             var movement = actor.Components.Get<MovementComponent>();
             var radius = actor.Components.Get<ColliderComponent>().Compound.BoundingRadius;
-            var maxSpeed = movement.Speed;
+            var maxSpeed = movement.EffectiveSpeed;
             if (maxSpeed <= 0f) return SimulationVector2.Zero;
 
             var preferredVelocity = preferredDirection.Normalized() * maxSpeed;
@@ -76,7 +76,7 @@ namespace RPG.Core.Navigation
                 var otherPosition = other.Components.Get<PositionComponent>().Position;
                 var otherMovement = other.Components.Get<MovementComponent>();
                 var relativePosition = otherPosition - position;
-                var relativeVelocity = velocity - otherMovement.DesiredDirection * otherMovement.Speed;
+                var relativeVelocity = velocity - otherMovement.DesiredDirection * otherMovement.EffectiveSpeed;
                 var combinedRadius = radius + other.Components.Get<ColliderComponent>().Compound.BoundingRadius;
                 var distanceSquared = relativePosition.LengthSquared;
                 if (!HasProjectedCollision(relativePosition, relativeVelocity, combinedRadius))

@@ -65,6 +65,7 @@ namespace RPG.Core.Actors
             if (kind == ActorKind.Player)
                 components.Add(new ManualMovementComponent());
             components.Add(new VisionComponent(data.VisionRange));
+            components.Add(new StatusEffectComponent());
             components.Add(new TargetComponent());
             components.Add(new AttackRangeComponent(data.AttackRange));
             components.Add(new AttackCooldownComponent(data.AttackCooldown));

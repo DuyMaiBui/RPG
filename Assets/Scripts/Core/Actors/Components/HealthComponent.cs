@@ -24,5 +24,15 @@ namespace RPG.Core.Actors
             CurrentHealth -= applied;
             return applied;
         }
+
+        public int ReceiveHealing(int healing)
+        {
+            if (healing < 0) throw new ArgumentOutOfRangeException(nameof(healing));
+            if (IsDead) return 0;
+
+            var applied = Math.Min(healing, MaximumHealth - CurrentHealth);
+            CurrentHealth += applied;
+            return applied;
+        }
     }
 }

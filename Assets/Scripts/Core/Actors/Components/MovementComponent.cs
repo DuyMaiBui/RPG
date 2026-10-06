@@ -12,6 +12,11 @@ namespace RPG.Core.Actors
         }
 
         public float Speed { get; }
+
+        /// <summary>Status-effect speed scale in [0, 1]; 1 when unaffected. Written by the status effect system.</summary>
+        public float SpeedMultiplier { get; set; } = 1f;
+
+        public float EffectiveSpeed => Speed * SpeedMultiplier;
         public SimulationVector2 DesiredDirection { get; set; }
     }
 }

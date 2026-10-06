@@ -101,7 +101,7 @@ namespace RPG.Core.Actors
                         context.FixedDeltaTime);
                     _resolvedDirections[index] = manualDirection;
                     _candidatePositions[index] = position.Position +
-                                                 manualDirection * (movement.Speed * context.FixedDeltaTime);
+                                                 manualDirection * (movement.EffectiveSpeed * context.FixedDeltaTime);
                     continue;
                 }
 
@@ -113,7 +113,7 @@ namespace RPG.Core.Actors
                     : context.State.GetEnemyBasePosition(actor.Components.Get<FactionComponent>().Faction);
                 var distance = hasTarget ? Distance(actor, target) : Distance(position.Position, destination);
                 var stopDistance = hasTarget ? AttackDistance(actor, target) : context.State.BaseReach;
-                if (movement.Speed <= 0f || distance <= stopDistance)
+                if (movement.EffectiveSpeed <= 0f || distance <= stopDistance)
                     continue;
 
                 if (!context.State.MovementCohorts.TryGetDirection(actor, out var preferredDirection))
@@ -126,7 +126,7 @@ namespace RPG.Core.Actors
                     _spatialHash,
                     context.FixedDeltaTime);
                 var travel = SimulationMath.Min(
-                    movement.Speed * context.FixedDeltaTime,
+                    movement.EffectiveSpeed * context.FixedDeltaTime,
                     SimulationMath.Max(0f, distance - stopDistance));
                 _resolvedDirections[index] = resolvedDirection;
                 _candidatePositions[index] = position.Position + resolvedDirection * travel;
