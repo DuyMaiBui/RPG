@@ -135,9 +135,10 @@ namespace RPG.Core.Actors
                 var vision = actor.Components.Get<VisionComponent>();
                 var target = actor.Components.Get<TargetComponent>();
                 var behavior = actor.Components.Get<AutoCombatStateComponent>();
+                var statusMask = actor.Components.TryGet<StatusEffectComponent>(out var effects) ? effects.Mask() : (byte)0;
                 snapshots.Add(new ActorSnapshot(actor.Id, kind, faction, health.CurrentHealth, health.MaximumHealth,
                     position.Position, body.Radius, attackRange.Reach, attackType, vision.Range, target.CurrentTarget,
-                    health.IsDead ? ActorVisualState.Dead : ActorVisualState.Idle, behavior.State));
+                    health.IsDead ? ActorVisualState.Dead : ActorVisualState.Idle, behavior.State, statusMask));
             }
 
             return snapshots.ToArray();

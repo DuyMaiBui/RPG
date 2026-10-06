@@ -129,6 +129,18 @@ namespace RPG.Core.Tests
         }
 
         [Test]
+        public void Snapshot_CarriesTheStatusEffectMask()
+        {
+            var state = new RpgSimulationState();
+            var actor = Spawn(state, health: 10);
+            actor.Components.Get<StatusEffectComponent>().Apply(StatusEffectType.Poison, 2, 3);
+
+            var snapshot = state.Actors.CreateSnapshot()[0];
+
+            Assert.That(snapshot.StatusEffectMask, Is.EqualTo(1 << (int)StatusEffectType.Poison));
+        }
+
+        [Test]
         public void System_LethalPoisonPublishesDeathAndRemovesTheActor()
         {
             var state = new RpgSimulationState();

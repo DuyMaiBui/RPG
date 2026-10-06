@@ -7,5 +7,6 @@ namespace RPG.Core.Actors
         Died = 3,
         TurnStarted = 4,
         BattleEnded = 5,
+        AbilityCast = 6,
     }
 }

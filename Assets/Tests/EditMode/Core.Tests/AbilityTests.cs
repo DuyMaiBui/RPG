@@ -115,6 +115,17 @@ namespace RPG.Core.Tests
         }
 
         [Test]
+        public void System_PublishesAnAbilityCastEvent()
+        {
+            var (state, _, _) = Setup(casterAbilities: new[] { Strike(4) });
+
+            var context = Context(state);
+            new AbilitySystem().Tick(context);
+
+            Assert.That(context.DrainEvents(), Has.Exactly(1).TypeOf<ActorAbilityCast>());
+        }
+
+        [Test]
         public void System_LethalAbilityPublishesDeathAndRemovesTheTarget()
         {
             var (state, _, target) = Setup(casterAbilities: new[] { Strike(20) });

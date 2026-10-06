@@ -27,6 +27,7 @@ namespace RPG.Core.Actors
                     if (!TryResolveTarget(context, actor, ability, out var target)) continue;
 
                     ApplyEffects(context, actor, target, ability);
+                    context.Publish(new ActorAbilityCast(actor.Id, target.Id, ability.Id));
                     abilities.StartCooldown(abilityIndex);
                     break;
                 }

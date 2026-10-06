@@ -17,7 +17,8 @@ namespace RPG.Core.Actors
             float visionRange,
             EntityId target,
             ActorVisualState visualState,
-            AutoCombatState behaviorState)
+            AutoCombatState behaviorState,
+            byte statusEffectMask)
         {
             Entity = entity;
             Kind = kind;
@@ -32,6 +33,7 @@ namespace RPG.Core.Actors
             Target = target;
             VisualState = visualState;
             BehaviorState = behaviorState;
+            StatusEffectMask = statusEffectMask;
         }
 
         public EntityId Entity { get; }
@@ -47,5 +49,8 @@ namespace RPG.Core.Actors
         public EntityId Target { get; }
         public ActorVisualState VisualState { get; }
         public AutoCombatState BehaviorState { get; }
+
+        /// <summary>Bit per <see cref="StatusEffectType"/> for the actor's active effects; presentation only.</summary>
+        public byte StatusEffectMask { get; }
     }
 }

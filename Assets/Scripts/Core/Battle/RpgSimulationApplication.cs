@@ -47,6 +47,9 @@ namespace RPG.Core.Actors
                     case ActorDamaged damaged when damaged.Damage > 0:
                         context.State.Signals.Add(new PresentationSignal(PresentationSignalKind.Damaged, damaged.Target, damaged.Source, damaged.Damage));
                         break;
+                    case ActorAbilityCast cast:
+                        context.State.Signals.Add(new PresentationSignal(PresentationSignalKind.AbilityCast, cast.Target, cast.Source, cast.AbilityId));
+                        break;
                     case ActorDied died:
                         context.State.Signals.Add(new PresentationSignal(PresentationSignalKind.Died, died.Target, died.Source, 0));
                         break;

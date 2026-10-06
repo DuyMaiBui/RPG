@@ -65,5 +65,14 @@ namespace RPG.Core.Actors
         }
 
         public void Clear() => _effects.Clear();
+
+        /// <summary>Bit per <see cref="StatusEffectType"/> for the active effects; for presentation only.</summary>
+        public byte Mask()
+        {
+            var mask = 0;
+            for (var index = 0; index < _effects.Count; index++)
+                mask |= 1 << (int)_effects[index].Type;
+            return (byte)mask;
+        }
     }
 }
