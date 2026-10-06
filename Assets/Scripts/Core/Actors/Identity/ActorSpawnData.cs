@@ -21,7 +21,8 @@ namespace RPG.Core.Actors
             float projectileLifetime = 5f,
             int formationId = -1,
             SimulationVector2 formationOffset = default,
-            ColliderShapeData[] colliderShapes = null)
+            ColliderShapeData[] colliderShapes = null,
+            AbilityDefinition[] abilities = null)
         {
             MaximumHealth = maximumHealth;
             AttackPower = attackPower;
@@ -39,6 +40,7 @@ namespace RPG.Core.Actors
             FormationId = formationId;
             FormationOffset = formationOffset;
             ColliderShapes = colliderShapes;
+            Abilities = abilities;
         }
 
         public int MaximumHealth { get; }
@@ -58,6 +60,8 @@ namespace RPG.Core.Actors
         public SimulationVector2 FormationOffset { get; }
         public ColliderShapeData[] ColliderShapes { get; }
 
+        public AbilityDefinition[] Abilities { get; }
+
         public ActorSpawnData WithPosition(SimulationVector2 position) => new(
             MaximumHealth,
             AttackPower,
@@ -74,6 +78,7 @@ namespace RPG.Core.Actors
             ProjectileLifetime,
             FormationId,
             FormationOffset,
-            ColliderShapes);
+            ColliderShapes,
+            Abilities);
     }
 }

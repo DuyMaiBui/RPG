@@ -8,6 +8,7 @@ namespace RPG.Core.Actors
     {
         private readonly AutoBattleSystem _autoBattle = new();
         private readonly StatusEffectSystem _statusEffects = new();
+        private readonly AbilitySystem _abilities = new();
 
         void ISimulationApplication<RpgSimulationState>.BeginTick(SimulationContext<RpgSimulationState> context, SimulationTick tick) => context.State.BeginTick();
 
@@ -29,6 +30,7 @@ namespace RPG.Core.Actors
         {
             _statusEffects.Tick(context);
             _autoBattle.Tick(context);
+            _abilities.Tick(context);
         }
 
         void ISimulationApplication<RpgSimulationState>.HandleEvents(

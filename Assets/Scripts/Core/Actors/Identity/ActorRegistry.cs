@@ -76,6 +76,8 @@ namespace RPG.Core.Actors
                 components.Add(new ProjectileWeaponComponent(data.ProjectileSpeed, data.ProjectileRadius, data.ProjectileLifetime));
             if (data.FormationId >= 0)
                 components.Add(new FormationSlotComponent(data.FormationId, data.FormationOffset));
+            if (data.Abilities != null && data.Abilities.Length > 0)
+                components.Add(new AbilityComponent(data.Abilities));
             _actors[index] = new Actor(id, components);
             return id;
         }
