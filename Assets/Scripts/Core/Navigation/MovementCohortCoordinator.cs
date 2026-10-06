@@ -71,7 +71,7 @@ namespace RPG.Core.Navigation
                 !TryGet(membership.CohortId, out var cohort))
                 return false;
 
-            direction = cohort.GetDirection(actor, membership.SlotIndex);
+            direction = cohort.GetDirection(actor);
             return direction.LengthSquared > 0.000001f;
         }
 
@@ -145,7 +145,7 @@ namespace RPG.Core.Navigation
                     blueBase,
                     cohort);
                 BuildRoute(actors, navigation, pathfinder, flowFields, occupancy, redBase, blueBase, cohort);
-                AssignSlots(actors, cohort);
+                AssignMembership(actors, cohort);
                 activeCount++;
             }
 
@@ -258,28 +258,16 @@ namespace RPG.Core.Navigation
             cohort.RefreshDirection(flowFields);
         }
 
-        private void AssignSlots(ActorRegistry actors, MovementCohort cohort)
+        /// <summary>Joins the cohort members. There is no rank or slot assignment any more: steering every actor onto
+        /// its own slot made the group march in ranks, and the crowd flows from the shared route direction plus the soft
+        /// separation pass instead.</summary>
+        private static void AssignMembership(ActorRegistry actors, MovementCohort cohort)
         {
-            var meleeCount = 0;
-            for (var index = 0; index < cohort.MemberCount; index++)
-            {
-                if (actors.TryGet(cohort.Members[index], out var actor) &&
-                    !actor.Components.Contains<ProjectileWeaponComponent>())
-                    meleeCount++;
-            }
-
-            var meleeSlot = 0;
-            var rangedSlot = meleeCount;
             for (var index = 0; index < cohort.MemberCount; index++)
             {
                 if (actors.TryGet(cohort.Members[index], out var actor) &&
                     actor.Components.TryGet<MovementCohortComponent>(out var membership))
-                {
-                    var slot = actor.Components.Contains<ProjectileWeaponComponent>()
-                        ? rangedSlot++
-                        : meleeSlot++;
-                    membership.Assign(cohort.Id, slot);
-                }
+                    membership.Assign(cohort.Id);
             }
         }
 

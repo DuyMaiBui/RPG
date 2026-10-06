@@ -10,7 +10,7 @@ namespace RPG.Unity.Tests
     /// <summary>Authored loadout values that the scene hands to the simulation. The health multiplier is what makes a
     /// melee rank tougher than the rank that shoots from safety, so its scaling and its rejection of a bad value are
     /// both pinned here.</summary>
-    public sealed class ActorLoadoutAuthoringTests
+    public sealed class ActorLoadoutStatsTests
     {
         [Test]
         public void CreateSpawnData_ScalesHealthByTheLoadoutMultiplier()

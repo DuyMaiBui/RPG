@@ -5,20 +5,11 @@ namespace RPG.Core.Actors
     public sealed class MovementCohortComponent : IActorComponent
     {
         public int CohortId { get; private set; } = -1;
-        public int SlotIndex { get; private set; } = -1;
 
         public bool IsAssigned => CohortId >= 0;
 
-        public void Assign(int cohortId, int slotIndex)
-        {
-            CohortId = cohortId;
-            SlotIndex = slotIndex;
-        }
+        public void Assign(int cohortId) => CohortId = cohortId;
 
-        public void Clear()
-        {
-            CohortId = -1;
-            SlotIndex = -1;
-        }
+        public void Clear() => CohortId = -1;
     }
 }

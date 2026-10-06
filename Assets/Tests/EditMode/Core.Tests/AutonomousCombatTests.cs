@@ -94,7 +94,7 @@ namespace RPG.Core.Tests
         }
 
         [Test]
-        public void MovementCohort_AssignsRangedMembersBehindMeleeMembers()
+        public void MovementCohort_GroupsMeleeAndRangedMembersTogether()
         {
             var navigation = new NavigationGrid(20, 20, 1f, new SimulationVector2(-10f, -10f));
             var actors = new ActorRegistry();
@@ -125,7 +125,8 @@ namespace RPG.Core.Tests
             var meleeMembership = meleeActor.Components.Get<MovementCohortComponent>();
             var rangedMembership = rangedActor.Components.Get<MovementCohortComponent>();
             Assert.That(meleeMembership.CohortId, Is.EqualTo(rangedMembership.CohortId));
-            Assert.That(rangedMembership.SlotIndex, Is.GreaterThan(meleeMembership.SlotIndex));
+            Assert.That(meleeMembership.IsAssigned, Is.True);
+            Assert.That(rangedMembership.IsAssigned, Is.True);
         }
 
         [Test]
@@ -544,8 +545,11 @@ namespace RPG.Core.Tests
         }
 
         [Test]
-        public void Avoidance_SteersSameFactionActorsAwayFromCollision()
+        public void Avoidance_KeepsPreferredDirectionForSameFactionActor()
         {
+            // Own side is not an obstacle: reciprocal avoidance between allies is what makes a crowd queue and shuffle,
+            // so the solver leaves allies out and the soft separation pass keeps them from stacking instead. See
+            // Docs/RPG-Combat-Plan.md (C6).
             var registry = new ActorRegistry();
             var leftId = registry.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
                 10, 1, new SimulationVector2(-0.4f, 0f), 0.3f, 1f, 3f, 1f, 1f));
@@ -562,8 +566,8 @@ namespace RPG.Core.Tests
             var direction = new OrcaAvoidanceSolver().Solve(
                 left, new SimulationVector2(1f, 0f), registry, hash);
 
-            Assert.That(direction.X, Is.LessThan(0.99f));
-            Assert.That(direction.LengthSquared, Is.GreaterThan(0.9f));
+            Assert.That(direction.X, Is.EqualTo(1f).Within(0.0001f));
+            Assert.That(direction.Y, Is.EqualTo(0f).Within(0.0001f));
         }
 
         [Test]

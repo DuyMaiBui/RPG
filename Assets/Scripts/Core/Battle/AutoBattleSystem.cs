@@ -27,6 +27,23 @@ namespace RPG.Core.Actors
         // objective for this long is the signal that actually means "not getting anywhere".
         private const int ObjectiveStallTicks = 90;
         private const float ObjectiveProgressEpsilon = 0.1f;
+        // Own side is not an obstacle and the direction is recomputed from scratch every tick, so without smoothing an
+        // actor wobbles forward instead of walking a line: the heading is blended with the previous one and its turn is
+        // rate limited (12 degrees a tick, a full turn in a third of a second).
+        private const float HeadingBlend = 0.4f;
+        private const float MaxTurnRadiansPerTick = 0.2094f;
+        // Smoothing is for the small per-tick chatter that makes a crowd shuffle. A decisive turn - stepping around an
+        // actor or an obstacle - is applied as asked, and the last stretch towards a destination is not smoothed at all,
+        // otherwise a rate limited heading orbits what it is trying to reach instead of arriving.
+        private const float SmoothingMaxTurnRadians = 0.35f;
+        private const float SmoothingMinDistance = 1.5f;
+        // The ally push has to stay below half a movement step (0.0133 units at speed 0.8 over 1/30 s): a push that
+        // cancels the step makes a crowd stand still while it shuffles, which is exactly the "stuck in a crowd" feel
+        // the soft model is meant to remove.
+        private const float AllyPushRelaxation = 0.05f;
+        private const float AllyPushCorrection = 0.013f;
+        private const float EnemyPushRelaxation = 0.35f;
+        private const float EnemyPushCorrection = 0.12f;
 
         private readonly AnyAliveEnemyTargetSelector _targetSelector = new();
         private readonly ProjectileSystem _projectiles = new();
@@ -47,6 +64,8 @@ namespace RPG.Core.Actors
         private float[] _bestObjectiveDistance = new float[0];
         private int[] _objectiveStallTicks = new int[0];
         private bool[] _engaged = new bool[0];
+        private bool[] _terrainBlocked = new bool[0];
+        private SimulationVector2[] _headings = new SimulationVector2[0];
         private int _tick;
         private bool[] _wantsToMove = new bool[0];
 
@@ -244,6 +263,13 @@ namespace RPG.Core.Actors
                     }
                 }
 
+                _terrainBlocked[index] = RefusesStep(
+                    context.State.Navigation,
+                    position.Position,
+                    preferredDirection,
+                    movement.EffectiveSpeed * context.FixedDeltaTime,
+                    MovingBodyRadius(actor));
+
                 var escaping = _recoveryTicks[index] > 0;
                 if (escaping && _escapeStartDistance[index] - distance >= EscapeProgressEpsilon)
                 {
@@ -279,7 +305,8 @@ namespace RPG.Core.Actors
                 // army. The separation pass still keeps bodies apart while the actor walks out.
                 var resolvedDirection = escaping
                     ? preferredDirection
-                    : _avoidance.Solve(actor, preferredDirection, actors, _spatialHash, context.FixedDeltaTime);
+                    : SmoothHeading(index, _avoidance.Solve(actor, preferredDirection, actors, _spatialHash,
+                        context.FixedDeltaTime), distance);
                 var travel = SimulationMath.Min(
                     movement.EffectiveSpeed * context.FixedDeltaTime,
                     SimulationMath.Max(0f, distance - stopDistance));
@@ -359,6 +386,51 @@ namespace RPG.Core.Actors
             _escapeStartDistance[index] = _objectiveDistance[index];
         }
 
+        /// <summary>True when the navigation grid refuses to move the actor along its desired direction at all, which
+        /// is what static geometry looks like from inside the movement loop.</summary>
+        private static bool RefusesStep(
+            NavigationGrid navigation,
+            SimulationVector2 position,
+            SimulationVector2 direction,
+            float step,
+            float radius)
+        {
+            if (direction.LengthSquared <= 0.000001f || step <= 0f) return false;
+            var resolved = navigation.ResolveMovement(position, position + direction * step, radius);
+            return (resolved - position).LengthSquared <= ProgressEpsilonSquared;
+        }
+
+        /// <summary>Turns the desired direction into the direction the actor actually travels: blended with the previous
+        /// heading and rate limited, so a crowd walks lines instead of shuffling.</summary>
+        private SimulationVector2 SmoothHeading(int index, SimulationVector2 direction, float remainingDistance)
+        {
+            var previous = _headings[index];
+            if (direction.LengthSquared <= 0.000001f)
+                return previous.LengthSquared > 0.000001f ? previous : direction;
+
+            var desired = direction.Normalized();
+            if (previous.LengthSquared <= 0.000001f || remainingDistance <= SmoothingMinDistance)
+            {
+                _headings[index] = desired;
+                return desired;
+            }
+
+            var cross = previous.X * desired.Y - previous.Y * desired.X;
+            var dot = SimulationMath.Max(-1f, SimulationMath.Min(1f, previous.X * desired.X + previous.Y * desired.Y));
+            if ((float)System.Math.Acos(dot) > SmoothingMaxTurnRadians)
+            {
+                _headings[index] = desired;
+                return desired;
+            }
+
+            var blended = (previous * (1f - HeadingBlend) + desired * HeadingBlend).Normalized();
+            var blendedDot = SimulationMath.Max(-1f, SimulationMath.Min(1f, previous.X * blended.X + previous.Y * blended.Y));
+            if ((float)System.Math.Acos(blendedDot) > MaxTurnRadiansPerTick)
+                blended = Rotate(previous, (cross < 0f ? -1f : 1f) * MaxTurnRadiansPerTick);
+            _headings[index] = blended;
+            return blended;
+        }
+
         /// <summary>Detects the slow stall the per-tick displacement check cannot see: the actor keeps moving but never
         /// gets closer to what it is walking towards, which is what happens when a route dead-ends at an obstacle field
         /// and the actor twitches against it. Triggers the same recovery window a jam does, so the actor plans a detour
@@ -366,11 +438,11 @@ namespace RPG.Core.Actors
         private void TrackObjectiveProgress(int index)
         {
             var objective = _objectiveDistance[index];
-            if (objective < 0f || _engaged[index])
+            if (objective < 0f || _engaged[index] || !_terrainBlocked[index])
             {
-                // A unit in combat is supposed to stand where it is: waiting for a swing, holding a line or queueing
-                // behind the rank in front is not a navigation stall, and treating it as one made melee units wander
-                // off instead of fighting.
+                // A unit in combat is supposed to stand where it is, and a crowd that compresses into a choke is not
+                // stuck either: waiting for a swing, holding a line or queueing behind the rank in front are all normal.
+                // Only terrain refusing the step for this long is a navigation stall worth escaping.
                 _bestObjectiveDistance[index] = objective < 0f ? float.MaxValue : objective;
                 _objectiveStallTicks[index] = 0;
                 return;
@@ -461,6 +533,8 @@ namespace RPG.Core.Actors
             _bestObjectiveDistance = new float[count];
             _objectiveStallTicks = new int[count];
             _engaged = new bool[count];
+            _terrainBlocked = new bool[count];
+            _headings = new SimulationVector2[count];
             for (var index = 0; index < count; index++) _bestObjectiveDistance[index] = float.MaxValue;
             _wantsToMove = new bool[count];
         }
@@ -511,10 +585,10 @@ namespace RPG.Core.Actors
             }
         }
 
-        /// <summary>Resolves overlap against nearby actors with a bounded, relaxed push. Resolving every overlap fully
-        /// each tick would let separation — not the actor's movement — decide the final position, which is what makes
-        /// a dense crowd stop moving: the forward step is a fraction of a push, so units get shoved back where they
-        /// came from. The correction is therefore a fraction of each overlap and is capped per tick.</summary>
+        /// <summary>Resolves overlap against nearby actors. Own side is pushed apart gently and by a small amount:
+        /// a firm push is what turns a crowd into a queue that shuffles sideways, and no push at all lets units stack.
+        /// Enemies keep the firmer correction, and the actor's own target is left out of it because that is the actor
+        /// the attack is trying to reach.</summary>
         private static SimulationVector2 ResolveOverlap(
             ActorRegistry actors,
             Actor movingActor,
@@ -522,22 +596,38 @@ namespace RPG.Core.Actors
             SpatialHash spatialHash,
             List<EntityId> nearby)
         {
-            const float relaxation = 0.35f;
-            const float maximumCorrection = 0.12f;
-
-            var start = candidate;
             var movingRadius = movingActor.Components.Get<ColliderComponent>().Compound.BoundingRadius;
             spatialHash.Collect(candidate, movingRadius + 1f, nearby);
-            for (var pass = 0; pass < 3; pass++)
+            var faction = movingActor.Components.Get<FactionComponent>().Faction;
+            var target = movingActor.Components.Get<TargetComponent>().CurrentTarget;
+            candidate = SeparateAgainst(actors, movingActor, candidate, nearby, faction, true, EntityId.None,
+                AllyPushRelaxation, AllyPushCorrection);
+            return SeparateAgainst(actors, movingActor, candidate, nearby, faction, false, target,
+                EnemyPushRelaxation, EnemyPushCorrection);
+        }
+
+        private static SimulationVector2 SeparateAgainst(
+            ActorRegistry actors,
+            Actor movingActor,
+            SimulationVector2 candidate,
+            List<EntityId> nearby,
+            FactionId faction,
+            bool sameFaction,
+            EntityId excluded,
+            float relaxation,
+            float maximumCorrection)
+        {
+            var start = candidate;
+            var movingRadius = movingActor.Components.Get<ColliderComponent>().Compound.BoundingRadius;
+            var passes = sameFaction ? 2 : 3;
+            for (var pass = 0; pass < passes; pass++)
             {
                 for (var index = 0; index < nearby.Count; index++)
                 {
-                    if (!actors.TryGet(nearby[index], out var other) || other.Id == movingActor.Id ||
-                        other.Components.Get<HealthComponent>().IsDead)
-                        continue;
-                    if (IsLongerReachAlly(movingActor, other)) continue;
-                    if (other.Id == movingActor.Components.Get<TargetComponent>().CurrentTarget) continue;
-
+                    if (!actors.TryGet(nearby[index], out var other) || other.Id == movingActor.Id) continue;
+                    if (other.Id == excluded) continue;
+                    if (other.Components.Get<HealthComponent>().IsDead) continue;
+                    if ((other.Components.Get<FactionComponent>().Faction == faction) != sameFaction) continue;
                     var otherPosition = other.Components.Get<PositionComponent>().Position;
                     var otherRadius = other.Components.Get<ColliderComponent>().Compound.BoundingRadius;
                     candidate = CollisionResolver.SeparateCircles(
@@ -556,8 +646,8 @@ namespace RPG.Core.Actors
                 : candidate;
         }
 
-        /// <summary>Nearest live enemy the attacker can already reach with its basic attack, used to turn contact
-        /// into a target. Deterministic: nearest wins and a tie keeps the earlier candidate.</summary>
+        /// <summary>Nearest live enemy the attacker can already reach with its basic attack, used to turn contact into
+        /// a target. Deterministic: nearest wins and a tie keeps the earlier candidate.</summary>
         private bool TrySelectContactTarget(Actor attacker, ActorRegistry actors, out EntityId targetId)
         {
             targetId = EntityId.None;
@@ -582,15 +672,6 @@ namespace RPG.Core.Actors
 
             return !targetId.IsNone;
         }
-
-        /// <summary>An ally that shoots further does not hold ground against an ally that has to close. A ranged rank
-        /// stops at its own attack range and used to wall in the melee rank behind it, so the melee units - the only
-        /// ones that must touch the enemy - could never arrive. The longer-ranged ally still resolves against the
-        /// mover in its own pass, so the pair separates without stopping the advance.</summary>
-        private static bool IsLongerReachAlly(Actor mover, Actor other) =>
-            mover.Components.Get<FactionComponent>().Faction == other.Components.Get<FactionComponent>().Faction &&
-            other.Components.Get<AttackRangeComponent>().Reach >
-            mover.Components.Get<AttackRangeComponent>().Reach + ReachEpsilon;
 
         private static bool IsLiveEnemy(ActorRegistry actors, Actor source, EntityId targetId, out Actor target)
         {

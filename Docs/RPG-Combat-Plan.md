@@ -371,6 +371,43 @@ static map. Two changes, measured on the same 300 s run:
 | units that never acquire a target | 17 of 362 | **8 of 362**, every one spawned in the last 20 s |
 | stalled >= 10 s | 0 | 0 (longest 6.8 s -> 6.4 s) |
 
+**Fluid crowd movement (2026-10-06).** A crowd that queues, gives way and shuffles sideways reads as broken movement,
+so the crowd model is soft now:
+
+- `MovementCohort.GetDirection` returns the shared route direction. It used to blend that with a correction towards
+  the actor's own slot near the cohort anchor, so the group marched in ranks and every anchor or membership change
+  turned into a direction change.
+- Own side is not an obstacle: `OrcaAvoidanceSolver` leaves allies out of the solve entirely, because reciprocal
+  avoidance between allies is what makes every actor slow down for the one in front. Separation pushes allies gently
+  (`AllyPushRelaxation` 0.05, capped at 0.013 units a tick) against the firmer enemy correction (0.35, capped at
+  0.12). The ally cap is deliberately below half a movement step: a push that cancels the step is what makes a crowd
+  stand still while it shuffles.
+- Heading smoothing: the travelled direction is blended with the previous one and rate limited to 12 degrees a tick,
+  but only for small per-tick chatter (turns under 20 degrees) and only while the actor is more than 1.5 units from
+  its destination. A decisive turn around an actor or an obstacle is applied as asked, and the last stretch towards a
+  destination is not smoothed at all - otherwise a rate limited heading orbits what it is trying to reach.
+- The crawl detector above only fires when the navigation grid refuses the step, so a crowd compressing into a choke
+  is not treated as a stall and does not wander out of the press.
+
+Measured on the 300 s Moba run:
+
+| | before | after |
+|---|---|---|
+| turn per tick (median / average) | 0.39 / 7.05 degrees | **0.02 / 5.46 degrees** |
+| heading vs direction to target (median) | 9.5 degrees | **1.7 degrees** |
+| moving ticks below half a step | 10.9% | **7.0%** |
+| units past the midline | 93 of 362 | **136 of 362** |
+| median speed ratio | 0.90 | **0.93** |
+| stall ticks | 1.36% | **0.93%** (longest stall 7.9 s -> 5.0 s) |
+
+Sampled from the actual actor views in a Play session of the demo scene (30 s, 120 samples at 0.25 s): turn median
+0.28 degrees per sample, movement speed median 0.80 of the 0.8 units/s budget, 1.3% of samples below half speed, and
+the nearest same-faction neighbour 0.74 units away at the median (the bodies touch at 0.7), so the crowd runs at full
+speed in lines and compresses without stacking.
+
+`AutonomousCombatTests.Avoidance_KeepsPreferredDirectionForSameFactionActor` pins the policy - the test that asserted
+the opposite was rewritten rather than re-pinned - and `MobaScenarioTests` runs the crowd scenario.
+
 **Rejected: a per-actor A\* detour.** Planning a real path for a stuck actor (rate limited, occupancy
 aware, heading followed until reached) was implemented and measured: stalls went from **0 to 81 of 362**
 and the longest stall to 104 s. A path runs through cells occupied by other actors — the occupancy grid

@@ -27,6 +27,13 @@ namespace RPG.Core.Tests
         public float MinTargetDistance = float.MaxValue;
         public int InRangeTicks;
         public bool WantsToMove;
+        public SimulationVector2 LastHeading;
+        public int CurrentDipTicks;
+        public int DipEpisodes;
+        public int CurrentContactDipTicks;
+        public int ContactDipEpisodes;
+        public float CurrentTargetDistance = -1f;
+        public bool CrossedMidline;
         public bool Died;
         public int DeathTick = -1;
         public int Attacks;

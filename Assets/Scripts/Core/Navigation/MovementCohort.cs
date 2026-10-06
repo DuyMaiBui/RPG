@@ -6,7 +6,6 @@ namespace RPG.Core.Navigation
     public sealed class MovementCohort
     {
         private const float WaypointReachDistance = 0.35f;
-        private const float SlotSpacing = 0.9f;
 
         public MovementCohort(int id, int routeCapacity)
         {
@@ -140,26 +139,16 @@ namespace RPG.Core.Navigation
             AdvanceWaypoint();
         }
 
-        public SimulationVector2 GetDirection(Actor actor, int slotIndex)
+        /// <summary>Direction the cohort is moving in. Every member follows the shared route direction: steering each
+        /// actor onto its own slot near the cohort anchor made the group march in ranks and turned every anchor or
+        /// membership change into a direction change, which is what a crowd reads as shuffling sideways instead of
+        /// flowing. Spacing comes from the separation pass, which is soft and settles without a target to march to.</summary>
+        public SimulationVector2 GetDirection(Actor actor)
         {
             if (!HasRoute && !UsesFlowField)
                 return SimulationVector2.Zero;
 
-            var routeDirection = SharedDirection;
-            var position = actor.Components.Get<PositionComponent>().Position;
-            var columns = System.Math.Max(1, System.Math.Min(4, (int)SimulationMath.Ceiling(SimulationMath.Sqrt(MemberCount))));
-            var row = slotIndex / columns;
-            var column = slotIndex % columns;
-            var lateral = (column - (columns - 1) * 0.5f) * SlotSpacing;
-            var backward = row * SlotSpacing;
-            var side = new SimulationVector2(-routeDirection.Y, routeDirection.X);
-            var slotPosition = Anchor + side * lateral - routeDirection * backward;
-            var slotCorrection = slotPosition - position;
-            if (slotCorrection.LengthSquared <= 0.04f)
-                return routeDirection;
-
-            var correction = slotCorrection.Normalized();
-            return (routeDirection * 0.75f + correction * 0.25f).Normalized();
+            return SharedDirection;
         }
 
         private void AdvanceWaypoint()

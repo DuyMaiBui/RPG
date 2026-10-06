@@ -33,6 +33,10 @@ namespace RPG.Core.Tests
         private readonly List<float> _meleeNearestEnemy = new();
         private readonly List<float> _meleeStopDistances = new();
         private readonly List<float> _targetAngles = new();
+        private readonly List<float> _headingJitter = new();
+        private const int StopGoTicks = 10;
+        private int _speedDipTicks;
+        private int _movingTicks;
         private readonly List<float> _idleTravel = new();
         private readonly List<float> _idleNetDisplacement = new();
         private int _idleReachedBase;
@@ -102,6 +106,26 @@ namespace RPG.Core.Tests
         /// <summary>Closest any melee unit got to its assigned target: the number that tells "cannot reach" apart from
         /// "reached but the ability fight decided it first".</summary>
         public float MeleeClosestApproach { get; private set; }
+
+        /// <summary>Median turn per tick of the direction an actor actually travelled: the "walks a wobbly line"
+        /// number. Straight-line movement keeps this near zero.</summary>
+        public float MedianHeadingJitterDegrees { get; private set; }
+
+        /// <summary>Share of moving ticks in which an actor covered less than half of its own step.</summary>
+        public float SpeedDipShare { get; private set; }
+
+        /// <summary>Times an actor stayed below half its own step for ten ticks in a row: the visible stop-and-go,
+        /// as opposed to the one or two ticks it naturally loses while arriving at its stop distance.</summary>
+        public int FlowStopGoEpisodes { get; private set; }
+
+        public int UnitsWithStopGo { get; private set; }
+
+        /// <summary>Stop-and-go episodes while an enemy was in reach: combat pressure, not a crowd-flow problem.</summary>
+        public int ContactStopGoEpisodes { get; private set; }
+
+        public int ContactUnitsWithStopGo { get; private set; }
+
+        public int MidlineCrossings { get; private set; }
 
         public int IdleUnits => _idleUnits.Count;
 
@@ -210,8 +234,10 @@ namespace RPG.Core.Tests
                     if (unit.CurrentStall > unit.MaxStall) unit.MaxStall = unit.CurrentStall;
                 }
 
-                unit.WantsToMove = actor.Components.Get<MovementComponent>().DesiredDirection.LengthSquared > 0.000001f;
+                var movement = actor.Components.Get<MovementComponent>();
+                unit.WantsToMove = movement.DesiredDirection.LengthSquared > 0.000001f;
                 TrackCloseDistance(state, actor, position, unit);
+                TrackFlowQuality(unit, movement, position, delta);
                 if (actor.Components.Get<HealthComponent>().IsDead)
                 {
                     unit.Died = true;
@@ -220,8 +246,53 @@ namespace RPG.Core.Tests
             }
         }
 
+        /// <summary>Measures how smoothly an actor moved this tick: how far it turned since the last tick and whether
+        /// it covered its own step. The two numbers behind "the crowd shuffles instead of flowing".</summary>
+        private void TrackFlowQuality(MobaScenarioUnit unit, MovementComponent movement, SimulationVector2 position, SimulationVector2 delta)
+        {
+            if (unit.WantsToMove)
+            {
+                _movingTicks++;
+                var step = movement.EffectiveSpeed / MobaScenarioData.TickRate;
+                if (delta.LengthSquared < step * step * 0.25f)
+                {
+                    _speedDipTicks++;
+                    var inContact = unit.CurrentTargetDistance >= 0f &&
+                                    unit.CurrentTargetDistance <= unit.AttackDistance + 1.5f;
+                    if (inContact)
+                    {
+                        unit.CurrentContactDipTicks++;
+                        if (unit.CurrentContactDipTicks == StopGoTicks) unit.ContactDipEpisodes++;
+                        unit.CurrentDipTicks = 0;
+                    }
+                    else
+                    {
+                        unit.CurrentDipTicks++;
+                        if (unit.CurrentDipTicks == StopGoTicks) unit.DipEpisodes++;
+                        unit.CurrentContactDipTicks = 0;
+                    }
+                }
+                else
+                {
+                    unit.CurrentDipTicks = 0;
+                    unit.CurrentContactDipTicks = 0;
+                }
+            }
+
+            if (delta.LengthSquared <= 0.0000001f) return;
+            var heading = delta.Normalized();
+            if (unit.LastHeading.LengthSquared > 0.0000001f && (_tick + unit.Id.Index) % 10 == 0)
+            {
+                var cosine = Math.Max(-1f, Math.Min(1f, heading.X * unit.LastHeading.X + heading.Y * unit.LastHeading.Y));
+                _headingJitter.Add((float)(Math.Acos(cosine) * 180.0 / Math.PI));
+            }
+
+            unit.LastHeading = heading;
+        }
+
         private void TrackCloseDistance(RpgSimulationState state, Actor actor, SimulationVector2 position, MobaScenarioUnit unit)
         {
+            unit.CurrentTargetDistance = -1f;
             if (!actor.Components.TryGet<TargetComponent>(out var targetComponent) ||
                 targetComponent.CurrentTarget == EntityId.None ||
                 !state.Actors.TryGet(targetComponent.CurrentTarget, out var target) ||
@@ -233,6 +304,7 @@ namespace RPG.Core.Tests
             }
 
             var distance = Distance(target.Components.Get<PositionComponent>().Position, position);
+            unit.CurrentTargetDistance = distance;
             if (distance < unit.MinTargetDistance) unit.MinTargetDistance = distance;
             var targetRadius = target.Components.Get<ColliderComponent>().Compound.BoundingRadius;
             if (distance <= unit.AttackDistance + targetRadius)
@@ -412,6 +484,15 @@ namespace RPG.Core.Tests
         private void Sample(RpgSimulationState state, int tick)
         {
             var (redAlive, blueAlive, redFront, blueFront) = Alive(state);
+            MidlineCrossings = 0;
+            for (var index = 0; index < _order.Count; index++)
+            {
+                var unit = _units[_order[index]];
+                if (unit.CrossedMidline) { MidlineCrossings++; continue; }
+                var past = unit.Faction == FactionId.Red ? unit.LastPosition.X > 0f : unit.LastPosition.X < 0f;
+                if (past && !unit.Died) unit.CrossedMidline = true;
+                if (past) MidlineCrossings++;
+            }
             var stalled = 0;
             for (var index = 0; index < _order.Count; index++)
             {
@@ -424,7 +505,7 @@ namespace RPG.Core.Tests
                 + $"kills R/B={_killsByFaction[1],-3}/{_killsByFaction[2],-3} "
                 + $"dmg R/B={_damageByFaction[1],-6}/{_damageByFaction[2],-6} "
                 + $"front R={redFront,7:0.0} B={blueFront,7:0.0} gap={redFront - blueFront,6:0.0} "
-                + $"stalled={stalled} attacks={_attacksThisSample}");
+                + $"stalled={stalled} attacks={_attacksThisSample} crossed={MidlineCrossings}");
             _attacksThisSample = 0;
         }
 
@@ -517,6 +598,19 @@ namespace RPG.Core.Tests
             MedianSpeedRatio = Median(speedRatios);
             MedianPathEfficiency = Median(efficiency);
             MedianHeadingToTarget = Median(_targetAngles);
+            MedianHeadingJitterDegrees = Median(_headingJitter);
+            UnitsWithStopGo = 0;
+            ContactUnitsWithStopGo = 0;
+            FlowStopGoEpisodes = 0;
+            for (var index = 0; index < _order.Count; index++)
+            {
+                var unit = _units[_order[index]];
+                if (unit.DipEpisodes > 0) UnitsWithStopGo++;
+                if (unit.ContactDipEpisodes > 0) ContactUnitsWithStopGo++;
+                FlowStopGoEpisodes += unit.DipEpisodes;
+                ContactStopGoEpisodes += unit.ContactDipEpisodes;
+            }
+            SpeedDipShare = _movingTicks == 0 ? 0f : _speedDipTicks / (float)_movingTicks;
             FractionStalledLong = Spawned == 0 ? 0f : stalledLong / (float)Spawned;
             TrackIdle(state);
 
@@ -545,6 +639,10 @@ namespace RPG.Core.Tests
                 + $"nothing in front {_frontFree}; distance to target {Describe(_meleeStopDistances)}");
             Line($"## Move: travelled {Describe(travelled)}, speed ratio {Describe(speedRatios)}, "
                 + $"never moved {_neverMoved}, net/travelled {Describe(efficiency)}");
+            Line($"## Flow: turn per tick {Describe(_headingJitter)} degrees, speed dips {Pct(_speedDipTicks, _movingTicks)}% "
+                + $"of moving ticks, stop-and-go episodes {FlowStopGoEpisodes} affecting {UnitsWithStopGo}/{Spawned} units "
+                + $"(plus {ContactStopGoEpisodes} while an enemy was in reach), "
+                + $"units past the midline {MidlineCrossings}/{Spawned}");
             Line($"## Move: heading vs direction to the target {Describe(_targetAngles)}, away in "
                 + $"{Pct(_targetAnglesAway, _targetAngles.Count)}% of samples");
             Line($"## Stall: stalled >= 10s {stalledLong}/{Spawned} ({Pct(stalledLong, Spawned)}%), >= 30s "
