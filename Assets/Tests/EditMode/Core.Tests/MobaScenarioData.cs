@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using RPG.Core.Actors;
 using RPG.Core.Navigation;
@@ -28,6 +29,12 @@ namespace RPG.Core.Tests
         public const float VisionRange = 45f;
         public const float ActorRadius = 0.35f;
         public const float SessionAttackCooldown = 0.8f;
+
+        /// <summary>Melee loadout health multiplier from the demo scenes: the melee rank is the one that has to cross
+        /// the range where ranged abilities already hit it.</summary>
+        public const float MeleeHealthMultiplier = 2f;
+
+        public const int MeleeCleaveDamage = 4;
 
         public const bool EnableWaves = true;
         public const int MeleePerWave = 3;
@@ -86,7 +93,7 @@ namespace RPG.Core.Tests
         public static ContentCatalog CreateCatalog()
         {
             var cleave = new AbilityDefinition(1, 4, 1.2f, AbilityTargetMode.CurrentTarget,
-                new[] { new AbilityEffect(AbilityEffectType.Damage, 8) });
+                new[] { new AbilityEffect(AbilityEffectType.Damage, MeleeCleaveDamage) });
             var concussiveBlow = new AbilityDefinition(5, 9, 1.2f, AbilityTargetMode.CurrentTarget,
                 new[]
                 {
@@ -114,12 +121,15 @@ namespace RPG.Core.Tests
             return new ContentCatalog(abilities, loadouts);
         }
 
+        public static int MeleeMaximumHealth =>
+            Math.Max(1, (int)Math.Round(MaximumHealth * (double)MeleeHealthMultiplier));
+
         public static ActorSpawnData CreateMeleeSpawn(
             ContentCatalog catalog,
             SimulationVector2 position,
             float attackCooldown) =>
             new ActorSpawnData(
-                MaximumHealth,
+                MeleeMaximumHealth,
                 AttackPower,
                 position,
                 ActorRadius,

@@ -61,14 +61,11 @@ namespace RPG.Core.Tests
                 + $"(total basic attacks {metrics.TotalAttacks}, ability casts {metrics.TotalCasts})");
             Assert.That(metrics.TotalAttacks, Is.GreaterThan(20),
                 $"only {metrics.TotalAttacks} basic attacks landed against {metrics.TotalCasts} ability casts");
-            if (metrics.MeleeAttacks == 0)
-            {
-                TestContext.Progress.WriteLine(
-                    $"melee landed no basic attack: its reach is {MobaScenarioData.MeleeAttackRange} "
-                    + $"(attack distance {0.72f + MobaScenarioData.MeleeAttackRange:0.00}) while Cleave reaches 1.92 "
-                    + "and VenomStrike 4.72, so the melee fight is decided before contact. See "
-                    + "Docs/RPG-Combat-Plan.md (C2).");
-            }
+            Assert.That(metrics.MeleeAttacks, Is.GreaterThan(0),
+                $"no melee unit landed a basic attack in {LongRunTicks / MobaScenarioData.TickRate}s: melee reaches "
+                + $"{MobaScenarioData.MeleeAttackRange} against Cleave's 1.92 and VenomStrike's 4.72, so it has to "
+                + "survive the approach. It is the tankiest loadout for that reason "
+                + $"({MobaScenarioData.MeleeMaximumHealth} health against {MobaScenarioData.MaximumHealth}).");
         }
 
         [Test]

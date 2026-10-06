@@ -261,12 +261,26 @@ was the damage-over-time tick, which reports no attacking source. Two measured c
   ally that has to close. A duel with nothing else on the map now closes a melee pair at full speed to
   1.5 units (the solver used to hold two head-on actors apart with no attack at all).
 
-**Still open — now a content decision, not an engine one.** Melee basic attacks stay at zero in the Moba
-scenario: melee reach is 0.25 (attack distance 0.97) while Cleave reaches 1.92 and VenomStrike 4.72, so the
-abilities decide the fight before a melee unit can touch anything - 305 of 310 deaths in that run were the
-poison damage over time. Widening the melee reach to 0.9 (attack distance 1.62) was measured: **4 basic
-attacks** in the whole 300 s run and 16 samples in reach across 182 melee units. Making the melee basic
-attack matter needs a content change (melee reach up, or Cleave and VenomStrike range down).
+**Then tuned as content (2026-10-06).** Melee reach (0.25, attack distance 0.97) sits inside Cleave's 1.92
+and VenomStrike's 4.72, so abilities decided the fight before a melee unit could touch anything - 305 of 310
+deaths in the earlier run were the poison damage over time, and widening the melee reach to 0.9 was measured
+at only 4 basic attacks per 300 s. The content change instead hardened the melee rank and softened its
+ability: `ActorLoadoutAuthoring` gained a per-loadout `_healthMultiplier` (the three demo scenes use 2 for
+melee, 1 for ranged, so melee fields 60 health against 30) and Cleave's damage went 8 -> 4.
+
+Measured on the same 300 s run:
+
+| | before | after |
+|---|---|---|
+| basic attacks (melee / ranged) | 27 (0 / 27) | **141 (3 / 138)** |
+| melee closest approach to its target | 1.88 | **0.86** |
+| units that never attacked | 94.8% | 74.9% |
+| units stalled ten seconds or more | 4 | **0** |
+| ability casts | 661 | 864 |
+
+Melee now reaches contact (0.86, inside its 0.97 attack distance) and lands its first basic attacks. What
+still limits melee is attrition, not reach: `VenomStrike` plus its poison remains the dominant damage
+source (11.2k of the 13.9k damage dealt), so any further melee tuning is a ranged-ability decision.
 
 ### C3 — Damage and mitigation (phase 2)
 `DamageType`, armor, resistances, penetration, crit, block, dodge, minimum

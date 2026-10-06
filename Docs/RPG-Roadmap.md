@@ -149,13 +149,16 @@ Evidence in this repository:
    exactly on its attack reach so the separation push left it out of range;
    only the assigned target could be attacked, so a unit pressed against an
    enemy chased something further away; and an actor avoided its own target and
-   was blocked by the ranged rank in front of it. Ranged basic attacks are now
-   82 per 300 s and a melee duel closes to contact. Melee basic attacks are
-   still zero because Cleave (1.92) and VenomStrike (4.72) outrange the 0.97
-   melee attack and decide the fight first - a content change (reach up or
-   ability range down) is needed; widening melee reach to 0.9 gave 4 attacks per
-   300 s. `MobaScenarioTests.Battle_BasicAttacksLand` guards the engine part;
-   evidence in `Docs/RPG-Combat-Plan.md` (C2).
+   was blocked by the ranged rank in front of it. Ranged basic attacks went to
+   82 per 300 s and a melee duel closes to contact. Melee basic attacks then
+   stayed at zero because Cleave (1.92) and VenomStrike (4.72) outrange the 0.97
+   melee attack, so the content now hardens the melee rank instead: a per-loadout
+   `_healthMultiplier` (2 for melee, 1 for ranged, written into the three demo
+   scenes) and Cleave damage 8 -> 4. Melee reaches contact (closest approach
+   1.88 -> 0.86) and lands basic attacks; 27 -> 141 attacks per 300 s and no unit
+   stalls any more. Ranged poison is still the dominant damage source.
+   `MobaScenarioTests.Battle_BasicAttacksLand` guards it; evidence in
+   `Docs/RPG-Combat-Plan.md` (C2).
 7. **Units pinned on the obstacle field — fixed (measured 2026-10-06).** 16% of
    units used to never acquire a target, travel about eight units and then stand
    against the obstacle field for the rest of the match; with the obstacles
@@ -285,11 +288,14 @@ Unity-side authoring assets (in `RPG.Unity` under `Content/`):
   `ContentCatalogAbilityTests` (2 end-to-end ability tests) in `Core.Tests`, plus
   `ContentLibraryAssetTests` (10 asset-level cases) in a new Editor-only
   `RPG.Unity.Tests` assembly.
-- `ActorLoadoutAuthoring.CreateSpawnData` takes the `ContentCatalog`.
-  `BattleSessionLifetimeScope` takes `battleRules` + `content` references, fails
-  with the full validation report when the library is invalid, and the session
-  reads tick rate, grid size, per-faction count and base offset from the rules
-  asset.
+- `ActorLoadoutAuthoring.CreateSpawnData` takes the `ContentCatalog`. A loadout
+  also carries a `_healthMultiplier` applied to the session health, which is how
+  the melee rank is made tougher than the rank that shoots from safety (the demo
+  scenes use 2 for melee and 1 for ranged); a non-positive value is rejected.
+  `ActorLoadoutAuthoringTests` pins both. `BattleSessionLifetimeScope` takes
+  `battleRules` + `content` references, fails with the full validation report
+  when the library is invalid, and the session reads tick rate, grid size,
+  per-faction count and base offset from the rules asset.
 - Wave composition is **not** content yet: it stays in `BattleSessionSetup` and
   moves to `EncounterAsset` in phase 4. Per-actor stats (health, power, move
   speed, vision, radius) likewise move in phase 3's stats pipeline.

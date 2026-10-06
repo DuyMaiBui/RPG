@@ -18,5 +18,5 @@ MonoBehaviour:
   _targetMode: 0
   _effects:
   - _type: 0
-    _magnitude: 8
+    _magnitude: 4
     _durationTicks: 0
