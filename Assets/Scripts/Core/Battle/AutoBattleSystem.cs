@@ -48,10 +48,10 @@ namespace RPG.Core.Actors
 
                 var target = actor.Components.Get<TargetComponent>();
                 if (!IsLiveEnemy(actors, actor, target.CurrentTarget, out var targetActor) ||
-                    !IsTargetVisible(actor, targetActor))
+                    !IsTargetVisible(actor, targetActor, context.State.Navigation))
                 {
                     target.CurrentTarget = EntityId.None;
-                    if (!_targetSelector.TrySelect(actor, actors, _spatialHash, out var targetId))
+                    if (!_targetSelector.TrySelect(actor, actors, _spatialHash, context.State.Navigation, out var targetId))
                     {
                         behavior.State = AutoCombatState.ChaseTarget;
                         continue;
@@ -107,7 +107,7 @@ namespace RPG.Core.Actors
 
                 var targetComponent = actor.Components.Get<TargetComponent>();
                 var hasTarget = IsLiveEnemy(actors, actor, targetComponent.CurrentTarget, out var target) &&
-                                IsTargetVisible(actor, target);
+                                IsTargetVisible(actor, target, context.State.Navigation);
                 var destination = hasTarget
                     ? target.Components.Get<PositionComponent>().Position
                     : context.State.GetEnemyBasePosition(actor.Components.Get<FactionComponent>().Faction);
@@ -245,14 +245,19 @@ namespace RPG.Core.Actors
                    source.Components.Get<FactionComponent>().Faction;
         }
 
-        private static bool IsTargetVisible(Actor source, Actor target)
+        private static bool IsTargetVisible(Actor source, Actor target, NavigationGrid navigation)
         {
-            var difference = target.Components.Get<PositionComponent>().Position -
-                             source.Components.Get<PositionComponent>().Position;
+            var sourcePosition = source.Components.Get<PositionComponent>().Position;
+            var targetPosition = target.Components.Get<PositionComponent>().Position;
+            var difference = targetPosition - sourcePosition;
             var vision = source.Components.Get<VisionComponent>().Range +
                          source.Components.Get<BodyComponent>().Radius +
                          target.Components.Get<BodyComponent>().Radius;
-            return difference.LengthSquared <= vision * vision;
+            if (difference.LengthSquared > vision * vision)
+                return false;
+
+            // A wall between the two blocks the sight line even when the target is inside the vision range.
+            return navigation == null || navigation.HasLineOfSight(sourcePosition, targetPosition, 0f);
         }
 
         private static float Distance(Actor left, Actor right)

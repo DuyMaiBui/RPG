@@ -11,10 +11,23 @@ namespace RPG.Core.Actors
 
         public bool TrySelect(Actor attacker, ActorRegistry actors, out EntityId targetId)
         {
-            return TrySelect(attacker, actors, null, out targetId);
+            return TrySelect(attacker, actors, null, null, out targetId);
         }
 
         public bool TrySelect(Actor attacker, ActorRegistry actors, SpatialHash spatialHash, out EntityId targetId)
+        {
+            return TrySelect(attacker, actors, spatialHash, null, out targetId);
+        }
+
+        /// <summary>Selects the best enemy within vision. When <paramref name="navigation"/> is given, a candidate is
+        /// only considered when the straight line to it is clear of static obstacles, so walls block target
+        /// acquisition. Without a navigation grid the selector only filters by faction, range and priority.</summary>
+        public bool TrySelect(
+            Actor attacker,
+            ActorRegistry actors,
+            SpatialHash spatialHash,
+            NavigationGrid navigation,
+            out EntityId targetId)
         {
             targetId = EntityId.None;
             var faction = attacker.Components.Get<FactionComponent>().Faction;
@@ -29,7 +42,7 @@ namespace RPG.Core.Actors
             {
                 for (var index = 0; index < actors.SlotCount; index++)
                 {
-                    if (!TryConsider(attacker, actors, index, faction, position, body, vision, priority,
+                    if (!TryConsider(attacker, actors, index, faction, position, body, vision, priority, navigation,
                             ref bestDistance, ref bestHealth, ref targetId))
                         continue;
                 }
@@ -41,7 +54,7 @@ namespace RPG.Core.Actors
                 {
                     if (!actors.TryGet(_nearby[index], out var candidate)) continue;
                     if (candidate.Id == attacker.Id) continue;
-                    Consider(attacker, candidate, faction, position, body, vision, priority,
+                    Consider(attacker, candidate, faction, position, body, vision, priority, navigation,
                         ref bestDistance, ref bestHealth, ref targetId);
                 }
             }
@@ -58,6 +71,7 @@ namespace RPG.Core.Actors
             BodyComponent body,
             VisionComponent vision,
             TargetPriorityMode priority,
+            NavigationGrid navigation,
             ref float bestDistance,
             ref int bestHealth,
             ref EntityId targetId)
@@ -65,7 +79,7 @@ namespace RPG.Core.Actors
             if (!actors.TryGetAt(index, out var candidate) || candidate.Id == attacker.Id)
                 return false;
 
-            Consider(attacker, candidate, faction, position, body, vision, priority,
+            Consider(attacker, candidate, faction, position, body, vision, priority, navigation,
                 ref bestDistance, ref bestHealth, ref targetId);
             return true;
         }
@@ -78,6 +92,7 @@ namespace RPG.Core.Actors
             BodyComponent body,
             VisionComponent vision,
             TargetPriorityMode priority,
+            NavigationGrid navigation,
             ref float bestDistance,
             ref int bestHealth,
             ref EntityId targetId)
@@ -94,6 +109,9 @@ namespace RPG.Core.Actors
                 var visionDistance = vision.Range + body.Radius + candidateBody.Radius;
                 var distance = difference.LengthSquared;
             if (distance > visionDistance * visionDistance)
+                return;
+
+            if (navigation != null && !navigation.HasLineOfSight(position, candidatePosition, 0f))
                 return;
 
                 var isBetter = priority == TargetPriorityMode.LowestHealth
