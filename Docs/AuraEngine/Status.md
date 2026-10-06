@@ -175,6 +175,69 @@ Known kernel defects found by those oracles, not fixed yet:
 Demo scenes: see `Sample-Catalog.md`. Open scene issues: `AuraDemoVehicle2D` is undriven, the kernel ragdoll
 scenes are rigid or collapse, `AuraDemoCore3D` is static, `AuraDemoArticulation2D` arm is cropped.
 
+## Remaining work (backlog, 2026-10-06)
+
+Ordered by the current priority: safety first, then scale, then everything else. Details of the first two
+groups are in `Report-Safety-Scale.md`.
+
+### P0 Safety
+
+- [ ] Report Jolt `PhysicsSystem::Update` errors through `Aura_Step` (ABI 13, managed mirror, test that forces
+      the error with a tiny cache).
+- [ ] Measure peak memory of the 2^20 contact caches (about 528 MB temp in one full 3D step) and size them from
+      `initialBodyCapacity`, or grow on demand, so mobile devices do not reserve it.
+- [ ] Soak at 10,000+ bodies under real Guard Malloc; add CI budgets for 5,000 and 10,000 bodies to
+      `bench --check` (only 250 and 1,000 are checked today).
+- [ ] Rare Box2D `b2Solve` crash (soak seed 1, episode 847) and the remaining Box2D explosion findings in soak.
+- [ ] `RestoreState` bit-exactness for 3D (Jolt state recorder against the current safe restore).
+- [ ] ThreadSanitizer run (not available on this machine); run the CI kernel-tests job on GitHub (only
+      syntax-checked); build Android and iOS (scripts are only lint-checked).
+- [ ] Decide collider `lossyScale` against joint anchor semantics (the `AuraDemoArticulation2D` arm uses an
+      anchor of (0, 2) on a 4 m scaled body) and the joint-rejection thresholds and joint-before-bodies retry.
+
+### P1 Scale
+
+- [ ] Hide the first-step cost at 50,000 bodies (about 2.1 s): pre-warm the contact cache or spread the load.
+- [ ] 3D above 10,000 awake bodies: measure sleeping piles and islands, broad-phase layers and per-layer
+      collision masks, and document the per-game budget.
+- [ ] Per-scene instance limits in the Unity layer (`AuraSimulationInstance`, views) and a many-bodies demo
+      scene that reports step time.
+
+### P2 Kernel defects found by the oracles
+
+- [ ] Jolt contact impulse is always 0 (`aura_jolt_contacts.cpp:54`); Box2D contact impulse is the first
+      manifold point only and a resting box emits a (box, box) self-contact. Re-enable the commented oracle in
+      `KernelTestSuite.PackageM.Dynamics.cs`.
+- [ ] 3D character `MoveCharacter` clamps with `min(vy, 0)`: stale landing velocity and slope speed depends on
+      the earlier fall. Ground velocity of a moving platform is never added. Four commented cases in package N.
+- [ ] `Aura_SetVehicleInput` must activate a sleeping chassis.
+- [ ] Box2D joints are softer than Jolt (cantilever sag 1.6 cm against 0.64 cm); decide whether to raise
+      the joint solver settings.
+
+### P3 Demo scenes and tests
+
+- [ ] View the preview sheets `s2` (ChainRagdoll2D, Cloth3D) and `s3` (Hair3D, Sandbox2D); recheck `s1`
+      (soft cube barely deforms, ball seems to hover; Articulation2D arm cropped and looks static).
+- [ ] Add exact, physically derived state assertions per scene to `Tools/AuraSmoke/expectations.json` and
+      tighten the weak rules (Sandbox2D bridge `plank3Y < 2.0`, soft body, pendulum swing, chain swing).
+- [ ] Scene fixes: `AuraDemoVehicle2D` undriven (use a wheel-joint car driver), kernel ragdoll scenes rigid
+      or collapsing (`AuraDemoHumanoid3D`, `AuraDemoAdvancedRagdoll3D`), `AuraDemoCore3D` static and framing,
+      soft body tuning, labels and colours.
+- [ ] Authoring default `_linearDrag` is 0; consider 2 to 4 for water.
+- [ ] Deploy the new `libaura.dylib` (copy, chmod, move to a fresh inode), restart Unity, then run EditMode
+      tests, `aura_smoke.sh` with the visual check, FPS safety (8 fps), lifecycle, and only then commit the
+      uncommitted scene rebuilds, `AuraSoftBodyAuthoring`/`AuraSoftBodyView` and probe/expectations changes.
+- [ ] Update `Native-Abi.md` (`linearDrag` is 1/s at full submersion; soft body vertices are world space;
+      damping in Box2D; cache sizes) and `Sample-Catalog.md`/`Test-Plan.md` for the new packages.
+- [ ] Delete the stray `Assets/_Recovery/0 (2).unity` after asking the user.
+
+### P4 Features not demoed
+
+- [ ] Scenes for shapes (ConvexHull, Mesh, HeightField, tapered), general body (conveyor, sensor, restitution,
+      freeze DOF) and top-down 2D (needs a velocity driver).
+- [ ] Path constraint, SixDof soft limits and per-axis motors, runtime shape change, shape filters, tank and
+      motorcycle vehicles, Box2D position motors, 2D box character mover, GPU hair and cloth backend.
+
 ## Not yet implemented
 
 - Platform builds of `libaura`: `build_plugin.sh` covers the desktop hosts;
