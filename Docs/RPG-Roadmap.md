@@ -92,16 +92,18 @@ Evidence in this repository:
 - **Scenes**: `Assets/Scenes/MobaBattleDemo.unity`,
   `TurnBattleDemo.unity` — renamed to `SkirmishBattleDemo.unity` under
   decision 8 — and `StressBattleDemo.unity`.
-- **Tests**: after phase 1, C1a and the movement fix, `Assets/Tests/EditMode`
-  holds **381** tests = **147** in `Core.Tests` + `Simulation.Contracts.Tests`
+- **Tests**: after phase 1, C1a, the movement fix and the scenario harness,
+  `Assets/Tests/EditMode` holds **383** tests = **149** in `Core.Tests` +
+  `Simulation.Contracts.Tests`
   (engine-free and headless-runnable), **10** in `Unity.Tests` (Editor-only,
   authored-asset validation), and **224** in `Assets/AuraEngine/Tests` (out of
   scope for this plan). `Assets/Tests/PlayMode` holds one `[UnityTest]`
   (`NavigationStressPlayModeTests`). The standalone harness at `/tmp/rpg-tests`
-  compiles the engine-free sources and runs the 147 headless through
+  compiles the engine-free sources and runs the 149 headless through
   `dotnet test` (needs `DOTNET_ROLL_FORWARD=LatestMajor` against this machine's
-  .NET 9 runtime). Last verified: **EditMode 381/381**, **headless 147/147** on
-  two consecutive runs, **PlayMode 1/1**.
+  .NET 9 runtime). Seven further tests are `[Explicit]` measurement/known-defect
+  runs and are excluded from the suite counts. Last verified: **EditMode
+  383/383**, **headless 149/149**, **PlayMode 1/1**.
 
 ### Phase-0 defects: status
 
@@ -140,12 +142,34 @@ Evidence in this repository:
    Measured: stalled units 42 → 16 (1-unit gap), 23 → 7 (1.5), 22 → 7 (2),
    10 → 2 (3). `CrowdMovementTests` guards it; details in
    `Docs/RPG-Combat-Plan.md` (C6).
+6. **Basic attacks almost never fire — open (measured 2026-10-06 with the Moba
+   scenario run headlessly from its authored data).** 27 basic attacks against
+   591 ability casts over 300 s of game time; no melee unit (0 of 182) ever
+   landed one; 94.8% of units never attacked at all. Targets are sticky and only
+   the assigned target can be attacked, and 75% of the melee approaches are
+   blocked by an ally that stopped closer to the same target at its own attack
+   range. `MobaScenarioTests.Battle_MeleeUnitsLandBasicAttacks` records it;
+   evidence and fix options in `Docs/RPG-Combat-Plan.md` (C2).
+7. **Units pinned on the obstacle field — open (measured 2026-10-06).** 16% of
+   units never acquire a target, travel about eight units and then stand against
+   the obstacle field for the rest of the match. With the obstacles removed the
+   same run pins none (0/242 versus 39/242) and stalls none (0/242 versus 42/242
+   for ten seconds or more). `MobaScenarioTests.Battle_UnitsAreNotPinnedOnTerrain`
+   records it; evidence in `Docs/RPG-Combat-Plan.md` (C6).
 
 ### Phase-0 baseline additions
 
 `jp.hadashikick.vcontainer` 1.19.0 and `com.cysharp.unitask` 2.5.11 are now in
 `Packages/manifest.json` and referenced by `RPG.Unity.asmdef`; the Editor
 compiles clean with both.
+
+The Moba demo battle can now be measured headlessly from its authored data:
+`Assets/Tests/EditMode/Core.Tests/MobaScenarioData.cs` transcribes the scene map,
+rules asset, content library and actor prefab into engine-free data, and asserts
+a navigation fingerprint (`869631345`, 6353 blocked samples) taken from the
+runtime grid so a wrong transcription fails. `MobaScenarioTests` runs the battle
+in the ordinary suite; `MobaScenarioFlowDiagnostic` reports attack, movement and
+stall numbers on demand and writes `/tmp/rpg_flow_report.txt`.
 
 ---
 

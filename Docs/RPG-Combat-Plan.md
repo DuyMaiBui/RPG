@@ -233,6 +233,28 @@ Stances and leash, threat accumulation and decay, extended
 *Acceptance:* a tank holds threat against a higher-damage ally; a defensive unit
 never leaves its hold radius; a `HoldPosition` unit does not path.
 
+**Measured 2026-10-06 (headless run of the real Moba scenario, `MobaScenarioFlowDiagnostic`).**
+In 300 s of game time with 362 units spawned the battle produced **27 basic attacks** (all ranged) against
+**591 ability casts**; **182 of 182 melee units never landed a single basic attack** and 94.8% of all units
+never attacked at all. Combat is decided by `VenomStrike` and its poison: in the 200 s instrumented run 4.3k of the 5.5k damage
+was the damage-over-time tick, which reports no attacking source. Two measured causes:
+
+- **Targets are sticky and only the assigned target can be attacked.** Target acquisition keeps the current
+  target while it is alive and visible, and `IsAttackTriggerOverlapping` tests only that actor, so a unit can
+  stand next to an enemy it never hits.
+- **The friendly rank stands in the way.** Of 1366 "melee wants to move but is outside its attack range"
+  samples, **1028 (75%) had an ally closer to the same target within two units** — the ally had stopped at
+  its own attack distance (ranged 4.22) and the melee unit (attack distance 0.97) never got past it. Its
+  median minimum distance to its target was 4.86 and it never came closer than 1.88 to any enemy. A duel
+  measurement with nothing else on the map shows the avoidance solver alone holds two head-on actors about
+  1.5 units apart, already above the melee attack distance.
+
+Candidate fixes in the order the measurement supports them: drop or re-evaluate a target that is out of
+reach when a closer enemy is in reach; let a unit attack an enemy it is in contact with, not only the
+assigned target; give the melee rank a way through (front-rank priority in `MovementCohortCoordinator`, or a
+melee reach that clears the friendly rank). Widening only the melee reach was measured and is not enough:
+with reach 1.3 (attack distance 2.02) melee units still landed one attack in a 200 s run.
+
 ### C3 — Damage and mitigation (phase 2)
 `DamageType`, armor, resistances, penetration, crit, block, dodge, minimum
 damage floor, and a `DamageInfo` value object carried by `ActorDamaged` so the
@@ -291,6 +313,22 @@ Three changes, all deterministic:
 Still open in C6: throughput through a choke is bounded by geometry (a crowd cannot pass a one-unit
 gap faster than the gap allows), formation shapes and slot assignment are still not ticked, and there
 is no queue discipline or crowd pressure beyond local avoidance.
+
+**Measured 2026-10-06 (real Moba scenario, headless).** Movement itself is healthy: median speed 0.90 of
+the 0.8 u/s budget, net displacement over travelled distance 0.89, and the heading sits within 8.4° of the
+direction to the assigned target (only 4% of samples move away from it). Two behaviour-level problems
+remain:
+
+- **The shortest reach never arrives.** Every rank stops at its own attack distance, so the melee rank
+  queues behind the ranged rank and can never get through — see the measurement under C2.
+- **16% of units never acquire a target and are then pinned on the terrain.** 39 of 242 units in a 100 s
+  run (42 of 362 in 300 s) never picked a target, travelled about eight units and stopped against the
+  obstacle field — 8 of the 10 sampled were within three units of an obstacle centre — for the rest of the
+  match. The same scenario with the obstacles removed pins **zero** units and stalls **none** (0/242
+  versus 42/242 stalled for ten seconds or more, and speed ratio 0.99 versus 0.84): the pinning comes from
+  the route/avoidance interaction at the obstacle field, not from the crowd. `MovementCohortCoordinator`
+  routes toward the battle objective; when a route dead-ends, the sidestep recovery (`_recoveryTicks`) is
+  not enough to break out.
 
 ### C7 — Vision and information (phase 4/6)
 Per-faction visible/explored sets, hidden and stealth units, reveals, target
