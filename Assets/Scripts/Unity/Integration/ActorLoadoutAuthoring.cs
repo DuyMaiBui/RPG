@@ -1,4 +1,5 @@
 using System;
+using RPG.Content;
 using RPG.Core.Actors;
 using RPG.Core.Physics;
 using RPG.Simulation.Contracts;
@@ -32,6 +33,7 @@ namespace RPG.Unity
         }
 
         public ActorSpawnData CreateSpawnData(
+            ContentCatalog catalog,
             int maximumHealth,
             int attackPower,
             SimulationVector2 position,
@@ -41,6 +43,7 @@ namespace RPG.Unity
             float attackCooldown,
             ColliderShapeData[] colliderShapes = null)
         {
+            if (catalog == null) throw new ArgumentNullException(nameof(catalog));
             if (_attackRange < 0f)
                 throw new InvalidOperationException("Actor loadout attack range cannot be negative.");
             if (_attackType == AttackType.Projectile && (_projectileSpeed <= 0f || _projectileLifetime <= 0f))
@@ -60,7 +63,7 @@ namespace RPG.Unity
                 projectileRadius: _projectileRadius,
                 projectileLifetime: _projectileLifetime,
                 colliderShapes: colliderShapes,
-                abilities: AbilityCatalog.Abilities(ResolveArchetype()));
+                abilities: catalog.AbilitiesFor(ResolveArchetype()));
         }
 
         private ActorArchetype ResolveArchetype() => _archetype != ActorArchetype.None

@@ -1,0 +1,9 @@
+{
+  "name": "RPG.Content",
+  "rootNamespace": "RPG.Content",
+  "references": [
+    "RPG.Core",
+    "RPG.Simulation.Contracts"
+  ],
+  "noEngineReferences": true
+}

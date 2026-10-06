@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c31897e294a4d4dd996a776aacf9bf75, type: 3}
+  m_Name: Cleave
+  m_EditorClassIdentifier: RPG.Unity::RPG.Unity.AbilityAsset
+  _abilityId: 1
+  _cooldownTicks: 4
+  _range: 1.2
+  _targetMode: 0
+  _effects:
+  - _type: 0
+    _magnitude: 8
+    _durationTicks: 0

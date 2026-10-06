@@ -113,21 +113,6 @@ public sealed class RpgSimulationTests
     }
 
     [Test]
-    public void TurnState_RemovesDefeatedActorBeforeAdvancing()
-    {
-        var registry = new ActorRegistry();
-        var redId = registry.Spawn(ActorKind.Player, FactionId.Red, 10, 1);
-        var blueId = registry.Spawn(ActorKind.Monster, FactionId.Blue, 10, 1);
-        var order = new[] { redId, blueId };
-        var turns = new TurnState();
-        turns.Initialize(order);
-
-        Assert.That(registry.Destroy(blueId), Is.True);
-        Assert.That(turns.Advance(registry), Is.True);
-        Assert.That(turns.ActiveActorId, Is.EqualTo(redId));
-    }
-
-    [Test]
     public void AutoBattle_ZeroDamageDoesNotDestroyTarget()
     {
         var state = new RpgSimulationState();

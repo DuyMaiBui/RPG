@@ -1,8 +1,9 @@
 {
-  "name": "RPG.Core.Tests",
+  "name": "RPG.Unity.Tests",
   "references": [
     "RPG.Core",
     "RPG.Content",
+    "RPG.Unity",
     "RPG.Simulation.Contracts",
     "RPG.Simulation.Runtime"
   ],

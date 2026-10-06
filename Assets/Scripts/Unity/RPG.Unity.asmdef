@@ -3,11 +3,14 @@
   "rootNamespace": "RPG.Unity",
   "references": [
     "RPG.Core",
+    "RPG.Content",
     "RPG.Simulation.Contracts",
     "RPG.Simulation.Runtime",
     "Unity.InputSystem",
     "LitMotion",
-    "LitMotion.Extensions"
+    "LitMotion.Extensions",
+    "VContainer",
+    "UniTask"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

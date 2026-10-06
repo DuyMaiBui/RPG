@@ -48,7 +48,7 @@ Project hooks in `.codex/hooks.json` add architecture/reuse context at session a
 
 Codex requires review/trust of new hook definitions. Start a new trusted project session, open `/hooks`, and review/trust Ponytail's three hooks and this project's two hooks. Installing a plugin does not grant hook trust. No trust-bypass or approval-policy changes are part of this setup. [Official hook behavior](https://learn.chatgpt.com/docs/hooks).
 
-VContainer, UniTask and LitMotion are the chosen stack for future implementation. At this update they are not in the manifest: skills and hooks do not pretend they are installed. Add verified package versions when implementing the first feature that needs them. Custom ECS and ZLinq are not implied by this choice.
+VContainer, UniTask and LitMotion are the chosen stack. `jp.hadashikick.vcontainer` 1.19.0 and `com.cysharp.unitask` 2.5.11 are now in `Packages/manifest.json` as git dependencies and referenced by `RPG.Unity.asmdef`; LitMotion was already installed. Custom ECS and ZLinq are not implied by this choice.
 
 ## Current validation
 

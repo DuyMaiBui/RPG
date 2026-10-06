@@ -39,7 +39,7 @@ Two plans exist in this repository and must not be confused:
 | Phase | Goal | Status |
 |---|---|---|
 | 0 | Deterministic battle vertical slice | **Done** |
-| 1 | Composition root + authored content pipeline | Open |
+| 1 | Composition root + authored content pipeline | **Content done**, composition root open |
 | 2 | Playable loop: player agency + battle HUD | Open |
 | 3 | Progression, stats and persistence | Open |
 | 4 | Meta structure: campaign, encounters, roster | Open |
@@ -87,33 +87,41 @@ Evidence in this repository:
   collider authoring components.
 - **Scenes**: `Assets/Scenes/MobaBattleDemo.unity`,
   `TurnBattleDemo.unity`, `StressBattleDemo.unity`.
-- **Tests**: `Assets/Tests/EditMode` holds **94** tests — 11 test classes in
-  `Core.Tests` (`AbilityCatalogTests`, `AbilityTests`, `ActorComponentSetTests`,
-  `AutonomousCombatTests`, `CollisionQueryTests`, `CollisionResolverTests`,
-  `NavigationLineOfSightTests`, `RpgSimulationTests`, `StatusEffectTests`,
-  `StunTests`, `TargetVisibilityTests`) plus the `ThrowingApplication`
-  fault-injection helper, and `Simulation.Contracts.Tests`. `Assets/Tests/PlayMode`
-  holds one `[UnityTest]` (`NavigationStressPlayModeTests`). Last recorded run
-  at `b7b0ca4`: **318/318** EditMode pass = these 94 + 224 from
-  `Assets/AuraEngine/Tests` (out of scope for this plan). The standalone harness
-  at `/tmp/rpg-tests` compiles the engine-free sources and runs the 94 without
-  Unity via `dotnet test`.
+- **Tests**: after phase 1, `Assets/Tests/EditMode` holds **339** tests =
+  **105** in `Core.Tests` + `Simulation.Contracts.Tests` (engine-free and
+  headless-runnable), **10** in `Unity.Tests` (Editor-only, authored-asset
+  validation), and **224** in `Assets/AuraEngine/Tests` (out of scope for this
+  plan). `Assets/Tests/PlayMode` holds one `[UnityTest]`
+  (`NavigationStressPlayModeTests`). The standalone harness at `/tmp/rpg-tests`
+  compiles the engine-free sources and runs the 105 headless through
+  `dotnet test` (needs `DOTNET_ROLL_FORWARD=LatestMajor` against this machine's
+  .NET 9 runtime). Last verified: **EditMode 339/339**, **PlayMode 1/1**.
 
-### Known defects carried by phase 0 (fix inside phase 2)
+### Phase-0 defects: status
 
-1. **The turn-based path is inert.** `RpgSimulationApplication.CreateUpdate`
-   always passes `activeActorId: EntityId.None`, and
-   `TurnBattleDemoDriver.OnFrame` returns immediately when
-   `frame.ActiveActorId.IsNone` — so `AttackCommand`, `TurnState` and
-   `TurnBattleDemoDriver` never execute in a running scene. Either wire the
-   turn pipeline through `WorldFrameUpdate.Round`/`TurnNumber`/`ActiveActorId`
-   or delete `TurnState`, `AttackCommand` and the driver.
-2. **Player input is nearly inert.** `SimulationMoveInput` sends
-   `MoveIntentCommand` for one mapped actor; `MobaBattleDemo` has no mapped
-   player actor, so keyboard input does nothing there.
-3. **Empty assembly.** `Assets/Scripts/Combat/RPG.Combat.asmdef` declares an
-   assembly with no sources and no references. Delete it (or give it a real
-   module) in phase 1.
+1. **The turn-based path was inert — resolved by removal (decision 4).**
+   `RpgSimulationApplication.CreateUpdate` always passed
+   `activeActorId: EntityId.None`, and `TurnBattleDemoDriver.OnFrame` returned
+   immediately when `frame.ActiveActorId.IsNone`, so `AttackCommand`,
+   `TurnState` and the driver never executed in a running scene. `TurnState`,
+   `AttackCommand` and `TurnBattleDemoDriver` are deleted, the driver component
+   is removed from all three demo scenes, and `WorldFrameUpdate.Round` /
+   `TurnNumber` / `ActiveActorId` are now always-default fields with no
+   producer — phase 2 must either populate them for the result/turn UI or drop
+   them from the frame contract.
+2. **Player input is nearly inert — carried into phase 2.**
+   `SimulationMoveInput` sends `MoveIntentCommand` for one mapped actor;
+   `MobaBattleDemo` has no mapped player actor, so keyboard input does nothing
+   there. Under the full-RTS decision this whole input path is replaced anyway.
+3. **Empty assembly — resolved.** `Assets/Scripts/Combat/RPG.Combat.asmdef`
+   declared an assembly with no sources and no references; it was deleted along
+   with the now-empty `Assets/Scripts/Combat` folder.
+
+### Phase-0 baseline additions
+
+`jp.hadashikick.vcontainer` 1.19.0 and `com.cysharp.unitask` 2.5.11 are now in
+`Packages/manifest.json` and referenced by `RPG.Unity.asmdef`; the Editor
+compiles clean with both.
 
 ---
 
@@ -123,19 +131,22 @@ Evidence in this repository:
 Content becomes authored data with validation; the object graph gets one
 explicit composition root instead of per-scene hand wiring.
 
-### Problem (evidence)
-- Content lives in code (`Core/Actors/Abilities/AbilityCatalog.cs`) or as
-  Inspector fields on `BattleDemoBootstrap` / `ActorLoadoutAuthoring`; there is
-  **no** `ScriptableObject` content asset anywhere under `Assets/Scripts`.
+### Problem (evidence, before this phase)
+- Content lived in code (`Core/Actors/Abilities/AbilityCatalog.cs`, now deleted)
+  or as Inspector fields on `BattleDemoBootstrap` / `ActorLoadoutAuthoring`;
+  there was **no** `ScriptableObject` content asset anywhere under
+  `Assets/Scripts`.
 - `BattleDemoBootstrap.Start` constructs `RpgSimulationState`, the host, the
   registry, the clients and the views itself; each new scene copies that logic.
 
 ### Work
+Items 2–5 are done (see *as implemented* below). Only item 1 is open.
+
 1. **Composition root** in `RPG.Unity`: one bootstrapper that builds the
    session scope, registers the module implementations and disposes them in
    reverse order. Keep constructor injection in the domain; the container only
    lives in the composition layer (`AGENTS.md`, `Docs/Architecture.md`).
-   Decide the container (see *Decisions*).
+   Container: VContainer (decision 2), already in the manifest.
 2. **Content module** `RPG.Content` (engine-free) holding immutable records and
    ids; **authoring assets** in `RPG.Unity` (`ScriptableObject`) for
    `AbilityAsset`, `StatusEffectAsset`, `ActorArchetypeAsset`,
@@ -150,14 +161,90 @@ explicit composition root instead of per-scene hand wiring.
 4. **Catalog load**: `RpgSimulationState` receives the compiled catalog
    instead of reaching for `AbilityCatalog`. Keep `AbilityCatalog` as a test
    fixture only.
-5. Delete `Assets/Scripts/Combat/RPG.Combat.asmdef` (dead assembly).
+5. ~~Delete `Assets/Scripts/Combat/RPG.Combat.asmdef`~~ — done with the
+   decision-4 removal (assembly and folder deleted).
+
+Delivered so far: 2 (without `StatusEffectAsset`/`ActorLoadoutAsset`/
+`EncounterAsset`), 3 (for abilities and archetypes), 4 (with `AbilityCatalog`
+deleted outright), 5.
+
+### Content schema (implementation contract)
+
+Engine-free module `RPG.Content` (`noEngineReferences`, references `RPG.Core`
+and `RPG.Simulation.Contracts`):
+
+| Type | Responsibility |
+|---|---|
+| `ContentValidationError` | `readonly struct`: `Code`, `Message`, `Source`. |
+| `ContentValidationResult` | Ordered `IReadOnlyList<ContentValidationError>` + `IsValid`. |
+| `ContentCatalog` | Immutable: ability lookup by id, and the ordered ability list per `ActorArchetype`. |
+| `ContentCatalogBuilder` | `AddAbility`, `AddArchetypeLoadout`, `Build`; rejects duplicate ids, unknown ability references, empty archetype loadouts, and abilities with no effects or non-positive magnitudes. |
+
+Ability ids stay plain `int` (matching `AbilityDefinition.Id`) with a
+documented stability rule — no wrapper type until something actually needs to
+distinguish id kinds. Rules the builder enforces:
+
+| Code | Rejected |
+|---|---|
+| `duplicate-ability-id` | the same id defined by two assets |
+| `duplicate-archetype-loadout` | two loadouts for one archetype |
+| `empty-archetype-loadout` | an archetype with no abilities |
+| `unknown-ability-reference` | a loadout naming an id that no asset defines |
+| `non-positive-magnitude` | any effect with magnitude ≤ 0 |
+| `unexpected-duration` | `Damage`/`Heal` with a non-zero duration |
+| `missing-duration` | a status effect (`Poison`/`Regeneration`/`Slow`/`Stun`) with duration ≤ 0 |
+
+The asset layer adds `missing-ability-asset`, `missing-archetype-asset`,
+`invalid-ability-id`, `invalid-ability-tuning`, `empty-ability-effects` and
+`missing-ability-reference`, which the builder cannot see because an
+`AbilityDefinition` cannot be constructed from them.
+
+Unity-side authoring assets (in `RPG.Unity` under `Content/`):
+
+| Type | Responsibility |
+|---|---|
+| `AbilityAsset : ScriptableObject` | `abilityId`, `cooldownTicks`, `range`, `targetMode`, `AbilityEffectAuthoring[]`. |
+| `AbilityEffectAuthoring` | `[Serializable]` `(type, magnitude, durationTicks)`. |
+| `ActorArchetypeAsset : ScriptableObject` | archetype + its `AbilityAsset[]` in cast-priority order. |
+| `BattleRulesAsset : ScriptableObject` | tick rate, navigation grid, base offset/reach, vision, actor radius. |
+| `ContentLibraryAsset : ScriptableObject` | the root: all ability/archetype assets; builds the `ContentCatalog` and surfaces `ContentValidationResult` errors in the Inspector. |
+
+### Phase-1 content pipeline — as implemented
+
+- `RPG.Content` is a `noEngineReferences` assembly under
+  `Assets/Scripts/Content/`.
+- Authoring assets live under `Assets/Scripts/Unity/Content/`:
+  `AbilityAsset`, `AbilityEffectAuthoring`, `ActorArchetypeAsset`,
+  `BattleRulesAsset`, `ContentLibraryAsset`, plus a `ContentLibraryAssetEditor`
+  that renders the validation report inline.
+- Shipped content is authored under `Assets/Content/`: five abilities (ids 1–5,
+  preserving the previous `AbilityCatalog` values), three archetype loadouts
+  (Bruiser/Skirmisher/Support) and three `BattleRulesAsset`s — Moba (60×40 grid),
+  Stress (60×40, 100 per faction), Skirmish (20×10, 3 per faction).
+- `AbilityCatalog` was **deleted**, not kept as a fixture: its definitions now
+  exist only as assets. `AbilityCatalogTests` was replaced by
+  `ContentCatalogBuilderTests` (13 rule/ordering tests) and
+  `ContentCatalogAbilityTests` (2 end-to-end ability tests) in `Core.Tests`, plus
+  `ContentLibraryAssetTests` (10 asset-level cases) in a new Editor-only
+  `RPG.Unity.Tests` assembly.
+- `ActorLoadoutAuthoring.CreateSpawnData` takes the `ContentCatalog`.
+  `BattleDemoBootstrap` takes `battleRules` + `content` references, fails with the
+  full validation report when the library is invalid, and reads tick rate, grid
+  size, per-faction count and base offset from the rules asset.
+- Wave composition is **not** content yet: it stays on the bootstrap and moves to
+  `EncounterAsset` in phase 4. Per-actor stats (health, power, move speed, vision,
+  radius) likewise move in phase 3's stats pipeline.
 
 ### Acceptance
-- A new ability, archetype and wave schedule can be authored and played
-  **without touching C#**.
-- The validator fails an EditMode test on each malformed-asset case above.
-- No scene constructs simulation state by hand anymore; one composition root
-  serves all three demo scenes.
+- A new ability or archetype loadout can be authored and played **without
+  touching C#** — verified: all three demo scenes run from `Assets/Content`, and
+  a wave schedule still needs C# until phase 4.
+- The validator is exercised for every malformed case above — verified: 13
+  builder cases run headless, 10 asset-level cases run in the Editor.
+- No scene builds content by hand — verified: all three scenes reference
+  `ContentLibrary.asset` and their own `BattleRulesAsset`.
+- Still open: work item 1. `BattleDemoBootstrap` continues to wire the object
+  graph itself.
 
 ### Depends on
 Nothing. This is the first phase to execute.
@@ -460,30 +547,32 @@ save-data migration policy for post-launch patches.
 
 ---
 
-## Decisions required before phase 1 starts
+## Decisions (settled 2026-10-06)
 
-These materially change the plan; each has a recommended default.
+Recorded here so later phases do not reopen them.
 
-1. **Game frame.** What is the player's role — a single controlled hero inside
-   an otherwise auto-battling squad (recommended: matches the existing
-   `PlayerActors` mapping, `ManualMovementComponent` and auto-cast systems) or
-   full RTS control of every unit? Shapes phases 2 and 6.
-2. **DI container.** Adopt VContainer (named as preferred in `AGENTS.md`) or
-   keep explicit constructor wiring in the composition root? VContainer is
-   **not** currently in `Packages/manifest.json`. Recommended: explicit wiring
-   until a second lifetime scope (menu/battle session) actually exists, then
-   adopt VContainer for the session scope only.
-3. **Async package.** UniTask is named in `AGENTS.md` but is **not** in the
-   manifest. Phase 2's scene flow needs cancellation and lifecycle handling;
-   recommended: add UniTask when that flow is implemented, not before.
-4. **Turn-based combat.** Keep the (currently dead) turn pipeline and fix it, or
-   delete `TurnState`, `AttackCommand` and `TurnBattleDemoDriver`? Recommended:
-   delete, unless turn-based is a shipping mode.
-5. **AuraEngine boundary.** Is any heavyweight feature (ragdoll, destructible,
-   vehicle) in the RPG scope? Recommended: no; keep AuraEngine separate until
-   one concrete feature requires it.
-6. **Save authority.** Local-only saves (recommended for phases 3–8) or
-   server-validated saves from the start? Shapes phase 9.
+1. **Game frame: full RTS.** The player controls every unit — selection,
+   move/attack/ability orders per unit and per group — not a single
+   auto-battling hero. Consequences: `ManualMovementComponent` +
+   `MoveIntentCommand` as the only player input is a placeholder, not the
+   target; phase 2 owes group selection, formation/hold orders from the player,
+   and per-unit ability casting; phase 6 owes an order system that the player
+   and the encounter script share.
+2. **DI: VContainer, adopted now.** `jp.hadashikick.vcontainer` 1.19.0 is added
+   to `Packages/manifest.json`. Registration lives in the composition layer
+   only; domain services stay constructor-injected and container-free.
+3. **Async: UniTask, added now.** `com.cysharp.unitask` 2.5.11 is added to
+   `Packages/manifest.json`. Phase 2's scene/session flow uses it with explicit
+   cancellation and ownership.
+4. **Turn-based combat: removed.** The turn pipeline is dead code (see the
+   phase-0 defects) and full RTS does not use it. `TurnState`, `AttackCommand`
+   and `TurnBattleDemoDriver` are deleted; the attack path is the real-time
+   `AttackComponent`/`AutoBattleSystem` one plus the phase-2 `AttackTargetCommand`.
+5. **AuraEngine boundary: separate, permanently for now.** No heavyweight
+   physics feature is in RPG scope.
+6. **Save authority: local-only.** Saves are client-side for phases 3–8; if
+   phase 9 happens, server validation is a new requirement, not an assumption
+   baked into the phase-3 schema.
 
 ## Verify loops
 

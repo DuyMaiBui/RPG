@@ -12,7 +12,6 @@ namespace RPG.Unity
         private ISimulationClient _client;
         private ActorViewRegistry _registry;
         private ProjectileViewRegistry _projectiles;
-        private TurnBattleDemoDriver _driver;
         private PredictionBuffer _prediction;
         private SimulationEntityId _localActorId;
         private float _predictionSpeed;
@@ -33,7 +32,6 @@ namespace RPG.Unity
         public void Initialize(
             ISimulationClient client,
             ActorViewRegistry registry,
-            TurnBattleDemoDriver driver,
             ProjectileView projectilePrefab,
             Transform projectileRoot,
             SimulationEntityId localActorId,
@@ -45,7 +43,6 @@ namespace RPG.Unity
 
             _client = client;
             _registry = registry;
-            _driver = driver;
             _projectiles = new ProjectileViewRegistry(projectilePrefab, projectileRoot);
             _prediction = new PredictionBuffer(64);
             _localActorId = localActorId;
@@ -120,8 +117,6 @@ namespace RPG.Unity
                     if (!_liveIds.Contains(entry.Key) && !_pendingRemoval.ContainsKey(entry.Key))
                         _pendingRemoval[entry.Key] = 0.9f;
                 }
-
-                _driver.OnFrame(frame);
             }
 
             AdvanceRemotePresentation(presentationDelta);
