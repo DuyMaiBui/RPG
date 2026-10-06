@@ -447,7 +447,7 @@ GameObject:
   - component: {fileID: 1361859388}
   - component: {fileID: 1361859390}
   m_Layer: 0
-  m_Name: BattleDemoBootstrap
+  m_Name: BattleSessionLifetimeScope
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -480,6 +480,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a7ebbace73c904562bee08b960b3607c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: RPG.Unity::RPG.Unity.BattleDemoBootstrap
+  parentReference:
+    TypeName: 
+  autoRun: 1
+  autoInjectGameObjects: []
   battleRules: {fileID: 11400000, guid: 4b3ef5979a32846dea2277eb7039dd68, type: 2}
   content: {fileID: 11400000, guid: 96e6d07b2413a409cad88a2a19e08363, type: 2}
   enableWaves: 0

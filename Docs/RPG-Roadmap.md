@@ -39,7 +39,7 @@ Two plans exist in this repository and must not be confused:
 | Phase | Goal | Status |
 |---|---|---|
 | 0 | Deterministic battle vertical slice | **Done** |
-| 1 | Composition root + authored content pipeline | **Content done**, composition root open |
+| 1 | Composition root + authored content pipeline | **Done** |
 | 2 | Playable loop: player agency + battle HUD | Open |
 | 3 | Progression, stats and persistence | Open |
 | 4 | Meta structure: campaign, encounters, roster | Open |
@@ -140,7 +140,7 @@ explicit composition root instead of per-scene hand wiring.
   registry, the clients and the views itself; each new scene copies that logic.
 
 ### Work
-Items 2–5 are done (see *as implemented* below). Only item 1 is open.
+All items are done; see *as implemented* below.
 
 1. **Composition root** in `RPG.Unity`: one bootstrapper that builds the
    session scope, registers the module implementations and disposes them in
@@ -228,12 +228,38 @@ Unity-side authoring assets (in `RPG.Unity` under `Content/`):
   `ContentLibraryAssetTests` (10 asset-level cases) in a new Editor-only
   `RPG.Unity.Tests` assembly.
 - `ActorLoadoutAuthoring.CreateSpawnData` takes the `ContentCatalog`.
-  `BattleDemoBootstrap` takes `battleRules` + `content` references, fails with the
-  full validation report when the library is invalid, and reads tick rate, grid
-  size, per-faction count and base offset from the rules asset.
-- Wave composition is **not** content yet: it stays on the bootstrap and moves to
-  `EncounterAsset` in phase 4. Per-actor stats (health, power, move speed, vision,
-  radius) likewise move in phase 3's stats pipeline.
+  `BattleSessionLifetimeScope` takes `battleRules` + `content` references, fails
+  with the full validation report when the library is invalid, and the session
+  reads tick rate, grid size, per-faction count and base offset from the rules
+  asset.
+- Wave composition is **not** content yet: it stays in `BattleSessionSetup` and
+  moves to `EncounterAsset` in phase 4. Per-actor stats (health, power, move
+  speed, vision, radius) likewise move in phase 3's stats pipeline.
+
+### Phase-1 composition root — as implemented
+
+- `BattleSessionLifetimeScope : LifetimeScope` is the scene's composition root.
+  It keeps only serialized references and `Configure(IContainerBuilder)`, where
+  it validates its authoring, registers the battle rules, the compiled catalog,
+  the setup, the bridge instance and the view registry, and registers
+  `BattleSession` as an entry point. VContainer creates and disposes it.
+- `BattleSession : IStartable, IDisposable` is plain C# and owns one battle:
+  it builds `RpgSimulationState`, applies the navigation obstacles, spawns the
+  actors with their clients and views, starts the fixed-tick host, and on
+  disposal releases the bridge, disposes the clients and disposes the host —
+  in that order.
+- `BattleSessionSetup` is the injected value object carrying the serialized
+  scene references and the tuning that is not authored content yet, so the
+  session never reads a MonoBehaviour.
+- `ActorViewRegistry` owns view creation (`Create(id, faction, position, name)`)
+  instead of the caller instantiating and registering views.
+- The scope is a renamed `BattleDemoBootstrap` (script GUID preserved, so the
+  three scenes kept every serialized reference; the scene object was renamed to
+  match).
+- Lifetime semantics come from VContainer, verified in the package source:
+  container-created instances implementing `IDisposable` are tracked and
+  disposed by `Container.Dispose()`, while `RegisterInstance` values (the scene
+  bridge, the assets) are deliberately **not** disposed by the container.
 
 ### Acceptance
 - A new ability or archetype loadout can be authored and played **without
@@ -243,8 +269,12 @@ Unity-side authoring assets (in `RPG.Unity` under `Content/`):
   builder cases run headless, 10 asset-level cases run in the Editor.
 - No scene builds content by hand — verified: all three scenes reference
   `ContentLibrary.asset` and their own `BattleRulesAsset`.
-- Still open: work item 1. `BattleDemoBootstrap` continues to wire the object
-  graph itself.
+- One composition root serves the session — verified: all three scenes hold a
+  `BattleSessionLifetimeScope`, and no scene code constructs the graph.
+- Session teardown releases the session — verified in Play mode: destroying the
+  scope GameObject mid-battle dropped the actor-view count from 12 to 0, i.e.
+  the container disposed `BattleSession`, which released the bridge and its
+  views. No console errors in any Play session.
 
 ### Depends on
 Nothing. This is the first phase to execute.
