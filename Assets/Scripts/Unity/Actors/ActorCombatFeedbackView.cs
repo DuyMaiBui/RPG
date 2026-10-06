@@ -36,8 +36,11 @@ namespace RPG.Unity
 
         private Color StatusColor(byte mask)
         {
+            const byte stun = 1 << (int)StatusEffectType.Stun;
             const byte poison = 1 << (int)StatusEffectType.Poison;
             const byte slow = 1 << (int)StatusEffectType.Slow;
+            if ((mask & stun) != 0)
+                return Color.Lerp(_factionColor, Color.white, 0.75f);
             if ((mask & poison) != 0)
                 return Color.Lerp(_factionColor, new Color(0.35f, 0.85f, 0.35f), 0.6f);
             if ((mask & slow) != 0)

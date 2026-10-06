@@ -26,6 +26,8 @@ namespace RPG.Core.Actors
             return false;
         }
 
+        public bool Has(StatusEffectType type) => TryGet(type, out _);
+
         /// <summary>Applies an effect, or refreshes and stacks an existing one of the same type. Returns true when the
         /// state changed; a non-positive duration is ignored.</summary>
         public bool Apply(StatusEffectType type, int magnitude, int durationTicks)

@@ -91,6 +91,8 @@ namespace RPG.Core.Actors
                 var position = actor.Components.Get<PositionComponent>();
                 var movement = actor.Components.Get<MovementComponent>();
                 _candidatePositions[index] = position.Position;
+                if (ActorStatus.IsDisabled(actor))
+                    continue;
                 if (actor.Components.TryGet<ManualMovementComponent>(out var manualMovement) && manualMovement.IsActive)
                 {
                     var manualDirection = _avoidance.Solve(
@@ -167,6 +169,8 @@ namespace RPG.Core.Actors
             for (var index = 0; index < actors.SlotCount; index++)
             {
                 if (!actors.TryGetAt(index, out var attacker) || attacker.Components.Get<HealthComponent>().IsDead)
+                    continue;
+                if (ActorStatus.IsDisabled(attacker))
                     continue;
 
                 var targetId = attacker.Components.Get<TargetComponent>().CurrentTarget;

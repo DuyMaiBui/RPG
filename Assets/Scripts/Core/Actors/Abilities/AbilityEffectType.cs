@@ -17,5 +17,8 @@ namespace RPG.Core.Actors
 
         /// <summary>Applies <see cref="StatusEffectType.Slow"/> for <see cref="AbilityEffect.DurationTicks"/>.</summary>
         Slow = 4,
+
+        /// <summary>Applies <see cref="StatusEffectType.Stun"/> for <see cref="AbilityEffect.DurationTicks"/>.</summary>
+        Stun = 5,
     }
 }

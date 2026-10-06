@@ -8,6 +8,7 @@ namespace RPG.Core.Actors
             StatusEffectType.Poison => 3,
             StatusEffectType.Regeneration => 1,
             StatusEffectType.Slow => 2,
+            StatusEffectType.Stun => 1,
             _ => 1,
         };
 
@@ -17,5 +18,8 @@ namespace RPG.Core.Actors
 
         /// <summary>True when the effect changes the actor's movement speed.</summary>
         public static bool IsMovementModifier(StatusEffectType type) => type == StatusEffectType.Slow;
+
+        /// <summary>True when the effect stops the actor from moving, attacking or casting.</summary>
+        public static bool IsDisabling(StatusEffectType type) => type == StatusEffectType.Stun;
     }
 }

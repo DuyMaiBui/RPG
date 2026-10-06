@@ -18,6 +18,7 @@ namespace RPG.Core.Actors
                 if (!actor.Components.TryGet<AbilityComponent>(out var abilities) || abilities.Count == 0) continue;
 
                 abilities.Tick();
+                if (ActorStatus.IsDisabled(actor)) continue;
                 if (actor.Components.Get<HealthComponent>().IsDead) continue;
 
                 for (var abilityIndex = 0; abilityIndex < abilities.Count; abilityIndex++)
@@ -111,6 +112,7 @@ namespace RPG.Core.Actors
         {
             AbilityEffectType.Poison => StatusEffectType.Poison,
             AbilityEffectType.Regeneration => StatusEffectType.Regeneration,
+            AbilityEffectType.Stun => StatusEffectType.Stun,
             _ => StatusEffectType.Slow,
         };
     }

@@ -38,7 +38,18 @@ namespace RPG.Core.Actors
             AbilityTargetMode.CurrentTarget,
             new[] { new AbilityEffect(AbilityEffectType.Slow, 30, 6) });
 
-        private static readonly AbilityDefinition[] BruiserAbilities = { Cleave };
+        public static AbilityDefinition ConcussiveBlow { get; } = new AbilityDefinition(
+            5,
+            9,
+            1.2f,
+            AbilityTargetMode.CurrentTarget,
+            new[]
+            {
+                new AbilityEffect(AbilityEffectType.Damage, 4),
+                new AbilityEffect(AbilityEffectType.Stun, 1, 4),
+            });
+
+        private static readonly AbilityDefinition[] BruiserAbilities = { Cleave, ConcussiveBlow };
         private static readonly AbilityDefinition[] SkirmisherAbilities = { VenomStrike };
         private static readonly AbilityDefinition[] SupportAbilities = { Mend, Hamstring };
         private static readonly AbilityDefinition[] NoAbilities = Array.Empty<AbilityDefinition>();
