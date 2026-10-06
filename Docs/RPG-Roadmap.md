@@ -4,12 +4,16 @@ This file tracks the agreed direction for the **RPG game** (not the physics
 kernel) and the concrete remaining work, so a fresh session can pick it up.
 It mirrors `Docs/AuraEngine/Roadmap.md`.
 
-Two plans exist in this repository and must not be confused:
+Three plans exist in this repository and must not be confused:
 
 | Plan | Scope |
 |---|---|
 | `Docs/AuraEngine/Roadmap.md` | the C++ physics kernel `Native/AuraEngine` |
-| **this file** | the RPG gameplay built on `RPG.Core` + `RPG.Simulation` |
+| **this file** | the RPG game built on `RPG.Core` + `RPG.Simulation`: phases, gates, status |
+| `Docs/RPG-Combat-Plan.md` | what combat **is**: model, feature set, data schema, milestones C1–C8 |
+
+Phase order here wins; the combat plan is the specification for the combat parts
+of phases 2, 4, 6 and 7.
 
 ## Agreed direction (already decided — do not relitigate)
 
@@ -86,7 +90,8 @@ Evidence in this repository:
   `SimulationUnityBridge`, `SimulationMoveInput`, `BattleDemoBootstrap`,
   collider authoring components.
 - **Scenes**: `Assets/Scenes/MobaBattleDemo.unity`,
-  `TurnBattleDemo.unity`, `StressBattleDemo.unity`.
+  `TurnBattleDemo.unity` — renamed to `SkirmishBattleDemo.unity` under
+  decision 8 — and `StressBattleDemo.unity`.
 - **Tests**: after phase 1, `Assets/Tests/EditMode` holds **339** tests =
   **105** in `Core.Tests` + `Simulation.Contracts.Tests` (engine-free and
   headless-runnable), **10** in `Unity.Tests` (Editor-only, authored-asset
@@ -287,6 +292,10 @@ Nothing. This is the first phase to execute.
 A human plays a battle start → victory/defeat with mouse and keyboard, instead
 of watching auto-combat.
 
+Combat scope here: **C1 orders and control**, **C2 aggro/stances**, **C3 damage
+and mitigation**, **C4 ability model**, **C5 status model** — see
+`Docs/RPG-Combat-Plan.md`.
+
 ### Problem (evidence)
 - The only player command is `MoveIntentCommand`, and only movement of a
   mapped actor is affected (`SimulationMoveInput`).
@@ -380,6 +389,9 @@ Phase 1 (content ids are the save keys).
 Battles belong to a structure: a sequence of encounters with objectives,
 rewards and a roster the player builds.
 
+Combat scope here: **C8 objectives/morale** and the `EncounterAsset` schema, plus
+the ability and status content extensions — see `Docs/RPG-Combat-Plan.md`.
+
 ### Problem (evidence)
 A search across `Assets/Scripts` for
 `Campaign|Encounter|LoadScene|SceneManager|Addressables|LoadingScreen` returns
@@ -458,6 +470,10 @@ Phase 2 (signals and pooled views).
 ### Goal
 Enemies and allies behave tactically rather than uniformly charging.
 
+Combat scope here: **C6 formation and movement combat**, **C7 vision and
+information**, and the AI that consumes them — see
+`Docs/RPG-Combat-Plan.md`.
+
 ### Problem (evidence)
 `CombatBehaviorTree` is a 37-line selector mapping target/range to
 `AutoCombatState`; `AbilitySystem` casts the first ready ability in catalog
@@ -492,6 +508,10 @@ Phases 1 and 4 (content-driven encounters).
 ### Goal
 Known unit counts hold the tick budget with measurable, regression-guarded
 cost.
+
+Combat scope here: the cost of vision recomputation, path requests,
+targeting/threat evaluation and per-tick snapshot allocation — see
+`Docs/RPG-Combat-Plan.md`.
 
 ### Problem (evidence)
 `StressBattleDemo` and `NavigationStressPlayModeTests` exist, but there is no
@@ -603,6 +623,19 @@ Recorded here so later phases do not reopen them.
 6. **Save authority: local-only.** Saves are client-side for phases 3–8; if
    phase 9 happens, server validation is a new requirement, not an assumption
    baked into the phase-3 schema.
+7. **Combat model: settled in `Docs/RPG-Combat-Plan.md`** (accepted
+   2026-10-06). Real time with pause and speed control; per-unit order queues
+   with stances and rules of engagement; typed, mitigated integer damage with
+   seeded-RNG crit/block/dodge; abilities with resource cost, cast and channel
+   times, area shapes and ground targeting; status categories with stack
+   policies and diminishing returns; ticked formations; per-faction vision with
+   explored memory; morale/rout and objectives; a seeded simulation RNG is the
+   only randomness. Combat milestones C1–C8 map onto roadmap phases 2, 4, 6, 7.
+8. **Remaining scene/content loose ends, decided.** The `TurnBattleDemo` scene
+   is renamed to `SkirmishBattleDemo` (it is a 3v3 auto-battle sandbox with no
+   turns); wave composition stays on the bootstrap and becomes `EncounterAsset`
+   in phase 4; per-actor stats stay on the bootstrap until phase 3's stats
+   pipeline.
 
 ## Verify loops
 

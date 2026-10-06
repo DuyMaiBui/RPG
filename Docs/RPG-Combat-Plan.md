@@ -1,0 +1,282 @@
+# RPG combat plan — real-time tactical combat on the deterministic simulation
+
+This is the combat design and delivery plan for the RPG. `Docs/RPG-Roadmap.md`
+owns *when* work happens (phases and gates); this file owns *what combat is*:
+the model, the feature set, the data schema and the acceptance criteria for each
+combat milestone. Where the two disagree, the roadmap's phase order wins and
+this file's detail is the specification for that phase.
+
+Decisions in this file are settled (accepted 2026-10-06). They are not reopened
+without a concrete counter-example from a running battle.
+
+## 0. Scope
+
+In scope: unit and group control, targeting and aggro, a typed damage model,
+abilities, status effects, formations, vision, morale, objectives, and the
+combat-facing data schema — all inside the engine-free fixed-tick simulation,
+presented by the Unity layer.
+
+Out of scope (explicit): rigid-body physics (see
+`Docs/Collision-Architecture.md`), naval/air layers, siege equipment,
+destructible terrain, netcode (roadmap phase 9), and per-frame fog raycasting.
+
+## 1. What combat is today (verified, with symbols)
+
+Tick order inside `RpgSimulationApplication.Tick`:
+`StatusEffectSystem` → `AutoBattleSystem` → `AbilitySystem`; commands are drained
+by `SimulationHost` before `Tick`, events are collected after it, and
+`CreateUpdate` projects `WorldFrameUpdate`.
+
+| Area | Implemented | Symbol |
+|---|---|---|
+| Targeting | faction + vision range + `NavigationGrid.HasLineOfSight`, sticky until invalid | `AnyAliveEnemyTargetSelector.TrySelect`, `TargetComponent.CurrentTarget`, `TargetPriorityMode` = `Nearest`/`LowestHealth` |
+| Attack | reach + integer cooldown, melee or projectile | `AttackComponent.AttackPower`, `AttackRangeComponent.Reach`, `AttackCooldownComponent`, `AttackType` = `Melee`/`Projectile` |
+| Combat state | 3-state selector: acquire → attack → chase | `CombatBehaviorTree`, `AutoCombatState` = `AcquireTarget`/`ChaseTarget`/`AttackTarget`/`Dead` |
+| Damage | single flat `int`, no types, no mitigation, no crit/block | `HealthComponent.ReceiveDamage`, `ActorDamaged.Source/Target/Damage` |
+| Abilities | first-ready in loadout order, no cost, no cast time, two target modes | `AbilityComponent`, `AbilitySystem`, `AbilityTargetMode` = `CurrentTarget`/`Self`, `AbilityEffectType` = `Damage`/`Heal`/`Poison`/`Regeneration`/`Slow`/`Stun` |
+| Status | 4 types, stack caps, periodic damage/heal, slow, stun | `StatusEffect.Type/Magnitude/RemainingTicks/Stacks`, `StatusEffectRules.MaxStacks/IsPeriodic/IsMovementModifier/IsDisabling` |
+| Movement | cohorts (0.15 s rebuild) + ORCA avoidance + occupancy-aware grid resolution | `MovementCohortCoordinator`, `OrcaAvoidanceSolver`, `NavigationGrid.ResolveMovement`, `DynamicOccupancyGrid`, `SpatialHash` |
+| Orders | **one** command, a direction vector, applied to one actor | `MoveIntentCommand.Direction` (TypeId 2), `RpgSimulationApplication.HandleCommand`, `PlayerActors` |
+| Formations | data only — **not ticked** | `FormationCoordinator`, `FormationSlotComponent` |
+| Vision | a per-actor range used for targeting | `VisionComponent.Range` |
+| Frame | snapshots + signals + result | `ActorSnapshot`, `ProjectileSnapshot`, `PresentationSignal`, `PresentationSignalKind`, `BattleResult` = `Ongoing`/`RedWon`/`BlueWon`/`Draw` |
+| Layers | filters exist but targeting ignores them | `ColliderFilter`, `ColliderMode`, `CollisionShapeType` |
+
+The seven gaps that define this plan: no **orders** beyond a direction, no
+**group** control, no **damage model**, no **cast/resource** model for abilities,
+no **fog/visibility**, no **formation execution**, no **morale or objectives**.
+
+## 2. Pillars
+
+1. **Orders, not impulses.** The player issues intent; the simulation owns
+   execution. An order survives until it completes, is replaced, or is
+   impossible — never one frame of input.
+2. **Position decides fights.** Facing, flanking, formation, chokepoints and
+   spacing must be able to win or lose an engagement.
+3. **Information is a resource.** What you can see shapes what you can target;
+   scouting and hiding are real actions.
+4. **Time is readable.** Cast times, wind-ups and cooldowns create the window to
+   interrupt, dodge or commit — every one of them is telegraphed in the frame.
+5. **Units have identity.** Archetype, ability kit, resource and veterancy make
+   two units of equal health behave differently.
+6. **Deterministic and replayable.** Fixed tick, no engine randomness; the only
+   randomness is a seeded simulation RNG whose draws are part of the record.
+
+## 3. Settled model decisions
+
+**Time and authority.** 30 Hz fixed tick, host-authoritative, unchanged. Combat
+is real time with pause and 0.5×/1×/2× speed control (single player); there is
+no turn mode. Every player action is a validated `ISimulationCommand`; a
+rejected order is reported, never silently dropped.
+
+**Order model.** Each controllable actor has an order queue. An order is
+`(kind, destination | target, formation, stance, queued)`. Kinds: `Move`,
+`AttackMove`, `AttackTarget`, `CastAbility`, `Stop`, `Hold`, `Patrol`,
+`SetStance`, `SetFormation`, `Follow`, `Retreat`. Shift-queue appends; a new
+order without shift clears the queue. Stances: `Aggressive` (chase within leash),
+`Defensive` (engage only inside a hold radius), `HoldPosition` (never leave the
+current cell), `StandGround` (never move; attack what is in reach).
+
+**Targeting and aggro.** Explicit targets always win for their duration. Without
+one, auto-engagement uses `TargetPriorityMode` extended with `ClosestThreat`,
+`LowestHealth`, `HighestThreat`, `WeakestArmor`. Threat is accumulated by
+damage dealt and healing done, decays per tick, and is the tank's taunt anchor.
+A leash radius sends a unit back to its post when the fight drags it too far.
+
+**Damage.** Typed and mitigated, integer throughout:
+
+```text
+raw      = abilityOrAttackPower * (1 + sum(offensive modifiers))
+mitigated= max(minimumDamage, raw - effectiveArmor(rawType))
+effectiveArmor = armor * (1 - penetration)
+final    = mitigated * critMultiplier   // crit drawn from the seeded sim RNG
+```
+
+Types: `Physical`, `Fire`, `Frost`, `Lightning`, `Poison`, `Holy`, `Shadow`,
+`True` (ignores armor). Every actor carries armor plus per-type resistance
+percentages; `True` bypasses both. Block and dodge are defender stats rolled
+against the seeded RNG and reported in the frame so the HUD can show them.
+Armor is never negative and mitigation is capped, so no combination reaches
+zero or negative damage.
+
+**Abilities.** Each ability declares: resource cost and resource type
+(`Mana`/`Stamina`/`Rage`/`None`), cooldown ticks (and optional charges),
+`CastTicks` (0 = instant, interrupted by damage or movement), `ChannelTicks`
+(pulses while channelling, cancelled by damage, stun or a new order), area shape
+(`SingleTarget`, `Self`, `Circle`, `Cone`, `Line`, `GroundCircle`), radius/angle,
+whether it requires line of sight, and its effects. Ground targeting is a
+position, not an entity. Effect kinds grow to: direct damage/heal, apply status,
+dispel, summon, knockback, teleport/blink, shield absorb, resource drain,
+taunt, revive.
+
+**Status effects.** Reclassified into `Buff`, `Debuff`, `Control` (stun, root,
+silence, disarm, slow, fear) and `DamageOverTime`. Stack policy per type:
+`Refresh` (reset duration), `Stack` (independent instances up to a cap),
+`Extend` (add duration). Control effects have a per-actor diminishing-returns
+table (full → 50% → 25% → immune within a window) and immunity tags so a boss
+cannot be chain-stunned. Damage can interrupt casts and channels.
+
+**Formations and movement.** `FormationCoordinator` becomes a ticked system:
+formations `Line`, `Column`, `Wedge`, `Box`, `Circle`, with spacing, facing and
+a formation anchor; units path to their slot and re-slot when the anchor moves.
+Cohorts keep handling crowd routing, ORCA keeps local avoidance, and unit
+collision separation stays deterministic. Order-level movement is: path →
+cohort route → avoidance → grid resolution → separation.
+
+**Vision and information.** Per faction: `Visible` cells (sources: own units,
+structures, temporary reveals) and `Explored` memory (geometry only). An enemy
+outside every faction's vision is not targetable and is not projected in
+`ActorSnapshot`. Stealth/hidden units are revealed by proximity or a reveal
+effect. Vision is recomputed on a fixed cadence (not every frame) from a light
+per-cell count, not per-pixel raycasting.
+
+**Morale.** Units carry morale that falls from casualties nearby, being
+flanked, low health and commander death; a broken unit routs toward the rally
+point and is uncontrollable until it recovers or the battle ends. Heroes are
+immune to rout; they can instead be `Downed` and rescued/revived.
+
+**Objectives.** `BattleResult` gains objective evaluation beyond annihilation:
+`Annihilate`, `Survive(tickLimit)`, `DestroyTarget(EntityId|tag)`,
+`Capture(point, holdTicks)`, `Escort(entity, toPoint)`, `Defend(point, ticks)`.
+Evaluation runs in its own tick step so the frame can carry progress.
+
+**RPG coupling.** Combat produces what the RPG consumes: XP per kill and per
+objective, loot rolls from the seeded RNG (roadmap phase 3), injuries that
+persist between battles, and veterancy that grows unit stats. Downed heroes and
+post-battle recovery are the bridge between a lost battle and campaign
+progression.
+
+## 4. Data schema (content additions)
+
+Existing `Assets/Content` grows from abilities/archetypes/rules to:
+
+| Asset | Owns |
+|---|---|
+| `AbilityAsset` (extended) | resource cost/type, cooldown, charges, cast/channel ticks, area shape + radius/angle, LoS requirement, effects, telegraph metadata |
+| `StatusEffectAsset` (new) | category, stack policy, cap, duration, magnitude semantics, immunity tags, diminishing-returns group |
+| `UnitStatAsset` (new) | armor, per-type resistances, crit chance/multiplier, block, dodge, morale, resource pool + regen |
+| `ActorArchetypeAsset` (extended) | references `UnitStatAsset` + ability loadout + default stance and engagement radius |
+| `FormationAsset` (new) | shape, spacing, facing, slot policy |
+| `EncounterAsset` (new, roadmap phase 4) | factions, wave schedule, spawn points, objectives, difficulty modifiers, reward table |
+| `BattleRulesAsset` (extended) | tick rate, grid, vision cadence, morale and diminishing-returns tuning |
+
+All of it goes through `RPG.Content` validation: unknown ids, missing references,
+negative or zero values where positive is required, empty loadouts, illegal
+combinations (e.g. a `Cone` with radius 0, a channel with `ChannelTicks == 0`,
+a stat block with resistances above the cap) are errors with stable codes, and
+`ContentCatalogBuilder` reports every problem in one pass.
+
+## 5. Combat milestones
+
+Each milestone is a vertical slice: model in `RPG.Core`, commands in
+`RPG.Simulation.Contracts`, content in `Assets/Content`, presentation in
+`RPG.Unity`, and tests. Milestones map onto roadmap phases 2, 4, 6 and 7.
+
+### C1 — Command and control surface (roadmap phase 2)
+Per-unit order queue with `Move`/`AttackMove`/`AttackTarget`/`CastAbility`/
+`Stop`/`Hold`; selection and box-select in the Unity layer; group order
+fan-out to selected actors; shift-queued orders; formation-aware arrival.
+Validation in the host: ownership, reachability, ability ownership, range, LoS,
+cooldown, resource, stance legality.
+*Acceptance:* a selected group moves, attacks and holds through orders only; an
+illegal order is rejected and observable; deterministic tests cover queue
+replacement, shift-append, unreachable destination and order completion.
+
+### C2 — Targeting, aggro and rules of engagement (phase 2/6)
+Stances and leash, threat accumulation and decay, extended
+`TargetPriorityMode`, focus fire, return-to-post, auto-engage gating by stance.
+*Acceptance:* a tank holds threat against a higher-damage ally; a defensive unit
+never leaves its hold radius; a `HoldPosition` unit does not path.
+
+### C3 — Damage and mitigation (phase 2)
+`DamageType`, armor, resistances, penetration, crit, block, dodge, minimum
+damage floor, and a `DamageInfo` value object carried by `ActorDamaged` so the
+frame can show type, mitigation, crit and block.
+*Acceptance:* table-driven mitigation tests (including `True` damage and the
+floor), determinism (same seed ⇒ same crit sequence), and no damage source can
+produce zero or negative damage.
+
+### C4 — Ability model upgrade (phase 2/4)
+Resource costs, cast and channel with interrupts, charges, area shapes and
+ground targeting, LoS requirement, telegraph data in the frame, and AI ability
+scoring that replaces "first ready in loadout order".
+*Acceptance:* a cast is interrupted by damage and by a move order; a channel
+pulses on its cadence and stops on stun; each area shape is covered by a
+deterministic hit-set test; an out-of-resource cast is rejected.
+
+### C5 — Status effect model upgrade (phase 2/4)
+Categories, stack policies, diminishing returns, immunity tags, dispel/purge,
+cast interruption on damage, and per-type resistance to control.
+*Acceptance:* diminishing returns reach immunity within the window and reset
+after it; purge removes only purgeable categories; a stunned unit cancels a cast
+and resumes the queued order afterwards.
+
+### C6 — Formation and movement combat (phase 6)
+Tick `FormationCoordinator`; shapes with spacing and facing; re-slotting while
+moving; charge/gap-close; retreat paths; flanking and rear-attack bonuses driven
+by facing; path-request budget at scale.
+*Acceptance:* a line formation advances without interpenetration; flanking
+produces the documented damage bonus; path cost stays inside the phase-7 budget
+at the target unit count.
+
+### C7 — Vision and information (phase 4/6)
+Per-faction visible/explored sets, hidden and stealth units, reveals, target
+gating on visibility, and the presentation contract for unseen actors
+(absence from the frame, not a hidden flag).
+*Acceptance:* an enemy outside vision is absent from `ActorSnapshot` and
+unattackable; a reveal effect makes it appear and targetable in the same tick;
+vision cost is inside the phase-7 budget.
+
+### C8 — Morale, objectives and battle flow (phase 4)
+Morale and rout, rally points, objectives and progress in the frame, victory and
+defeat evaluation, reinforcements, withdrawal, hero downed/revive, and the XP
+and loot hooks that feed the RPG progression.
+*Acceptance:* each objective type passes a deterministic test; a routing unit
+becomes uncontrollable and recovers or leaves; a battle ends with the correct
+`BattleResult` and reward payload.
+
+## 6. Order of execution and dependencies
+
+```text
+C1 orders ──► C2 aggro/stances ──► C6 formation/movement
+   │                 │
+   ├──► C3 damage ───┼──► C4 abilities ──► C5 status
+   │                 │
+   └──► C7 vision ───┴──► C8 objectives/morale ──► phase 7 scale
+```
+
+C1 and C3 are the first two slices and both belong to roadmap phase 2; C7 must
+land before any AI that needs information asymmetry; C8 needs C2 and C3 because
+objectives and morale read damage, threat and stance.
+
+## 7. Cross-cutting rules
+
+- All combat randomness comes from one seeded simulation RNG; the seed and its
+  draw count are part of the frame record so a replay reproduces a battle.
+- `RPG.Core` stays engine-free: no Unity types, no `Transform`, no time source
+  other than the tick and its delta.
+- One declared type per file; interface members implemented explicitly.
+- Presentation never decides combat: no view, tween or animation event may
+  change health, threat, cooldown, resource or visibility.
+- Content is validated, not repaired: a missing or illegal asset is an authoring
+  error surfaced in the Inspector and in tests.
+- Every combat milestone ships a deterministic EditMode scenario, a headless
+  core run where possible, and one Play-mode scenario that exercises the
+  presentation path.
+
+## 8. Risks
+
+| Risk | Mitigation |
+|---|---|
+| Combat scope crowds out RPG systems (progression, campaign) | Milestones are gated by the roadmap; C1+C3 land inside phase 2, the rest attach to phases 4/6 |
+| Order queue + nav + avoidance interact badly (units oscillating, order thrash) | Deterministic scenario tests per interaction before adding the next layer; cohort/route revision already exists to invalidate stale routes |
+| Vision cost grows with unit count | Fixed-cadence, count-based visibility grid rather than per-frame raycasts; measured against the phase-7 budget |
+| Damage/status numbers become unbalanceable | All tuning lives in content assets, with a validator and (phase 8) a balance table view |
+| Threat/aggro surprises in a deterministic sim | Threat is explicit, tick-quantised and covered by table tests rather than emergent from floating-point accumulation |
+| Ability model growth bloats `AbilityAsset` | Effects stay a small discriminated list; new effect kinds are additive and validated, never optional fields that silently do nothing |
+
+## 9. Non-goals
+
+Rigid-body or destructible physics; joints, ragdoll or vehicles; naval, air or
+siege layers; per-unit voice/barks; multiplayer combat (roadmap phase 9);
+procedural terrain; and any combat rule that requires a Unity object to evaluate.
