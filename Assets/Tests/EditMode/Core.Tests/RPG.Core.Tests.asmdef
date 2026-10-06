@@ -5,7 +5,9 @@
     "RPG.Simulation.Contracts",
     "RPG.Simulation.Runtime"
   ],
-  "includePlatforms": [],
+  "includePlatforms": [
+    "Editor"
+  ],
   "optionalUnityReferences": [
     "TestAssemblies"
   ]
