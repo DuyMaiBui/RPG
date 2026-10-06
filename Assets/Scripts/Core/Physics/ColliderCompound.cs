@@ -28,14 +28,14 @@ namespace RPG.Core.Physics
                     var bounds = shape.Shape.GetBoundsHalfExtents();
                     if (shape.Shape.Type == CollisionShapeType.Circle)
                     {
-                        radius = MathF.Max(radius,
-                            MathF.Sqrt(shape.LocalOffset.LengthSquared) + shape.Shape.Radius);
+                        radius = SimulationMath.Max(radius,
+                            SimulationMath.Sqrt(shape.LocalOffset.LengthSquared) + shape.Shape.Radius);
                         continue;
                     }
 
-                    var extentX = MathF.Abs(shape.LocalOffset.X) + bounds.X;
-                    var extentY = MathF.Abs(shape.LocalOffset.Y) + bounds.Y;
-                    radius = MathF.Max(radius, MathF.Sqrt(extentX * extentX + extentY * extentY));
+                    var extentX = SimulationMath.Abs(shape.LocalOffset.X) + bounds.X;
+                    var extentY = SimulationMath.Abs(shape.LocalOffset.Y) + bounds.Y;
+                    radius = SimulationMath.Max(radius, SimulationMath.Sqrt(extentX * extentX + extentY * extentY));
                 }
 
                 return radius;
@@ -82,8 +82,8 @@ namespace RPG.Core.Physics
 
         private static SimulationVector2 Rotate(SimulationVector2 value, float radians)
         {
-            var cosine = MathF.Cos(radians);
-            var sine = MathF.Sin(radians);
+            var cosine = SimulationMath.Cos(radians);
+            var sine = SimulationMath.Sin(radians);
             return new SimulationVector2(
                 value.X * cosine - value.Y * sine,
                 value.X * sine + value.Y * cosine);

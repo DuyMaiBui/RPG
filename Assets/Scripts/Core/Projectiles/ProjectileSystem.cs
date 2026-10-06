@@ -24,7 +24,7 @@ namespace RPG.Core.Projectiles
 
                 var targetPosition = target.Components.Get<PositionComponent>().Position;
                 var difference = targetPosition - projectile.Position;
-                var distance = System.MathF.Sqrt(difference.LengthSquared);
+                var distance = SimulationMath.Sqrt(difference.LengthSquared);
                 var travel = projectile.Speed * context.FixedDeltaTime;
                 var endPosition = distance <= travel
                     ? targetPosition

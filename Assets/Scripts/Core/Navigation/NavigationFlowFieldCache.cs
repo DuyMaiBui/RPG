@@ -38,7 +38,7 @@ namespace RPG.Core.Navigation
             for (var index = 0; index < Capacity; index++)
             {
                 if (_fields[index] != null && _targets[index].Equals(target) &&
-                    _revisions[index] == _grid.Revision && MathF.Abs(_radii[index] - radius) <= 0.001f)
+                    _revisions[index] == _grid.Revision && SimulationMath.Abs(_radii[index] - radius) <= 0.001f)
                     return _fields[index];
             }
 

@@ -55,7 +55,7 @@ namespace RPG.Core.Navigation
             }
         }
 
-        private int Cell(float value) => (int)MathF.Floor(value / _cellSize);
+        private int Cell(float value) => (int)SimulationMath.Floor(value / _cellSize);
         private static int Key(int x, int y) => HashCode.Combine(x, y);
     }
 }

@@ -46,7 +46,7 @@ namespace RPG.Core.Navigation
         {
             var count = GetCount(position);
             if (count <= 1) return 0f;
-            return (count - 1) * Grid.CellSize / MathF.Max(0.01f, speed);
+            return (count - 1) * Grid.CellSize / SimulationMath.Max(0.01f, speed);
         }
 
         public int GetStationaryCount(GridCoordinate coordinate)
@@ -59,8 +59,8 @@ namespace RPG.Core.Navigation
         public bool IsStationaryPathBlocked(SimulationVector2 start, SimulationVector2 destination)
         {
             var delta = destination - start;
-            var distance = MathF.Sqrt(delta.LengthSquared);
-            var steps = Math.Max(1, (int)MathF.Ceiling(distance / MathF.Max(Grid.CellSize * 0.5f, 0.01f)));
+            var distance = SimulationMath.Sqrt(delta.LengthSquared);
+            var steps = Math.Max(1, (int)SimulationMath.Ceiling(distance / SimulationMath.Max(Grid.CellSize * 0.5f, 0.01f)));
             for (var step = 0; step <= steps; step++)
             {
                 var position = start + delta * (step / (float)steps);

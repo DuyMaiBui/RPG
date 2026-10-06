@@ -58,7 +58,7 @@ namespace RPG.Core.Physics
                 var firstEdge = next - current;
                 var secondEdge = following - next;
                 var cross = firstEdge.X * secondEdge.Y - firstEdge.Y * secondEdge.X;
-                if (MathF.Abs(cross) <= 0.000001f)
+                if (SimulationMath.Abs(cross) <= 0.000001f)
                     continue;
                 if (turnSign == 0f)
                     turnSign = cross;
@@ -82,8 +82,8 @@ namespace RPG.Core.Physics
             for (var index = 0; index < count; index++)
             {
                 var vertex = GetLocalVertex(index);
-                maxX = MathF.Max(maxX, MathF.Abs(vertex.X));
-                maxY = MathF.Max(maxY, MathF.Abs(vertex.Y));
+                maxX = SimulationMath.Max(maxX, SimulationMath.Abs(vertex.X));
+                maxY = SimulationMath.Max(maxY, SimulationMath.Abs(vertex.Y));
             }
 
             return new SimulationVector2(maxX, maxY);
@@ -117,8 +117,8 @@ namespace RPG.Core.Physics
 
         private static SimulationVector2 Rotate(SimulationVector2 value, float radians)
         {
-            var cosine = MathF.Cos(radians);
-            var sine = MathF.Sin(radians);
+            var cosine = SimulationMath.Cos(radians);
+            var sine = SimulationMath.Sin(radians);
             return new SimulationVector2(
                 value.X * cosine - value.Y * sine,
                 value.X * sine + value.Y * cosine);

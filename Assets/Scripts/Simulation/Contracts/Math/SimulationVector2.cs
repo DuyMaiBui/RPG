@@ -17,7 +17,7 @@ namespace RPG.Simulation.Contracts
 
         public SimulationVector2 Normalized()
         {
-            var length = MathF.Sqrt(LengthSquared);
+            var length = SimulationMath.Sqrt(LengthSquared);
             return length <= 0.0001f ? Zero : this / length;
         }
 

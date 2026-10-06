@@ -45,7 +45,7 @@ namespace RPG.Core.Actors
         {
             RedBasePosition = redBase;
             BlueBasePosition = blueBase;
-            BaseReach = System.MathF.Max(0.1f, reach);
+            BaseReach = SimulationMath.Max(0.1f, reach);
         }
 
         public SimulationVector2 GetEnemyBasePosition(FactionId faction) =>

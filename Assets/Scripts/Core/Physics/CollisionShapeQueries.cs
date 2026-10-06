@@ -45,7 +45,7 @@ namespace RPG.Core.Physics
                     ? 0f
                     : ((circleCenter - first).X * edge.X + (circleCenter - first).Y * edge.Y) /
                       edgeLengthSquared;
-                projection = MathF.Max(0f, MathF.Min(1f, projection));
+                projection = SimulationMath.Max(0f, SimulationMath.Min(1f, projection));
                 var point = first + edge * projection;
                 var distance = (point - circleCenter).LengthSquared;
                 if (distance < closestDistance)
@@ -113,7 +113,7 @@ namespace RPG.Core.Physics
             if (shape.Type == CollisionShapeType.Circle)
             {
                 var centerProjection = center.X * axis.X + center.Y * axis.Y;
-                var radiusProjection = shape.Radius * MathF.Sqrt(axis.LengthSquared);
+                var radiusProjection = shape.Radius * SimulationMath.Sqrt(axis.LengthSquared);
                 minimum = centerProjection - radiusProjection;
                 maximum = centerProjection + radiusProjection;
                 return;
@@ -127,8 +127,8 @@ namespace RPG.Core.Physics
             {
                 var vertex = center + shape.GetLocalVertex(index);
                 var projection = vertex.X * axis.X + vertex.Y * axis.Y;
-                minimum = MathF.Min(minimum, projection);
-                maximum = MathF.Max(maximum, projection);
+                minimum = SimulationMath.Min(minimum, projection);
+                maximum = SimulationMath.Max(maximum, projection);
             }
         }
 
@@ -150,7 +150,7 @@ namespace RPG.Core.Physics
             if (lengthSquared <= 0.000000000001f)
                 return false;
 
-            var direction = ray.Direction * (1f / MathF.Sqrt(lengthSquared));
+            var direction = ray.Direction * (1f / SimulationMath.Sqrt(lengthSquared));
             if (!RaycastDirection(ray.Origin, direction, maxDistance, shape, shapeCenter, out var distance, out var normal))
                 return false;
 
@@ -174,7 +174,7 @@ namespace RPG.Core.Physics
                 return false;
 
             var delta = to - from;
-            var length = MathF.Sqrt(delta.LengthSquared);
+            var length = SimulationMath.Sqrt(delta.LengthSquared);
             if (length <= 0.000001f)
                 return false;
 
@@ -239,7 +239,7 @@ namespace RPG.Core.Physics
             if (discriminant < 0f)
                 return false;
 
-            var entry = -projection - MathF.Sqrt(discriminant);
+            var entry = -projection - SimulationMath.Sqrt(discriminant);
             if (entry < 0f)
                 entry = 0f;
             if (entry > maxDistance)
@@ -288,7 +288,7 @@ namespace RPG.Core.Physics
                 if (edgeLengthSquared <= 0.000001f)
                     continue;
 
-                var axis = new SimulationVector2(-edge.Y, edge.X) * (1f / MathF.Sqrt(edgeLengthSquared));
+                var axis = new SimulationVector2(-edge.Y, edge.X) * (1f / SimulationMath.Sqrt(edgeLengthSquared));
                 var midpoint = (current + next) * 0.5f;
                 if (axis.X * (midpoint.X - centroid.X) + axis.Y * (midpoint.Y - centroid.Y) < 0f)
                     axis = axis * -1f;
@@ -298,7 +298,7 @@ namespace RPG.Core.Physics
                     originInside = false;
 
                 var slope = direction.X * axis.X + direction.Y * axis.Y;
-                if (MathF.Abs(slope) <= 0.00000001f)
+                if (SimulationMath.Abs(slope) <= 0.00000001f)
                 {
                     if (offset > 0f)
                         return false;
@@ -370,7 +370,7 @@ namespace RPG.Core.Physics
                 if (edgeLengthSquared <= 0.000001f)
                     continue;
 
-                var axis = new SimulationVector2(-edge.Y, edge.X) * (1f / MathF.Sqrt(edgeLengthSquared));
+                var axis = new SimulationVector2(-edge.Y, edge.X) * (1f / SimulationMath.Sqrt(edgeLengthSquared));
                 var midpoint = (current + next) * 0.5f;
                 if (axis.X * (midpoint.X - centroid.X) + axis.Y * (midpoint.Y - centroid.Y) < 0f)
                     axis = axis * -1f;
@@ -408,7 +408,7 @@ namespace RPG.Core.Physics
             distance = 0f;
             var edge = end - start;
             var denominator = direction.X * edge.Y - direction.Y * edge.X;
-            if (MathF.Abs(denominator) <= 0.00000001f)
+            if (SimulationMath.Abs(denominator) <= 0.00000001f)
                 return false;
 
             var offset = start - origin;
@@ -471,7 +471,7 @@ namespace RPG.Core.Physics
                 return start;
 
             var projection = ((point.X - start.X) * edge.X + (point.Y - start.Y) * edge.Y) / edgeLengthSquared;
-            projection = MathF.Max(0f, MathF.Min(1f, projection));
+            projection = SimulationMath.Max(0f, SimulationMath.Min(1f, projection));
             return start + edge * projection;
         }
     }

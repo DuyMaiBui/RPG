@@ -209,7 +209,7 @@ namespace RPG.Core.Navigation
             for (var index = 0; index < cohort.MemberCount; index++)
             {
                 if (!actors.TryGet(cohort.Members[index], out var actor)) continue;
-                radius = MathF.Max(radius, actor.Components.Get<ColliderComponent>().Compound.BoundingRadius);
+                radius = SimulationMath.Max(radius, actor.Components.Get<ColliderComponent>().Compound.BoundingRadius);
                 if (TryGetObjective(actors, actor, navigation, redBase, blueBase, out _, out var memberDestination))
                 {
                     destination += memberDestination;

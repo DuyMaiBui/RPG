@@ -147,7 +147,7 @@ namespace RPG.Core.Navigation
 
             var routeDirection = SharedDirection;
             var position = actor.Components.Get<PositionComponent>().Position;
-            var columns = System.Math.Max(1, System.Math.Min(4, (int)System.MathF.Ceiling(System.MathF.Sqrt(MemberCount))));
+            var columns = System.Math.Max(1, System.Math.Min(4, (int)SimulationMath.Ceiling(SimulationMath.Sqrt(MemberCount))));
             var row = slotIndex / columns;
             var column = slotIndex % columns;
             var lateral = (column - (columns - 1) * 0.5f) * SlotSpacing;

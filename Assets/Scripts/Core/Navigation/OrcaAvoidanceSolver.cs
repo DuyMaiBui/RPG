@@ -65,7 +65,7 @@ namespace RPG.Core.Navigation
         {
             var velocity = preferredVelocity;
             var lineCount = 0;
-            var inverseTimeStep = 1f / MathF.Max(deltaTime, Epsilon);
+            var inverseTimeStep = 1f / SimulationMath.Max(deltaTime, Epsilon);
 
             for (var index = 0; index < _nearby.Count && lineCount < MaxLines; index++)
             {
@@ -92,14 +92,14 @@ namespace RPG.Core.Navigation
                     var dotProduct = Dot(w, relativePosition);
                     if (dotProduct < 0f && dotProduct * dotProduct > combinedRadius * combinedRadius * wLengthSquared)
                     {
-                        var wLength = MathF.Sqrt(wLengthSquared);
-                        var unitW = w / MathF.Max(wLength, Epsilon);
+                        var wLength = SimulationMath.Sqrt(wLengthSquared);
+                        var unitW = w / SimulationMath.Max(wLength, Epsilon);
                         direction = Perpendicular(unitW);
                         u = unitW * (combinedRadius / _timeHorizon - wLength);
                     }
                     else
                     {
-                        var leg = MathF.Sqrt(MathF.Max(0f, distanceSquared - combinedRadius * combinedRadius));
+                        var leg = SimulationMath.Sqrt(SimulationMath.Max(0f, distanceSquared - combinedRadius * combinedRadius));
                         if (Determinant(relativePosition, w) >= 0f)
                             direction = new SimulationVector2(
                                 (relativePosition.X * leg - relativePosition.Y * combinedRadius) / distanceSquared,
@@ -115,7 +115,7 @@ namespace RPG.Core.Navigation
                 else
                 {
                     var w = relativeVelocity - relativePosition * inverseTimeStep;
-                    var wLength = MathF.Sqrt(w.LengthSquared);
+                    var wLength = SimulationMath.Sqrt(w.LengthSquared);
                     var unitW = wLength <= Epsilon
                         ? TieBreakDirection(actor.Id, other.Id)
                         : w / wLength;
@@ -168,7 +168,7 @@ namespace RPG.Core.Navigation
                 {
                     var determinant = Determinant(lines[lineIndex].Direction, lines[previous].Direction);
                     SimulationVector2 point;
-                    if (MathF.Abs(determinant) <= Epsilon)
+                    if (SimulationMath.Abs(determinant) <= Epsilon)
                     {
                         if (Dot(lines[lineIndex].Direction, lines[previous].Direction) > 0f) continue;
                         point = (lines[lineIndex].Point + lines[previous].Point) * 0.5f;
@@ -214,29 +214,29 @@ namespace RPG.Core.Navigation
                 var discriminant = dotProduct * dotProduct + radius * radius - lines[lineIndex].Point.LengthSquared;
                 if (discriminant < 0f) return false;
 
-                var root = MathF.Sqrt(discriminant);
+                var root = SimulationMath.Sqrt(discriminant);
                 var left = -dotProduct - root;
                 var right = -dotProduct + root;
                 for (var previous = 0; previous < lineIndex; previous++)
                 {
                     var denominator = Determinant(lines[lineIndex].Direction, lines[previous].Direction);
                     var numerator = Determinant(lines[previous].Direction, lines[lineIndex].Point - lines[previous].Point);
-                    if (MathF.Abs(denominator) <= Epsilon)
+                    if (SimulationMath.Abs(denominator) <= Epsilon)
                     {
                         if (numerator < 0f) return false;
                         continue;
                     }
 
                     var value = numerator / denominator;
-                    if (denominator >= 0f) right = MathF.Min(right, value);
-                    else left = MathF.Max(left, value);
+                    if (denominator >= 0f) right = SimulationMath.Min(right, value);
+                    else left = SimulationMath.Max(left, value);
                     if (left > right) return false;
                 }
 
                 var t = directionOpt
                     ? Dot(preferredVelocity, lines[lineIndex].Direction) > 0f ? right : left
                     : Dot(preferredVelocity - lines[lineIndex].Point, lines[lineIndex].Direction);
-                t = MathF.Max(left, MathF.Min(right, t));
+                t = SimulationMath.Max(left, SimulationMath.Min(right, t));
                 result = lines[lineIndex].Point + lines[lineIndex].Direction * t;
             }
 

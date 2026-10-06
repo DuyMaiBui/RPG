@@ -101,10 +101,10 @@ namespace RPG.Core.Actors
                 var sampleCount = ring == 0 ? 1 : ring * 8;
                 for (var sample = 0; sample < sampleCount; sample++)
                 {
-                    var angle = ring == 0 ? 0f : sample * MathF.PI * 2f / sampleCount;
+                    var angle = ring == 0 ? 0f : sample * SimulationMath.PI * 2f / sampleCount;
                     var candidate = origin + new SimulationVector2(
-                        MathF.Cos(angle) * searchRadius,
-                        MathF.Sin(angle) * searchRadius);
+                        SimulationMath.Cos(angle) * searchRadius,
+                        SimulationMath.Sin(angle) * searchRadius);
                     if (IsSpawnClear(state, candidate, radius))
                     {
                         position = candidate;

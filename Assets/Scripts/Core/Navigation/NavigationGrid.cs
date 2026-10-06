@@ -41,8 +41,8 @@ namespace RPG.Core.Navigation
 
         public bool TryGetCoordinate(SimulationVector2 position, out GridCoordinate coordinate)
         {
-            var x = (int)MathF.Floor((position.X - Origin.X) / CellSize);
-            var y = (int)MathF.Floor((position.Y - Origin.Y) / CellSize);
+            var x = (int)SimulationMath.Floor((position.X - Origin.X) / CellSize);
+            var y = (int)SimulationMath.Floor((position.Y - Origin.Y) / CellSize);
             coordinate = new GridCoordinate(x, y);
             return x >= 0 && x < Width && y >= 0 && y < Height;
         }
@@ -53,8 +53,8 @@ namespace RPG.Core.Navigation
         public bool IsDirectPathWalkable(SimulationVector2 start, SimulationVector2 destination, float radius)
         {
             var delta = destination - start;
-            var distance = MathF.Sqrt(delta.LengthSquared);
-            var steps = Math.Max(1, (int)MathF.Ceiling(distance / MathF.Max(CellSize * 0.5f, 0.01f)));
+            var distance = SimulationMath.Sqrt(delta.LengthSquared);
+            var steps = Math.Max(1, (int)SimulationMath.Ceiling(distance / SimulationMath.Max(CellSize * 0.5f, 0.01f)));
             for (var step = 0; step <= steps; step++)
             {
                 var position = start + delta * (step / (float)steps);
@@ -76,10 +76,10 @@ namespace RPG.Core.Navigation
         {
             _obstacles.Add(obstacle);
             var bounds = obstacle.Shape.GetBoundsHalfExtents();
-            var minX = (int)MathF.Floor((obstacle.Center.X - bounds.X - Origin.X) / CellSize);
-            var maxX = (int)MathF.Floor((obstacle.Center.X + bounds.X - Origin.X) / CellSize);
-            var minY = (int)MathF.Floor((obstacle.Center.Y - bounds.Y - Origin.Y) / CellSize);
-            var maxY = (int)MathF.Floor((obstacle.Center.Y + bounds.Y - Origin.Y) / CellSize);
+            var minX = (int)SimulationMath.Floor((obstacle.Center.X - bounds.X - Origin.X) / CellSize);
+            var maxX = (int)SimulationMath.Floor((obstacle.Center.X + bounds.X - Origin.X) / CellSize);
+            var minY = (int)SimulationMath.Floor((obstacle.Center.Y - bounds.Y - Origin.Y) / CellSize);
+            var maxY = (int)SimulationMath.Floor((obstacle.Center.Y + bounds.Y - Origin.Y) / CellSize);
             for (var y = minY; y <= maxY; y++)
             {
                 for (var x = minX; x <= maxX; x++)
@@ -101,7 +101,7 @@ namespace RPG.Core.Navigation
             if (!TryGetCoordinate(position, out var coordinate) || !IsWalkableForRadius(coordinate, radius))
                 return false;
 
-            var body = CollisionShape.Circle(MathF.Max(0f, radius));
+            var body = CollisionShape.Circle(SimulationMath.Max(0f, radius));
             for (var index = 0; index < _obstacles.Count; index++)
             {
                 var obstacle = _obstacles[index];
@@ -144,8 +144,8 @@ namespace RPG.Core.Navigation
             out SimulationVector2 lastSafe)
         {
             var delta = destination - start;
-            var distance = MathF.Sqrt(delta.LengthSquared);
-            var steps = Math.Max(1, (int)MathF.Ceiling(distance / MathF.Max(MathF.Max(radius, 0.05f) * 0.5f, 0.05f)));
+            var distance = SimulationMath.Sqrt(delta.LengthSquared);
+            var steps = Math.Max(1, (int)SimulationMath.Ceiling(distance / SimulationMath.Max(SimulationMath.Max(radius, 0.05f) * 0.5f, 0.05f)));
             lastSafe = start;
             for (var step = 1; step <= steps; step++)
             {
@@ -161,16 +161,16 @@ namespace RPG.Core.Navigation
 
         public SimulationVector2 ClampInside(SimulationVector2 position, float radius)
         {
-            var padding = MathF.Max(0f, radius);
+            var padding = SimulationMath.Max(0f, radius);
             return new SimulationVector2(
-                MathF.Max(Origin.X + padding, MathF.Min(Origin.X + Width * CellSize - padding, position.X)),
-                MathF.Max(Origin.Y + padding, MathF.Min(Origin.Y + Height * CellSize - padding, position.Y)));
+                SimulationMath.Max(Origin.X + padding, SimulationMath.Min(Origin.X + Width * CellSize - padding, position.X)),
+                SimulationMath.Max(Origin.Y + padding, SimulationMath.Min(Origin.Y + Height * CellSize - padding, position.Y)));
         }
 
         public bool IsWalkableForRadius(GridCoordinate coordinate, float radius)
         {
             if (!IsWalkable(coordinate)) return false;
-            var clearance = MathF.Max(0f, CellSize * 0.5f);
+            var clearance = SimulationMath.Max(0f, CellSize * 0.5f);
             return radius <= clearance;
         }
     }

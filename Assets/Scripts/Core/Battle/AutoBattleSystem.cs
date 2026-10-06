@@ -125,9 +125,9 @@ namespace RPG.Core.Actors
                     actors,
                     _spatialHash,
                     context.FixedDeltaTime);
-                var travel = System.MathF.Min(
+                var travel = SimulationMath.Min(
                     movement.Speed * context.FixedDeltaTime,
-                    System.MathF.Max(0f, distance - stopDistance));
+                    SimulationMath.Max(0f, distance - stopDistance));
                 _resolvedDirections[index] = resolvedDirection;
                 _candidatePositions[index] = position.Position + resolvedDirection * travel;
             }
@@ -259,13 +259,13 @@ namespace RPG.Core.Actors
         {
             var difference = right.Components.Get<PositionComponent>().Position -
                              left.Components.Get<PositionComponent>().Position;
-            return System.MathF.Sqrt(difference.LengthSquared);
+            return SimulationMath.Sqrt(difference.LengthSquared);
         }
 
         private static float Distance(SimulationVector2 left, SimulationVector2 right)
         {
             var difference = right - left;
-            return System.MathF.Sqrt(difference.LengthSquared);
+            return SimulationMath.Sqrt(difference.LengthSquared);
         }
 
         private static float AttackDistance(Actor attacker, Actor target) =>
