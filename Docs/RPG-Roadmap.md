@@ -92,18 +92,20 @@ Evidence in this repository:
 - **Scenes**: `Assets/Scenes/MobaBattleDemo.unity`,
   `TurnBattleDemo.unity` — renamed to `SkirmishBattleDemo.unity` under
   decision 8 — and `StressBattleDemo.unity`.
-- **Tests**: after phase 1, C1a, the movement fix and the scenario harness,
-  `Assets/Tests/EditMode` holds **383** tests = **149** in `Core.Tests` +
-  `Simulation.Contracts.Tests`
-  (engine-free and headless-runnable), **10** in `Unity.Tests` (Editor-only,
-  authored-asset validation), and **224** in `Assets/AuraEngine/Tests` (out of
-  scope for this plan). `Assets/Tests/PlayMode` holds one `[UnityTest]`
+- **Tests**: after phase 1, C1a, the movement fix, the scenario harness and the
+  melee content change, `Assets/Tests/EditMode` holds **386** tests = **149** in
+  `Core.Tests` + `Simulation.Contracts.Tests` (engine-free and
+  headless-runnable), **13** in `Unity.Tests` (Editor-only, authored-asset and
+  loadout validation), and **224** in `Assets/AuraEngine/Tests` (out of scope
+  for this plan). `Assets/Tests/PlayMode` holds one `[UnityTest]`
   (`NavigationStressPlayModeTests`). The standalone harness at `/tmp/rpg-tests`
   compiles the engine-free sources and runs the 149 headless through
   `dotnet test` (needs `DOTNET_ROLL_FORWARD=LatestMajor` against this machine's
   .NET 9 runtime). Seven further tests are `[Explicit]` measurement/known-defect
   runs and are excluded from the suite counts. Last verified: **EditMode
-  383/383**, **headless 149/149**, **PlayMode 1/1**.
+  386/386**, **headless 149/149**, **PlayMode 1/1**, plus a Play session of the
+  Moba demo with the melee health multiplier read back from the scene
+  (`Melee x2`, `Projectile x1`) and a clean console.
 
 ### Phase-0 defects: status
 
