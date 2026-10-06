@@ -21,7 +21,7 @@ public:
     uint32_t CopyBodyStates(AuraBodyState* buffer, uint32_t capacity) const override;
     uint32_t BodyCount() const override;
 
-    void Step(float deltaTime) override;
+    AuraResultCode Step(float deltaTime) override;
 
     uint32_t PendingEventCount() const override;
     uint32_t CopyEvents(AuraPhysicsEvent* buffer, uint32_t capacity) override;

@@ -258,7 +258,7 @@ uint32_t Box2DWorld::BodyCount() const
     return count;
 }
 
-void Box2DWorld::Step(float deltaTime)
+AuraResultCode Box2DWorld::Step(float deltaTime)
 {
     if (deltaTime > 0.0f)
         impl_->lastDelta = deltaTime;
@@ -282,6 +282,7 @@ void Box2DWorld::Step(float deltaTime)
 
     impl_->GatherEvents();
     impl_->ProcessJointBreaks();
+    return AURA_SUCCESS;
 }
 
 AuraResultCode Box2DWorld::CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater)

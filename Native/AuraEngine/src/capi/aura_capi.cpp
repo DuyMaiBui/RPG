@@ -153,8 +153,7 @@ AuraResultCode Aura_Step(AuraWorldHandle world, AuraTick tick, float deltaTime)
     auto* instance = aura::ToWorld(world);
     if (instance == nullptr)
         return AURA_INVALID_WORLD;
-    instance->Step(deltaTime);
-    return AURA_SUCCESS;
+    return instance->Step(deltaTime);
 }
 
 AuraResultCode Aura_CopyBodyStates(AuraWorldHandle world, AuraBodyState* buffer, uint32_t capacity, uint32_t* outCount)

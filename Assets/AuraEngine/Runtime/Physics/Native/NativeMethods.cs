@@ -8,7 +8,7 @@ namespace AuraEngine.Physics.Native
         private const string Library = "aura";
 
         /* Must equal AURA_ENGINE_ABI_VERSION in aura_types.h; bumped together with every ABI change. */
-        public const uint ExpectedAbiVersion = 12u;
+        public const uint ExpectedAbiVersion = 13u;
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         public static extern uint Aura_AbiVersion();

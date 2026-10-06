@@ -66,7 +66,7 @@ public:
     uint32_t CopyBodyStates(AuraBodyState* buffer, uint32_t capacity) const;
     uint32_t BodyCount() const;
 
-    void Step(float deltaTime);
+    AuraResultCode Step(float deltaTime);
 
     uint32_t PendingEventCount() const { return static_cast<uint32_t>(events_.size()); }
     uint32_t CopyEvents(AuraPhysicsEvent* buffer, uint32_t capacity);

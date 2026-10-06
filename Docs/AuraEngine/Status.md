@@ -150,9 +150,13 @@ silicon, release, 120 steps of a dense, never-sleeping pile of unit boxes on a g
 - Hard limits: 65,536 bodies per Jolt world (`kMaxBodies`); `AttachBody` then returns an invalid body id, a freed
   slot can be reused (test `o_body_limit_fails_cleanly_and_world_keeps_stepping_3d`), 4,096 live worlds.
   Box2D has no fixed body limit and ran 50,000 bodies.
-- Regression tests: package O (dense pile 6,000 boxes 3D, 12,000 boxes 2D, body limit). Kernel suite 459 cases.
-- Still open for safety: `Aura_Step` does not report a Jolt update error (the caches are now large enough that
-  it should not occur); `RestoreState` is not bit-exact for 3D; a rare Box2D `b2Solve` crash (soak seed 1,
+- Regression tests: package O (dense pile 6,000 boxes 3D, 12,000 boxes 2D, body limit, full-cache step
+  failure). Kernel suite 460 cases.
+- **Fixed (ABI 13):** `Aura_Step` now returns `AURA_BACKEND_FAILURE` when Jolt reports a fatal step error
+  (full body-pair / manifold / contact-constraint cache) instead of returning success and silently dropping
+  contacts. The diagnostic overrides `AURA_JOLT_MAX_BODY_PAIRS` / `AURA_JOLT_MAX_CONTACT_CONSTRAINTS` shrink
+  the caches so `o_jolt_step_reports_full_cache_failure_3d` exercises that path.
+- Still open for safety: `RestoreState` is not bit-exact for 3D; a rare Box2D `b2Solve` crash (soak seed 1,
   episode 847) is unresolved; no ThreadSanitizer run; 3D step time past 10,000 awake bodies needs spatial
   sleeping or islands tuned per game.
 
@@ -182,7 +186,7 @@ groups are in `Report-Safety-Scale.md`.
 
 ### P0 Safety
 
-- [ ] Report Jolt `PhysicsSystem::Update` errors through `Aura_Step` (ABI 13, managed mirror, test that forces
+- [x] Report Jolt `PhysicsSystem::Update` errors through `Aura_Step` (ABI 13, managed mirror, test that forces
       the error with a tiny cache).
 - [ ] Measure peak memory of the 2^20 contact caches (about 528 MB temp in one full 3D step) and size them from
       `initialBodyCapacity`, or grow on demand, so mobile devices do not reserve it.

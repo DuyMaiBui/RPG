@@ -25,7 +25,9 @@ public:
     virtual uint32_t CopyBodyStates(AuraBodyState* buffer, uint32_t capacity) const = 0;
     virtual uint32_t BodyCount() const = 0;
 
-    virtual void Step(float deltaTime) = 0;
+    /* Advances the world one fixed step. Returns AURA_BACKEND_FAILURE when the backend reports a fatal step
+       error (for example a full Jolt contact cache) instead of silently dropping contacts. */
+    virtual AuraResultCode Step(float deltaTime) = 0;
 
     virtual uint32_t PendingEventCount() const = 0;
     virtual uint32_t CopyEvents(AuraPhysicsEvent* buffer, uint32_t capacity) = 0;

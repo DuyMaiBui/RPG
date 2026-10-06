@@ -230,6 +230,31 @@ inline int AuraJoltWorkerCount()
     return static_cast<int>(std::max(1u, std::thread::hardware_concurrency()) - 1u);
 }
 
+/* Diagnostic/test override for the Jolt contact caches. A small positive value forces Jolt's
+   EPhysicsUpdateError (body-pair / manifold / contact-constraint full), which Aura_Step reports as
+   AURA_BACKEND_FAILURE; this exists so that error path is reachable in a unit test without a million pairs. */
+inline uint32_t AuraJoltMaxBodyPairs()
+{
+    if (const char* text = std::getenv("AURA_JOLT_MAX_BODY_PAIRS"))
+    {
+        const int value = std::atoi(text);
+        if (value >= 1)
+            return static_cast<uint32_t>(value);
+    }
+    return kMaxBodyPairs;
+}
+
+inline uint32_t AuraJoltMaxContactConstraints()
+{
+    if (const char* text = std::getenv("AURA_JOLT_MAX_CONTACT_CONSTRAINTS"))
+    {
+        const int value = std::atoi(text);
+        if (value >= 1)
+            return static_cast<uint32_t>(value);
+    }
+    return kMaxContactConstraints;
+}
+
 struct JoltWorld::Impl
 {
     struct Slot
@@ -383,7 +408,7 @@ struct JoltWorld::Impl
         objectVsObject.Matrix = matrix;
         listener.owner = this;
 
-        physics.Init(kMaxBodies, 0, kMaxBodyPairs, kMaxContactConstraints, broadPhase, objectVsBroadPhase, objectVsObject);
+        physics.Init(kMaxBodies, 0, AuraJoltMaxBodyPairs(), AuraJoltMaxContactConstraints(), broadPhase, objectVsBroadPhase, objectVsObject);
         physics.SetGravity(ToVec3(gravity));
         physics.SetContactListener(&listener);
         simShapeFilter.groups = &simShapeFilterGroups;

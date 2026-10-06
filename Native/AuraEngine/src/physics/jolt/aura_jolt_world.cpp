@@ -318,7 +318,7 @@ uint32_t JoltWorld::BodyCount() const
     return count;
 }
 
-void JoltWorld::Step(float deltaTime)
+AuraResultCode JoltWorld::Step(float deltaTime)
 {
     if (deltaTime > 0.0f)
         impl_->lastDelta = deltaTime;
@@ -340,7 +340,8 @@ void JoltWorld::Step(float deltaTime)
     }
 
     impl_->ApplyForceFields(deltaTime);
-    impl_->physics.Update(deltaTime, 1, &impl_->tempAllocator, &impl_->jobSystem);
+    const JPH::EPhysicsUpdateError updateError =
+        impl_->physics.Update(deltaTime, 1, &impl_->tempAllocator, &impl_->jobSystem);
 
     /* Jolt reports contacts from several worker threads in timing-dependent order; make the sequence deterministic. */
     {
@@ -363,6 +364,10 @@ void JoltWorld::Step(float deltaTime)
     }
 
     impl_->ProcessJointBreaks();
+
+    /* Jolt bitmask of what failed this step; a full body-pair / manifold / contact-constraint cache would
+       otherwise silently drop contacts and let bodies sink through each other. */
+    return updateError != JPH::EPhysicsUpdateError::None ? AURA_BACKEND_FAILURE : AURA_SUCCESS;
 }
 
 AuraResultCode JoltWorld::CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater)

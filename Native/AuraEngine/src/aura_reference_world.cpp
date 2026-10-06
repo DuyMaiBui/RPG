@@ -300,7 +300,7 @@ uint32_t ReferenceWorld::BodyCount() const
     return count;
 }
 
-void ReferenceWorld::Step(float deltaTime)
+AuraResultCode ReferenceWorld::Step(float deltaTime)
 {
     if (waterActive_)
         ApplyWaterStep(AuraWaterHandle{ 1 }, deltaTime);
@@ -308,6 +308,7 @@ void ReferenceWorld::Step(float deltaTime)
     Detect();
     Resolve();
     EmitEvents();
+    return AURA_SUCCESS;
 }
 
 AuraResultCode ReferenceWorld::CreateWater(const AuraWaterDesc& desc, AuraWaterHandle* outWater)

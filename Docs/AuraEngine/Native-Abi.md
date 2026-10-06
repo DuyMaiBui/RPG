@@ -220,3 +220,20 @@ SwingTwist axes are 0 twist, 1 normal swing, 2 plane swing. Gear: A = -ratio * B
   Version 2 buffers still restore (without extras). Free flight, kinematic 3D and most 2D scenarios, and both
   character movers restore bit-exactly; piles, joints with warm starting and Jolt sleep timers do not (contact and joint
   warm-start caches cannot be captured through the public API).
+
+## ABI 13: step errors are reported
+
+`AURA_ENGINE_ABI_VERSION` is 13. `IWorld::Step` (and therefore `Aura_Step`) now returns `AuraResultCode`
+instead of `void`. The reference and Box2D backends return `AURA_SUCCESS`; the Jolt backend captures the
+`JPH::EPhysicsUpdateError` bitmask from `PhysicsSystem::Update` and returns `AURA_BACKEND_FAILURE` when any
+cache overflows (`ManifoldCacheFull`, `BodyPairCacheFull`, `ContactConstraintsFull`). Previously the kernel
+discarded that bitmask, so a full contact cache silently dropped contacts and let bodies sink through each
+other. The managed `NativeMethods.ExpectedAbiVersion` mirror is 13 and `IPhysicsWorld.Step` still returns
+`void` at the simulation layer.
+
+The Jolt caches default to `kMaxBodyPairs` / `kMaxContactConstraints` (2^20) sized for a full world. The
+diagnostic overrides `AURA_JOLT_MAX_BODY_PAIRS` and `AURA_JOLT_MAX_CONTACT_CONSTRAINTS` (positive values,
+read at world creation) shrink them so the failure path is reachable in tests without a million pairs; the
+kernel test `o_jolt_step_reports_full_cache_failure_3d` sets them through native `setenv` (the Unity-bundled
+.NET host does not propagate `Environment.SetEnvironmentVariable` into the C environment) and asserts a
+crowded step returns `AURA_BACKEND_FAILURE` while the world stays usable.
