@@ -48,7 +48,7 @@ of phases 2, 4, 6 and 7.
 | 3 | Progression, stats and persistence | Open |
 | 4 | Meta structure: campaign, encounters, roster | Open |
 | 5 | Presentation and feel | Open |
-| 6 | AI and tactical depth | Open |
+| 6 | AI and tactical depth | Open — C6 movement recovery landed early |
 | 7 | Scale, performance and validation | Open |
 | 8 | Authoring and live-ops tooling | Open |
 | 9 | Remote play (deferred) | Open |
@@ -92,16 +92,16 @@ Evidence in this repository:
 - **Scenes**: `Assets/Scenes/MobaBattleDemo.unity`,
   `TurnBattleDemo.unity` — renamed to `SkirmishBattleDemo.unity` under
   decision 8 — and `StressBattleDemo.unity`.
-- **Tests**: after phase 1 and C1a, `Assets/Tests/EditMode` holds **378** tests
-  = **144** in `Core.Tests` + `Simulation.Contracts.Tests` (engine-free and
-  headless-runnable), **10** in `Unity.Tests` (Editor-only, authored-asset
-  validation), and **224** in `Assets/AuraEngine/Tests` (out of scope for this
-  plan). `Assets/Tests/PlayMode` holds one `[UnityTest]`
+- **Tests**: after phase 1, C1a and the movement fix, `Assets/Tests/EditMode`
+  holds **381** tests = **147** in `Core.Tests` + `Simulation.Contracts.Tests`
+  (engine-free and headless-runnable), **10** in `Unity.Tests` (Editor-only,
+  authored-asset validation), and **224** in `Assets/AuraEngine/Tests` (out of
+  scope for this plan). `Assets/Tests/PlayMode` holds one `[UnityTest]`
   (`NavigationStressPlayModeTests`). The standalone harness at `/tmp/rpg-tests`
-  compiles the engine-free sources and runs the 144 headless through
+  compiles the engine-free sources and runs the 147 headless through
   `dotnet test` (needs `DOTNET_ROLL_FORWARD=LatestMajor` against this machine's
-  .NET 9 runtime). Last verified: **EditMode 378/378**, **headless 144/144** on
-  three consecutive runs, **PlayMode 1/1**.
+  .NET 9 runtime). Last verified: **EditMode 381/381**, **headless 147/147** on
+  two consecutive runs, **PlayMode 1/1**.
 
 ### Phase-0 defects: status
 
@@ -129,6 +129,17 @@ Evidence in this repository:
    work hit it because `PlayerRoster` compares players. Both types now compare
    through one private core, expose `==`/`!=`, and `ProtocolIdentityTests`
    guards the contract.
+5. **Dense crowds stalled mid-way — fixed (found while investigating a report of
+   units stopping during pathfinding).** `CollisionResolver.SeparateCircles`
+   resolved a full overlap every tick, so in a crowd a separation push (up to a
+   full body diameter) dwarfed the actor's own step (0.013 units at speed 0.8)
+   and shoved units back the way they came; nothing detected the lack of
+   progress. Separation is now a bounded relaxation with a per-tick cap,
+   an actor without headway for 45 ticks steps sideways for 20, and a cohort
+   with no route steers straight at its destination instead of standing still.
+   Measured: stalled units 42 → 16 (1-unit gap), 23 → 7 (1.5), 22 → 7 (2),
+   10 → 2 (3). `CrowdMovementTests` guards it; details in
+   `Docs/RPG-Combat-Plan.md` (C6).
 
 ### Phase-0 baseline additions
 

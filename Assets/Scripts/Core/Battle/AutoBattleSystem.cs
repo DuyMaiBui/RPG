@@ -9,6 +9,12 @@ namespace RPG.Core.Actors
 {
     public sealed class AutoBattleSystem
     {
+        // A crowd where every actor keeps pushing into the same blocked spot never dissolves. After this long without
+        // net progress an actor steps sideways for a short window, which breaks the symmetry and lets a queue form.
+        private const int RecoveryTickThreshold = 45;
+        private const int RecoveryTicks = 20;
+        private const float ProgressEpsilonSquared = 0.000001f;
+
         private readonly AnyAliveEnemyTargetSelector _targetSelector = new();
         private readonly ProjectileSystem _projectiles = new();
         private readonly SpatialHash _spatialHash = new(1f);
@@ -17,6 +23,10 @@ namespace RPG.Core.Actors
         private readonly List<EntityId> _overlapNearby = new();
         private SimulationVector2[] _resolvedDirections = new SimulationVector2[0];
         private SimulationVector2[] _candidatePositions = new SimulationVector2[0];
+        private SimulationVector2[] _lastProgressPositions = new SimulationVector2[0];
+        private int[] _stuckTicks = new int[0];
+        private int[] _recoveryTicks = new int[0];
+        private bool[] _wantsToMove = new bool[0];
 
         public void Tick(SimulationContext<RpgSimulationState> context)
         {
@@ -170,6 +180,7 @@ namespace RPG.Core.Actors
                 if (movement.EffectiveSpeed <= 0f || distance <= stopDistance)
                     continue;
 
+                _wantsToMove[index] = true;
                 SimulationVector2 preferredDirection;
                 if (steersDirectly)
                 {
@@ -177,11 +188,27 @@ namespace RPG.Core.Actors
                     // Cohort routing follows the battle objective, which is not where the player pointed.
                     preferredDirection = (destination - position.Position).Normalized();
                     if (preferredDirection.LengthSquared <= 0f)
+                    {
+                        _wantsToMove[index] = false;
                         continue;
+                    }
                 }
                 else if (!context.State.MovementCohorts.TryGetDirection(actor, out preferredDirection))
                 {
-                    continue;
+                    // The crowd route gave nothing (no route, or a flow field that could not resolve). Steering straight
+                    // at the destination beats standing still: an actor that stops here would never be re-routed.
+                    preferredDirection = (destination - position.Position).Normalized();
+                    if (preferredDirection.LengthSquared <= 0f)
+                    {
+                        _wantsToMove[index] = false;
+                        continue;
+                    }
+                }
+
+                if (_recoveryTicks[index] > 0)
+                {
+                    _recoveryTicks[index]--;
+                    preferredDirection = Sidestep(actor, preferredDirection);
                 }
 
                 var resolvedDirection = _avoidance.Solve(
@@ -215,15 +242,73 @@ namespace RPG.Core.Actors
                 position.Position = context.State.Navigation.ClampInside(
                     context.State.Navigation.ResolveMovement(position.Position, resolvedCandidate, radius), radius);
             }
+
+            TrackProgress(actors);
+        }
+
+        /// <summary>Detects actors that want to move but make no headway, which is how a crowd jams: everyone pushes
+        /// into the same blocked spot and the pushes cancel out. A stuck actor is given a short sidestep window so the
+        /// jam can dissolve into a queue instead of standing forever. Deterministic: it depends only on tick counts
+        /// and actor ids.</summary>
+        private void TrackProgress(ActorRegistry actors)
+        {
+            for (var index = 0; index < actors.SlotCount; index++)
+            {
+                if (!actors.TryGetAt(index, out var actor) || actor.Components.Get<HealthComponent>().IsDead)
+                {
+                    _stuckTicks[index] = 0;
+                    _recoveryTicks[index] = 0;
+                    continue;
+                }
+
+                var position = actor.Components.Get<PositionComponent>().Position;
+                if (!_wantsToMove[index])
+                {
+                    _stuckTicks[index] = 0;
+                    _lastProgressPositions[index] = position;
+                    continue;
+                }
+
+                if ((position - _lastProgressPositions[index]).LengthSquared > ProgressEpsilonSquared)
+                {
+                    _stuckTicks[index] = 0;
+                    _lastProgressPositions[index] = position;
+                    continue;
+                }
+
+                _stuckTicks[index]++;
+                if (_stuckTicks[index] < RecoveryTickThreshold)
+                    continue;
+
+                _stuckTicks[index] = 0;
+                _recoveryTicks[index] = RecoveryTicks;
+            }
+        }
+
+        /// <summary>Steps sideways while still advancing. The side comes from the actor index so the result stays
+        /// deterministic and two jammed actors tend to choose opposite sides.</summary>
+        private static SimulationVector2 Sidestep(Actor actor, SimulationVector2 direction)
+        {
+            var side = new SimulationVector2(-direction.Y, direction.X);
+            var sign = (actor.Id.Index & 1) == 0 ? 1f : -1f;
+            return (direction + side * sign).Normalized();
         }
 
         private void EnsureMovementBuffers(int count)
         {
             if (_resolvedDirections.Length >= count)
+            {
+                for (var index = 0; index < count; index++)
+                    _wantsToMove[index] = false;
                 return;
+            }
 
             _resolvedDirections = new SimulationVector2[count];
             _candidatePositions = new SimulationVector2[count];
+            _lastProgressPositions = new SimulationVector2[count];
+            _stuckTicks = new int[count];
+            _recoveryTicks = new int[count];
+            _wantsToMove = new bool[count];
         }
 
         private static void AttackActors(SimulationContext<RpgSimulationState> context)
@@ -272,6 +357,10 @@ namespace RPG.Core.Actors
             }
         }
 
+        /// <summary>Resolves overlap against nearby actors with a bounded, relaxed push. Resolving every overlap fully
+        /// each tick would let separation — not the actor's movement — decide the final position, which is what makes
+        /// a dense crowd stop moving: the forward step is a fraction of a push, so units get shoved back where they
+        /// came from. The correction is therefore a fraction of each overlap and is capped per tick.</summary>
         private static SimulationVector2 ResolveOverlap(
             ActorRegistry actors,
             Actor movingActor,
@@ -279,6 +368,10 @@ namespace RPG.Core.Actors
             SpatialHash spatialHash,
             List<EntityId> nearby)
         {
+            const float relaxation = 0.35f;
+            const float maximumCorrection = 0.12f;
+
+            var start = candidate;
             var movingRadius = movingActor.Components.Get<ColliderComponent>().Compound.BoundingRadius;
             spatialHash.Collect(candidate, movingRadius + 1f, nearby);
             for (var pass = 0; pass < 3; pass++)
@@ -296,11 +389,15 @@ namespace RPG.Core.Actors
                         movingRadius,
                         otherPosition,
                         otherRadius,
-                        movingActor.Id.Index < other.Id.Index ? -1f : 1f);
+                        movingActor.Id.Index < other.Id.Index ? -1f : 1f,
+                        relaxation);
                 }
             }
 
-            return candidate;
+            var correction = candidate - start;
+            return correction.LengthSquared > maximumCorrection * maximumCorrection
+                ? start + correction.Normalized() * maximumCorrection
+                : candidate;
         }
 
         private static bool IsLiveEnemy(ActorRegistry actors, Actor source, EntityId targetId, out Actor target)

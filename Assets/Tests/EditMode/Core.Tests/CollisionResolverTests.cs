@@ -45,5 +45,17 @@ namespace RPG.Core.Tests
             Assert.That(first.X, Is.EqualTo(second.X));
             Assert.That(first.Y, Is.EqualTo(second.Y));
         }
+
+        [Test]
+        public void SeparateCircles_RelaxationCorrectsOnlyThatFractionOfTheOverlap()
+        {
+            // Circles of radius 1 centred 1 apart overlap by 1; a quarter relaxation corrects a quarter of it.
+            var position = V(1f, 0f);
+            var relaxed = CollisionResolver.SeparateCircles(position, 1f, V(0f, 0f), 1f, 1f, 0.25f);
+
+            Assert.That(relaxed.X, Is.EqualTo(1.25f).Within(0.0001f));
+            Assert.That(relaxed.Y, Is.EqualTo(0f).Within(0.0001f));
+            Assert.That(CollisionResolver.SeparateCircles(position, 1f, V(0f, 0f), 1f, 1f, 1f).X, Is.EqualTo(2f).Within(0.0001f));
+        }
     }
 }

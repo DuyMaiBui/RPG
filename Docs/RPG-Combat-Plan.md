@@ -264,6 +264,34 @@ by facing; path-request budget at scale.
 produces the documented damage bonus; path cost stays inside the phase-7 budget
 at the target unit count.
 
+**Landed early (movement recovery).** A dense crowd jammed: `CollisionResolver.SeparateCircles`
+resolved a *full* overlap every tick, so a single separation push could be tens of times larger than
+the actor's own step and shoved it back the way it came — the position was decided by separation
+rather than by movement intent — and nothing anywhere detected that an actor had stopped making
+progress. Measured with 60 units ordered through a gap, 3600 ticks (60 s) per run:
+
+| Free gap | Units stalled for good | Units through the gap |
+|---|---|---|
+| 1.0 units | 42 → **16** | 21 → 25 |
+| 1.5 units | 23 → **7** | 46 → 46 |
+| 2.0 units | 22 → **7** | 51 → 50 |
+| 3.0 units | 10 → **2** | 57 → 57 |
+
+Three changes, all deterministic:
+
+1. **Bounded separation.** `CollisionResolver.SeparateCircles` takes a relaxation factor and
+   `ResolveOverlap` uses 35% of each overlap, capped at 0.12 units of correction per tick. The default
+   of `relaxation = 1` keeps the exact-separation behaviour for single-pair callers.
+2. **Stuck recovery.** An actor that wants to move but makes no headway for 45 ticks steps sideways
+   for 20 ticks, with the side chosen from the actor index, so a jam can dissolve into a queue
+   instead of everyone pressing into the same blocked spot.
+3. **No hard stop.** A cohort that yields no direction no longer leaves the actor standing still; it
+   steers straight at its destination. An actor that stopped there had no way to be re-routed.
+
+Still open in C6: throughput through a choke is bounded by geometry (a crowd cannot pass a one-unit
+gap faster than the gap allows), formation shapes and slot assignment are still not ticked, and there
+is no queue discipline or crowd pressure beyond local avoidance.
+
 ### C7 — Vision and information (phase 4/6)
 Per-faction visible/explored sets, hidden and stealth units, reveals, target
 gating on visibility, and the presentation contract for unseen actors
