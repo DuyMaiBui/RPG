@@ -14,7 +14,7 @@ namespace RPG.Core.Tests
     /// <c>/tmp/rpg_flow_report.txt</c> as well as to the test log.</summary>
     public sealed class MobaScenarioFlowDiagnostic
     {
-        private const string ReportPath = "/tmp/rpg_flow_report.txt";
+
 
         [Test]
         [Explicit("Measurement harness: about two minutes of CPU. Run on demand.")]
@@ -24,7 +24,7 @@ namespace RPG.Core.Tests
             Assert.That(ScenarioFlowDiagnosticFingerprint(state), Is.EqualTo(MobaScenarioData.NavigationFingerprint));
             var metrics = new MobaScenarioMetrics();
             metrics.Run(state, 9000, 600, 1f / MobaScenarioData.TickRate);
-            Report(metrics);
+            Report(metrics, "/tmp/rpg_flow_report.txt");
         }
 
         [Test]
@@ -33,7 +33,7 @@ namespace RPG.Core.Tests
         {
             var metrics = new MobaScenarioMetrics();
             metrics.Run(MobaScenarioData.CreateState(withObstacles: false), 6000, 600, 1f / MobaScenarioData.TickRate);
-            Report(metrics);
+            Report(metrics, "/tmp/rpg_flow_report_no_obstacles.txt");
         }
 
         [TestCase(AttackType.Melee, AttackType.Melee, 8f)]
@@ -77,11 +77,14 @@ namespace RPG.Core.Tests
                 {
                     var distance = Distance(redActor, blueActor);
                     if (distance < minimumDistance) minimumDistance = distance;
-                    if (tick % 150 == 0)
+                    if (tick % 15 == 0 && tick <= 300)
                     {
-                        Console.WriteLine($"[duel] {redType} vs {blueType} t={tick,5} d={distance,6:0.00} "
-                            + $"redHp={redActor.Components.Get<HealthComponent>().CurrentHealth,3} "
+                        Console.WriteLine($"[duel] {redType} vs {blueType} t={tick,4} d={distance,6:0.00} "
                             + $"redDir={redActor.Components.Get<MovementComponent>().DesiredDirection} "
+                            + $"redTarget={redActor.Components.Get<TargetComponent>().CurrentTarget.Index,3} "
+                            + $"redHp={redActor.Components.Get<HealthComponent>().CurrentHealth,3} "
+                            + $"blueDir={blueActor.Components.Get<MovementComponent>().DesiredDirection} "
+                            + $"blueTarget={blueActor.Components.Get<TargetComponent>().CurrentTarget.Index,3} "
                             + $"blueHp={blueActor.Components.Get<HealthComponent>().CurrentHealth,3}");
                     }
                 }
@@ -98,10 +101,10 @@ namespace RPG.Core.Tests
             return (float)Math.Sqrt(delta.LengthSquared);
         }
 
-        private static void Report(MobaScenarioMetrics metrics)
+        private static void Report(MobaScenarioMetrics metrics, string path)
         {
             var text = metrics.ReportText;
-            File.WriteAllText(ReportPath, text);
+            File.WriteAllText(path, text);
             TestContext.Progress.WriteLine(text);
         }
 

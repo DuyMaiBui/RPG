@@ -8,6 +8,7 @@ namespace RPG.Core.Navigation
     public sealed class OrcaAvoidanceSolver
     {
         private const float Epsilon = 0.00001f;
+        private const float ReachEpsilon = 0.0001f;
         // Bound local constraints so dense crowds do not turn one tick into an O(n^2) solve.
         private const int MaxLines = 32;
         private readonly List<EntityId> _nearby = new();
@@ -72,6 +73,8 @@ namespace RPG.Core.Navigation
                 if (!actors.TryGet(_nearby[index], out var other) || other.Id == actor.Id ||
                     other.Components.Get<HealthComponent>().IsDead)
                     continue;
+                if (IsLongerReachAlly(actor, other)) continue;
+                if (IsCurrentTarget(actor, other)) continue;
 
                 var otherPosition = other.Components.Get<PositionComponent>().Position;
                 var otherMovement = other.Components.Get<MovementComponent>();
@@ -128,6 +131,22 @@ namespace RPG.Core.Navigation
 
             return lineCount;
         }
+
+        /// <summary>An actor does not avoid the target it is trying to reach: reciprocal avoidance holds two
+        /// attackers about 1.1 units apart, which is more than a melee attack distance (0.97), so a melee unit could
+        /// never land a blow on the very actor it was chasing. The target still avoids the mover in its own solve and
+        /// separation still keeps the bodies apart.</summary>
+        private static bool IsCurrentTarget(Actor actor, Actor other) =>
+            other.Id == actor.Components.Get<TargetComponent>().CurrentTarget;
+
+        /// <summary>An ally that shoots further does not constrain an ally that has to close: the ranged rank stops at
+        /// its own attack range and would otherwise wall in the melee rank, which is the only one that must touch the
+        /// enemy, and the solver would report no admissible velocity at all. The longer-ranged actor still avoids the
+        /// mover in its own solve, so the pair separates without a deadlock.</summary>
+        private static bool IsLongerReachAlly(Actor mover, Actor other) =>
+            mover.Components.Get<FactionComponent>().Faction == other.Components.Get<FactionComponent>().Faction &&
+            other.Components.Get<AttackRangeComponent>().Reach >
+            mover.Components.Get<AttackRangeComponent>().Reach + ReachEpsilon;
 
         private bool HasProjectedCollision(
             SimulationVector2 relativePosition,

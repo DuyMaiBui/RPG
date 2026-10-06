@@ -142,20 +142,30 @@ Evidence in this repository:
    Measured: stalled units 42 → 16 (1-unit gap), 23 → 7 (1.5), 22 → 7 (2),
    10 → 2 (3). `CrowdMovementTests` guards it; details in
    `Docs/RPG-Combat-Plan.md` (C6).
-6. **Basic attacks almost never fire — open (measured 2026-10-06 with the Moba
-   scenario run headlessly from its authored data).** 27 basic attacks against
-   591 ability casts over 300 s of game time; no melee unit (0 of 182) ever
-   landed one; 94.8% of units never attacked at all. Targets are sticky and only
-   the assigned target can be attacked, and 75% of the melee approaches are
-   blocked by an ally that stopped closer to the same target at its own attack
-   range. `MobaScenarioTests.Battle_MeleeUnitsLandBasicAttacks` records it;
-   evidence and fix options in `Docs/RPG-Combat-Plan.md` (C2).
-7. **Units pinned on the obstacle field — open (measured 2026-10-06).** 16% of
-   units never acquire a target, travel about eight units and then stand against
-   the obstacle field for the rest of the match. With the obstacles removed the
-   same run pins none (0/242 versus 39/242) and stalls none (0/242 versus 42/242
-   for ten seconds or more). `MobaScenarioTests.Battle_UnitsAreNotPinnedOnTerrain`
-   records it; evidence in `Docs/RPG-Combat-Plan.md` (C6).
+6. **Basic attacks almost never fire — engine fixed, melee part is a content
+   decision (measured 2026-10-06 on the Moba scenario run headlessly from its
+   authored data).** 27 basic attacks against 591 ability casts over 300 s, and
+   no melee unit (0 of 182) landed one. Three causes were fixed: a chase stopped
+   exactly on its attack reach so the separation push left it out of range;
+   only the assigned target could be attacked, so a unit pressed against an
+   enemy chased something further away; and an actor avoided its own target and
+   was blocked by the ranged rank in front of it. Ranged basic attacks are now
+   82 per 300 s and a melee duel closes to contact. Melee basic attacks are
+   still zero because Cleave (1.92) and VenomStrike (4.72) outrange the 0.97
+   melee attack and decide the fight first - a content change (reach up or
+   ability range down) is needed; widening melee reach to 0.9 gave 4 attacks per
+   300 s. `MobaScenarioTests.Battle_BasicAttacksLand` guards the engine part;
+   evidence in `Docs/RPG-Combat-Plan.md` (C2).
+7. **Units pinned on the obstacle field — fixed (measured 2026-10-06).** 16% of
+   units used to never acquire a target, travel about eight units and then stand
+   against the obstacle field for the rest of the match; with the obstacles
+   removed that run pinned none, so the cause was the route/avoidance
+   interaction at the terrain. A stuck actor now sweeps escape headings (each
+   one checked against the navigation grid) with local avoidance bypassed while
+   it escapes. Measured on the 300 s run: never acquired a target 42 → 16 of
+   362, stalled for ten seconds or more 81 → 4, longest stall 132 s → 76 s.
+   `MobaScenarioTests.Battle_UnitsAreNotPinnedOnTerrain` guards it; evidence in
+   `Docs/RPG-Combat-Plan.md` (C6).
 
 ### Phase-0 baseline additions
 

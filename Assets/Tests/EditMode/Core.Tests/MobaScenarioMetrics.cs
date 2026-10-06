@@ -51,6 +51,8 @@ namespace RPG.Core.Tests
         private int _rangedDeaths;
         private int _unknownKillerDeaths;
         private int _meleeInRangeTicks;
+        private int _meleeAttacks;
+        private int _rangedAttacks;
         private int _rangedInRangeTicks;
         private int _meleeContactSamples;
         private int _meleeNearestSamples;
@@ -79,6 +81,18 @@ namespace RPG.Core.Tests
         }
 
         public int MeleeUnits => _meleeUnits;
+
+        public int RangedUnits => _rangedUnits;
+
+        public int MeleeAttacks => _meleeAttacks;
+
+        public int RangedAttacks => _rangedAttacks;
+
+        public int MeleeUnitsThatAttacked => _meleeUnits - _neverAttackedMelee;
+
+        public int MeleeUnitsInRange => _meleeInRangeTicks;
+
+        public int MeleeContactSamples => _meleeContactSamples;
 
         public int IdleUnits => _idleUnits.Count;
 
@@ -319,6 +333,8 @@ namespace RPG.Core.Tests
                         {
                             attacker.Attacks++;
                             _attacksByFaction[(int)attacker.Faction]++;
+                            if (attacker.Ranged) _rangedAttacks++;
+                            else _meleeAttacks++;
                             _attacksThisSample++;
                             _lastAttackTick = _tick;
                             if (state.Actors.TryGet(attack.Source, out var sourceActor) &&
@@ -489,6 +505,8 @@ namespace RPG.Core.Tests
             Line($"## Attack: damage melee {_meleeDamage}, ranged {_rangedDamage}, unattributed (damage over time) "
                 + $"{_unknownSourceDamage}; deaths by melee {_meleeDeaths}, ranged {_rangedDeaths}, unattributed "
                 + $"{_unknownKillerDeaths}; last basic attack at tick {_lastAttackTick}");
+            Line($"## Attack: basic attacks melee {_meleeAttacks} ({MeleeUnitsThatAttacked}/{_meleeUnits} melee units), "
+                + $"ranged {_rangedAttacks} ({_rangedUnits - _neverAttackedRanged}/{_rangedUnits} ranged units)");
             Line($"## Attack: basic attack distance melee {Describe(_meleeAttackDistances)} | ranged {Describe(_rangedAttackDistances)}");
             Line($"## Attack: melee in-range samples {_meleeInRangeTicks}, ranged {_rangedInRangeTicks}");
             var casts = new List<string>();

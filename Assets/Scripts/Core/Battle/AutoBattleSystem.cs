@@ -14,6 +14,7 @@ namespace RPG.Core.Actors
         private const int RecoveryTickThreshold = 45;
         private const int RecoveryTicks = 20;
         private const float ProgressEpsilonSquared = 0.000001f;
+        private const float ReachEpsilon = 0.0001f;
 
         private readonly AnyAliveEnemyTargetSelector _targetSelector = new();
         private readonly ProjectileSystem _projectiles = new();
@@ -21,11 +22,13 @@ namespace RPG.Core.Actors
         private readonly OrcaAvoidanceSolver _avoidance = new();
         private readonly CombatBehaviorTree _behaviorTree = new();
         private readonly List<EntityId> _overlapNearby = new();
+        private readonly List<EntityId> _contactNearby = new();
         private SimulationVector2[] _resolvedDirections = new SimulationVector2[0];
         private SimulationVector2[] _candidatePositions = new SimulationVector2[0];
         private SimulationVector2[] _lastProgressPositions = new SimulationVector2[0];
         private int[] _stuckTicks = new int[0];
         private int[] _recoveryTicks = new int[0];
+        private int[] _escapeIndex = new int[0];
         private bool[] _wantsToMove = new bool[0];
 
         public void Tick(SimulationContext<RpgSimulationState> context)
@@ -89,6 +92,16 @@ namespace RPG.Core.Actors
 
                     target.CurrentTarget = targetId;
                     actors.TryGet(targetId, out targetActor);
+                }
+
+                if (!IsAttackTriggerOverlapping(actor, targetActor) &&
+                    TrySelectContactTarget(actor, actors, out var contactTargetId))
+                {
+                    // The attack gate only ever tests the assigned target, so a unit pressed against an enemy it did
+                    // not pick never swings: it kept chasing a target it could not reach while the enemy in front of
+                    // it went unharmed. Prefer what is already in reach.
+                    target.CurrentTarget = contactTargetId;
+                    actors.TryGet(contactTargetId, out targetActor);
                 }
 
                 behavior.State = _behaviorTree.Evaluate(
@@ -205,18 +218,26 @@ namespace RPG.Core.Actors
                     }
                 }
 
-                if (_recoveryTicks[index] > 0)
+                var escaping = _recoveryTicks[index] > 0;
+                if (escaping)
                 {
                     _recoveryTicks[index]--;
-                    preferredDirection = Sidestep(actor, preferredDirection);
+                    preferredDirection = EscapeHeading(
+                        actor,
+                        preferredDirection,
+                        _escapeIndex[index],
+                        position.Position,
+                        movement.EffectiveSpeed * context.FixedDeltaTime,
+                        MovingBodyRadius(actor),
+                        context.State.Navigation);
                 }
 
-                var resolvedDirection = _avoidance.Solve(
-                    actor,
-                    preferredDirection,
-                    actors,
-                    _spatialHash,
-                    context.FixedDeltaTime);
+                // An escaping actor drives its heading directly: local avoidance is what refused to move in the first
+                // place, because a jam of mutually avoiding actors resolves to no velocity at all. The separation pass
+                // still keeps bodies apart while the actor walks out.
+                var resolvedDirection = escaping
+                    ? preferredDirection
+                    : _avoidance.Solve(actor, preferredDirection, actors, _spatialHash, context.FixedDeltaTime);
                 var travel = SimulationMath.Min(
                     movement.EffectiveSpeed * context.FixedDeltaTime,
                     SimulationMath.Max(0f, distance - stopDistance));
@@ -282,16 +303,49 @@ namespace RPG.Core.Actors
 
                 _stuckTicks[index] = 0;
                 _recoveryTicks[index] = RecoveryTicks;
+                _escapeIndex[index] = (_escapeIndex[index] + 1) % EscapeAngles.Length;
             }
         }
 
-        /// <summary>Steps sideways while still advancing. The side comes from the actor index so the result stays
-        /// deterministic and two jammed actors tend to choose opposite sides.</summary>
-        private static SimulationVector2 Sidestep(Actor actor, SimulationVector2 direction)
+        /// <summary>Headings a stuck actor sweeps through, relative to the direction it wanted. A fixed sequence keeps
+        /// the search deterministic and lets an actor walk around an obstacle or out of a jam instead of pressing into
+        /// it forever. The sign flips per actor index so neighbours do not all escape the same way.</summary>
+        private static readonly float[] EscapeAngles =
         {
-            var side = new SimulationVector2(-direction.Y, direction.X);
+            0.7853982f, -0.7853982f, 1.5707964f, -1.5707964f, 2.3561945f, -2.3561945f, 3.1415927f,
+        };
+
+        /// <summary>Picks the escape heading that actually goes somewhere: the angles are tried in order from the
+        /// actor's current one and the first whose step the navigation grid accepts wins, so an actor walks out of a
+        /// jam or around an obstacle instead of holding a heading the terrain rejects.</summary>
+        private static SimulationVector2 EscapeHeading(
+            Actor actor,
+            SimulationVector2 direction,
+            int escapeIndex,
+            SimulationVector2 position,
+            float step,
+            float radius,
+            NavigationGrid navigation)
+        {
             var sign = (actor.Id.Index & 1) == 0 ? 1f : -1f;
-            return (direction + side * sign).Normalized();
+            for (var attempt = 0; attempt < EscapeAngles.Length; attempt++)
+            {
+                var angle = EscapeAngles[(escapeIndex + attempt) % EscapeAngles.Length] * sign;
+                var rotated = Rotate(direction, angle);
+                var resolved = navigation.ResolveMovement(position, position + rotated * step, radius);
+                if ((resolved - position).LengthSquared > ProgressEpsilonSquared) return rotated;
+            }
+
+            return Rotate(direction, EscapeAngles[escapeIndex % EscapeAngles.Length] * sign);
+        }
+
+        private static SimulationVector2 Rotate(SimulationVector2 direction, float angle)
+        {
+            var cosine = SimulationMath.Cos(angle);
+            var sine = SimulationMath.Sin(angle);
+            return new SimulationVector2(
+                direction.X * cosine - direction.Y * sine,
+                direction.X * sine + direction.Y * cosine).Normalized();
         }
 
         private void EnsureMovementBuffers(int count)
@@ -308,6 +362,7 @@ namespace RPG.Core.Actors
             _lastProgressPositions = new SimulationVector2[count];
             _stuckTicks = new int[count];
             _recoveryTicks = new int[count];
+            _escapeIndex = new int[count];
             _wantsToMove = new bool[count];
         }
 
@@ -381,6 +436,8 @@ namespace RPG.Core.Actors
                     if (!actors.TryGet(nearby[index], out var other) || other.Id == movingActor.Id ||
                         other.Components.Get<HealthComponent>().IsDead)
                         continue;
+                    if (IsLongerReachAlly(movingActor, other)) continue;
+                    if (other.Id == movingActor.Components.Get<TargetComponent>().CurrentTarget) continue;
 
                     var otherPosition = other.Components.Get<PositionComponent>().Position;
                     var otherRadius = other.Components.Get<ColliderComponent>().Compound.BoundingRadius;
@@ -399,6 +456,42 @@ namespace RPG.Core.Actors
                 ? start + correction.Normalized() * maximumCorrection
                 : candidate;
         }
+
+        /// <summary>Nearest live enemy the attacker can already reach with its basic attack, used to turn contact
+        /// into a target. Deterministic: nearest wins and a tie keeps the earlier candidate.</summary>
+        private bool TrySelectContactTarget(Actor attacker, ActorRegistry actors, out EntityId targetId)
+        {
+            targetId = EntityId.None;
+            var faction = attacker.Components.Get<FactionComponent>().Faction;
+            var position = attacker.Components.Get<PositionComponent>().Position;
+            var searchRadius = attacker.Components.Get<AttackRangeComponent>().Reach +
+                               attacker.Components.Get<ColliderComponent>().Compound.BoundingRadius + 1.5f;
+            _contactNearby.Clear();
+            _spatialHash.Collect(position, searchRadius, _contactNearby);
+            var bestDistance = float.MaxValue;
+            for (var index = 0; index < _contactNearby.Count; index++)
+            {
+                if (!actors.TryGet(_contactNearby[index], out var candidate)) continue;
+                if (candidate.Id == attacker.Id) continue;
+                if (candidate.Components.Get<FactionComponent>().Faction == faction) continue;
+                if (candidate.Components.Get<HealthComponent>().IsDead) continue;
+                var distance = Distance(attacker, candidate);
+                if (distance > AttackDistance(attacker, candidate) || distance >= bestDistance) continue;
+                bestDistance = distance;
+                targetId = candidate.Id;
+            }
+
+            return !targetId.IsNone;
+        }
+
+        /// <summary>An ally that shoots further does not hold ground against an ally that has to close. A ranged rank
+        /// stops at its own attack range and used to wall in the melee rank behind it, so the melee units - the only
+        /// ones that must touch the enemy - could never arrive. The longer-ranged ally still resolves against the
+        /// mover in its own pass, so the pair separates without stopping the advance.</summary>
+        private static bool IsLongerReachAlly(Actor mover, Actor other) =>
+            mover.Components.Get<FactionComponent>().Faction == other.Components.Get<FactionComponent>().Faction &&
+            other.Components.Get<AttackRangeComponent>().Reach >
+            mover.Components.Get<AttackRangeComponent>().Reach + ReachEpsilon;
 
         private static bool IsLiveEnemy(ActorRegistry actors, Actor source, EntityId targetId, out Actor target)
         {

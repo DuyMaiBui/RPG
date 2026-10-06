@@ -75,9 +75,13 @@ namespace RPG.Core.Actors
             orders.HasOrder &&
             orders.Current.Kind == OrderKind.Move;
 
+        /// <summary>Slack between attack reach and where a chase stops, so a separation push does not leave the
+        /// attacker standing just outside its own range.</summary>
+        private const float ChaseStopMargin = 0.15f;
+
         /// <summary>How close the actor must get before its current order is satisfied: a cast order stops at the
-        /// ability's own reach, so the caster arrives able to cast; a direct attack stops at attack reach. The cast
-        /// measurement matches <see cref="AbilitySystem"/> exactly, including body radii.</summary>
+        /// ability's own reach, so the caster arrives able to cast; a direct attack stops inside attack reach. The
+        /// cast measurement matches <see cref="AbilitySystem"/> exactly, including body radii.</summary>
         public static float ResolveChaseStopDistance(Actor actor, Actor target)
         {
             if (actor.Components.TryGet<OrderQueueComponent>(out var orders) &&
@@ -95,7 +99,12 @@ namespace RPG.Core.Actors
                 }
             }
 
-            return AutoBattleSystem.AttackDistance(actor, target);
+            // Stop inside attack reach rather than exactly on it. Stopping on the boundary leaves the attacker a
+            // separation push away from being out of range, and then it neither moves (it has arrived) nor attacks
+            // (it is 0.05 too far): the measured Moba battle produced 27 basic attacks in 300 s that way.
+            return SimulationMath.Max(
+                ChaseStopMargin * 0.5f,
+                AutoBattleSystem.AttackDistance(actor, target) - ChaseStopMargin);
         }
 
         private static void Resolve(SimulationContext<RpgSimulationState> context, Actor actor, OrderQueueComponent orders)

@@ -249,11 +249,24 @@ was the damage-over-time tick, which reports no attacking source. Two measured c
   measurement with nothing else on the map shows the avoidance solver alone holds two head-on actors about
   1.5 units apart, already above the melee attack distance.
 
-Candidate fixes in the order the measurement supports them: drop or re-evaluate a target that is out of
-reach when a closer enemy is in reach; let a unit attack an enemy it is in contact with, not only the
-assigned target; give the melee rank a way through (front-rank priority in `MovementCohortCoordinator`, or a
-melee reach that clears the friendly rank). Widening only the melee reach was measured and is not enough:
-with reach 1.3 (attack distance 2.02) melee units still landed one attack in a 200 s run.
+**Fixed 2026-10-06.** Three changes, each measured on the same 300 s run:
+
+- A chase now stops `OrderSystem.ChaseStopMargin` (0.15) *inside* attack reach instead of exactly on it, so a
+  separation push cannot leave the attacker hovering just outside its own range with neither a move nor an
+  attack left to make. Ranged basic attacks went **27 → 82**.
+- The attack gate is no longer limited to the assigned target: when the assigned target is out of reach and
+  another enemy is in reach, the actor retargets onto it, so being pressed against an enemy now means hitting
+  it instead of chasing something further away.
+- An actor no longer avoids its own current target, and an ally that shoots further no longer constrains an
+  ally that has to close. A duel with nothing else on the map now closes a melee pair at full speed to
+  1.5 units (the solver used to hold two head-on actors apart with no attack at all).
+
+**Still open — now a content decision, not an engine one.** Melee basic attacks stay at zero in the Moba
+scenario: melee reach is 0.25 (attack distance 0.97) while Cleave reaches 1.92 and VenomStrike 4.72, so the
+abilities decide the fight before a melee unit can touch anything - 305 of 310 deaths in that run were the
+poison damage over time. Widening the melee reach to 0.9 (attack distance 1.62) was measured: **4 basic
+attacks** in the whole 300 s run and 16 samples in reach across 182 melee units. Making the melee basic
+attack matter needs a content change (melee reach up, or Cleave and VenomStrike range down).
 
 ### C3 — Damage and mitigation (phase 2)
 `DamageType`, armor, resistances, penetration, crit, block, dodge, minimum
@@ -313,6 +326,16 @@ Three changes, all deterministic:
 Still open in C6: throughput through a choke is bounded by geometry (a crowd cannot pass a one-unit
 gap faster than the gap allows), formation shapes and slot assignment are still not ticked, and there
 is no queue discipline or crowd pressure beyond local avoidance.
+
+**Fixed 2026-10-06 (same day as the measurement below).** A stuck actor now sweeps a fixed sequence of
+escape headings instead of one blind sidestep: on each no-progress window the next heading is tried, the
+first whose step the navigation grid accepts is held, and local avoidance is bypassed while escaping
+because the solver is what returned no velocity in the first place. Standing behind that, an ally that
+shoots further (`AttackRangeComponent.Reach`) no longer constrains an ally that has to close, and neither
+does an actor's own current target, so a melee rank can press through a ranged rank that stopped at its
+own attack range. Measured on the 300 s run: units that never acquire a target **42 → 16** of 362,
+units stalled for ten seconds or more **81 → 4**, longest stall **132 s → 76 s**, while speed ratio and
+path efficiency stayed at 0.89 and 0.84. `CrowdMovementTests` and `MobaScenarioTests` guard it.
 
 **Measured 2026-10-06 (real Moba scenario, headless).** Movement itself is healthy: median speed 0.90 of
 the 0.8 u/s budget, net displacement over travelled distance 0.89, and the heading sits within 8.4° of the
