@@ -209,3 +209,5 @@ work on Linux or CI; UBSan ran clean apart from the known float-to-uint32 conver
   (the Apple runtime crashes at startup here).
 - Scene-level checks after the pass: 23/23 assertions and visual checks, 23/23 safety bounds at 8 fps, 25/25 lifecycle
   cycles; 224 EditMode tests.
+- Re-validated after ABI 13 (step-error reporting, 2026-10-06): the rebuilt `libaura` was loaded in a restarted Editor;
+  kernel suite 460 cases, EditMode 224/224, smoke 23/23 scenes, 8 fps safety 23/23, lifecycle 25/25 cycles (memory flat).

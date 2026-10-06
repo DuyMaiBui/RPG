@@ -156,6 +156,12 @@ silicon, release, 120 steps of a dense, never-sleeping pile of unit boxes on a g
   (full body-pair / manifold / contact-constraint cache) instead of returning success and silently dropping
   contacts. The diagnostic overrides `AURA_JOLT_MAX_BODY_PAIRS` / `AURA_JOLT_MAX_CONTACT_CONSTRAINTS` shrink
   the caches so `o_jolt_step_reports_full_cache_failure_3d` exercises that path.
+- **ABI 13 validated in the Editor (2026-10-06):** the rebuilt `libaura` was deployed and loaded in a
+  restarted Editor (dylib mapped, `compilationFailed: false`, 0 console errors). EditMode 224/224 passed;
+  `aura_smoke.sh` 23/23 scenes (0 console errors, 0 failed visual checks); 8 fps safety bounds 23/23;
+  lifecycle 25/25 cycles with flat memory (-58 MB). A first 60 fps smoke pass reported four scenes with
+  `range 0` movement; re-running those four in isolation passed, so those were Editor focus/throttle
+  artifacts, not a kernel regression.
 - Still open for safety: `RestoreState` is not bit-exact for 3D; a rare Box2D `b2Solve` crash (soak seed 1,
   episode 847) is unresolved; no ThreadSanitizer run; 3D step time past 10,000 awake bodies needs spatial
   sleeping or islands tuned per game.
