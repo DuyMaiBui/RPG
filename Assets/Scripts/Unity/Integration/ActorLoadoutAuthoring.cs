@@ -10,6 +10,7 @@ namespace RPG.Unity
     public sealed class ActorLoadoutAuthoring
     {
         [SerializeField] private AttackType _attackType;
+        [SerializeField] private ActorArchetype _archetype;
         [SerializeField, Min(0f)] private float _attackRange = 0.25f;
         [SerializeField, Min(0f)] private float _projectileSpeed = 5f;
         [SerializeField, Min(0f)] private float _projectileRadius = 0.05f;
@@ -20,9 +21,10 @@ namespace RPG.Unity
         }
 
         public ActorLoadoutAuthoring(AttackType attackType, float attackRange, float projectileSpeed,
-            float projectileRadius, float projectileLifetime)
+            float projectileRadius, float projectileLifetime, ActorArchetype archetype = ActorArchetype.None)
         {
             _attackType = attackType;
+            _archetype = archetype;
             _attackRange = attackRange;
             _projectileSpeed = projectileSpeed;
             _projectileRadius = projectileRadius;
@@ -57,7 +59,14 @@ namespace RPG.Unity
                 projectileSpeed: _projectileSpeed,
                 projectileRadius: _projectileRadius,
                 projectileLifetime: _projectileLifetime,
-                colliderShapes: colliderShapes);
+                colliderShapes: colliderShapes,
+                abilities: AbilityCatalog.Abilities(ResolveArchetype()));
         }
+
+        private ActorArchetype ResolveArchetype() => _archetype != ActorArchetype.None
+            ? _archetype
+            : _attackType == AttackType.Projectile
+                ? ActorArchetype.Skirmisher
+                : ActorArchetype.Bruiser;
     }
 }
