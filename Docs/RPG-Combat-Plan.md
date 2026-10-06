@@ -400,10 +400,37 @@ Measured on the 300 s Moba run:
 | median speed ratio | 0.90 | **0.93** |
 | stall ticks | 1.36% | **0.93%** (longest stall 7.9 s -> 5.0 s) |
 
+Measured terrain sliding afterwards: when the navigation grid refuses the step, the actor immediately walks the first
+rotated heading the grid accepts instead of holding its ground until the unstick window opens. Terrain stop-and-go
+episodes 554 -> **0**, speed dips over the whole model 6.98% -> **2.92%**, turn per tick average 5.46 -> **2.74
+degrees**, stall ticks 0.93% -> **0.34%**, longest stall 5.0 s -> **2.0 s**, median speed ratio 0.93 -> **0.97** and
+net displacement over travelled distance 0.86 -> **0.90**.
+
 Sampled from the actual actor views in a Play session of the demo scene (30 s, 120 samples at 0.25 s): turn median
 0.28 degrees per sample, movement speed median 0.80 of the 0.8 units/s budget, 1.3% of samples below half speed, and
 the nearest same-faction neighbour 0.74 units away at the median (the bodies touch at 0.7), so the crowd runs at full
 speed in lines and compresses without stacking.
+
+### Movement status (2026-10-06)
+
+Fixed across this work: crowd jams (bounded separation plus unstick), actors frozen against an obstacle field (crawl
+detection and a committed escape), terrain edges (immediate sliding), and the queueing/shuffling feel (shared route
+direction, allies are not obstacles, soft ally separation, heading smoothing). Over the whole line of work on the
+300 s Moba run: pinned units 15 -> **0**, stalled ten seconds or more 81 -> **0**, longest stall 132 s -> **2.0 s**,
+stall ticks 1.36% -> **0.34%**, turn per tick 7.05 -> **2.74 degrees** average, moving ticks below half a step
+10.9% -> **2.9%**, median speed ratio 0.90 -> **0.97**, net over travelled 0.83 -> **0.90**, units past the midline 93
+-> 88 (a combat outcome: fewer units slip past a stalled front line, not a movement regression).
+
+Known limits, measured and accepted:
+
+- **Crowd compression** - 2.9% of moving ticks stay below half a step with nothing in front of the actor (315 episodes
+  in the run, longest single stall 2.0 s). A soft model lets an actor slow down while it is squeezed between allies;
+  the alternative (hard separation) is what produced the queueing feel, so this is the cost of the model rather than a
+  defect to hunt.
+- **Enemy pressure** - 17 contact episodes: an actor pressed against an enemy line does not advance. That is the
+  intended "the line holds" behaviour, not a stall.
+- **Melee reach** - melee lands at most a handful of basic attacks per 300 s because Cleave (1.92) and VenomStrike
+  (4.72) outrange its 0.97 attack distance; a content decision, not a movement one (C2).
 
 `AutonomousCombatTests.Avoidance_KeepsPreferredDirectionForSameFactionActor` pins the policy - the test that asserted
 the opposite was rewritten rather than re-pinned - and `MobaScenarioTests` runs the crowd scenario.

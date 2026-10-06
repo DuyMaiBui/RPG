@@ -22,6 +22,10 @@ namespace RPG.Core.Actors
         private const int EscapeTicks = 240;
         private const int EscapeBlockedTicks = 15;
         private const float EscapeProgressEpsilon = 0.5f;
+        // Headings tried when the walk runs into static geometry, in order. Walking into a wall used to hold the actor
+        // still until the unstick window opened ninety ticks later (554 of the 813 measured stop-and-go episodes were
+        // this): sliding along the wall as soon as the step is refused keeps it moving instead.
+        private static readonly float[] SlideAngles = { 0.7853982f, -0.7853982f, 1.5707964f, -1.5707964f, 2.3561945f, -2.3561945f };
         // A crawl is a stall too: an actor can keep twitching in place where an escape sweep or a body push moves it a
         // hair every tick, which the per-tick displacement check reads as progress. Not improving the distance to the
         // objective for this long is the signal that actually means "not getting anywhere".
@@ -263,12 +267,12 @@ namespace RPG.Core.Actors
                     }
                 }
 
+                var step = movement.EffectiveSpeed * context.FixedDeltaTime;
+                var radius = MovingBodyRadius(actor);
+                preferredDirection = SlideAlongTerrain(
+                    actor, context.State.Navigation, position.Position, preferredDirection, step, radius);
                 _terrainBlocked[index] = RefusesStep(
-                    context.State.Navigation,
-                    position.Position,
-                    preferredDirection,
-                    movement.EffectiveSpeed * context.FixedDeltaTime,
-                    MovingBodyRadius(actor));
+                    context.State.Navigation, position.Position, preferredDirection, step, radius);
 
                 var escaping = _recoveryTicks[index] > 0;
                 if (escaping && _escapeStartDistance[index] - distance >= EscapeProgressEpsilon)
@@ -386,8 +390,10 @@ namespace RPG.Core.Actors
             _escapeStartDistance[index] = _objectiveDistance[index];
         }
 
-        /// <summary>True when the navigation grid refuses to move the actor along its desired direction at all, which
-        /// is what static geometry looks like from inside the movement loop.</summary>
+        /// <summary>When the desired step is refused by static geometry, walks along the surface instead of into it:
+        /// the first rotated heading the navigation grid accepts is taken, otherwise the direction is left as it was so
+        /// the unstick path can still see that the actor has nowhere to go. Deterministic: the sign comes from the actor
+        /// index, so two actors against the same wall slide opposite ways.</summary>
         private static bool RefusesStep(
             NavigationGrid navigation,
             SimulationVector2 position,
@@ -398,6 +404,25 @@ namespace RPG.Core.Actors
             if (direction.LengthSquared <= 0.000001f || step <= 0f) return false;
             var resolved = navigation.ResolveMovement(position, position + direction * step, radius);
             return (resolved - position).LengthSquared <= ProgressEpsilonSquared;
+        }
+
+        private static SimulationVector2 SlideAlongTerrain(
+            Actor actor,
+            NavigationGrid navigation,
+            SimulationVector2 position,
+            SimulationVector2 direction,
+            float step,
+            float radius)
+        {
+            if (!RefusesStep(navigation, position, direction, step, radius)) return direction;
+            var sign = (actor.Id.Index & 1) == 0 ? 1f : -1f;
+            for (var attempt = 0; attempt < SlideAngles.Length; attempt++)
+            {
+                var rotated = Rotate(direction, SlideAngles[attempt] * sign);
+                if (!RefusesStep(navigation, position, rotated, step, radius)) return rotated;
+            }
+
+            return direction;
         }
 
         /// <summary>Turns the desired direction into the direction the actor actually travels: blended with the previous

@@ -32,6 +32,10 @@ namespace RPG.Core.Tests
         public int DipEpisodes;
         public int CurrentContactDipTicks;
         public int ContactDipEpisodes;
+        public int CurrentTerrainDipTicks;
+        public int TerrainDipEpisodes;
+        public int CurrentCrowdDipTicks;
+        public int CrowdDipEpisodes;
         public float CurrentTargetDistance = -1f;
         public bool CrossedMidline;
         public bool Died;

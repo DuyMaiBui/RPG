@@ -36,6 +36,7 @@ namespace RPG.Core.Tests
         private readonly List<float> _headingJitter = new();
         private const int StopGoTicks = 10;
         private int _speedDipTicks;
+        private int _terrainDipTicks;
         private int _movingTicks;
         private readonly List<float> _idleTravel = new();
         private readonly List<float> _idleNetDisplacement = new();
@@ -114,16 +115,20 @@ namespace RPG.Core.Tests
         /// <summary>Share of moving ticks in which an actor covered less than half of its own step.</summary>
         public float SpeedDipShare { get; private set; }
 
-        /// <summary>Times an actor stayed below half its own step for ten ticks in a row: the visible stop-and-go,
-        /// as opposed to the one or two ticks it naturally loses while arriving at its stop distance.</summary>
-        public int FlowStopGoEpisodes { get; private set; }
+        public int TerrainUnitsWithStopGo { get; private set; }
 
-        public int UnitsWithStopGo { get; private set; }
+        public int CrowdUnitsWithStopGo { get; private set; }
+
+        public int ContactUnitsWithStopGo { get; private set; }
 
         /// <summary>Stop-and-go episodes while an enemy was in reach: combat pressure, not a crowd-flow problem.</summary>
         public int ContactStopGoEpisodes { get; private set; }
 
-        public int ContactUnitsWithStopGo { get; private set; }
+        /// <summary>Episodes in which the navigation grid refused the step: static geometry.</summary>
+        public int TerrainStopGoEpisodes { get; private set; }
+
+        /// <summary>Episodes with nothing in front: the crowd itself or an unstick escape.</summary>
+        public int CrowdStopGoEpisodes { get; private set; }
 
         public int MidlineCrossings { get; private set; }
 
@@ -237,7 +242,7 @@ namespace RPG.Core.Tests
                 var movement = actor.Components.Get<MovementComponent>();
                 unit.WantsToMove = movement.DesiredDirection.LengthSquared > 0.000001f;
                 TrackCloseDistance(state, actor, position, unit);
-                TrackFlowQuality(unit, movement, position, delta);
+                TrackFlowQuality(state, actor, unit, movement, position, delta);
                 if (actor.Components.Get<HealthComponent>().IsDead)
                 {
                     unit.Died = true;
@@ -246,9 +251,25 @@ namespace RPG.Core.Tests
             }
         }
 
+        private bool RefusesStep(RpgSimulationState state, Actor actor, MovementComponent movement, SimulationVector2 position)
+        {
+            if (movement.DesiredDirection.LengthSquared <= 0.000001f) return false;
+            var step = movement.EffectiveSpeed / MobaScenarioData.TickRate;
+            if (step <= 0f) return false;
+            var radius = actor.Components.Get<ColliderComponent>().Compound.BoundingRadius;
+            var resolved = state.Navigation.ResolveMovement(position, position + movement.DesiredDirection * step, radius);
+            return (resolved - position).LengthSquared <= 0.000001f;
+        }
+
         /// <summary>Measures how smoothly an actor moved this tick: how far it turned since the last tick and whether
         /// it covered its own step. The two numbers behind "the crowd shuffles instead of flowing".</summary>
-        private void TrackFlowQuality(MobaScenarioUnit unit, MovementComponent movement, SimulationVector2 position, SimulationVector2 delta)
+        private void TrackFlowQuality(
+            RpgSimulationState state,
+            Actor actor,
+            MobaScenarioUnit unit,
+            MovementComponent movement,
+            SimulationVector2 position,
+            SimulationVector2 delta)
         {
             if (unit.WantsToMove)
             {
@@ -259,23 +280,34 @@ namespace RPG.Core.Tests
                     _speedDipTicks++;
                     var inContact = unit.CurrentTargetDistance >= 0f &&
                                     unit.CurrentTargetDistance <= unit.AttackDistance + 1.5f;
+                    var terrain = !inContact && RefusesStep(state, actor, movement, position);
                     if (inContact)
                     {
                         unit.CurrentContactDipTicks++;
                         if (unit.CurrentContactDipTicks == StopGoTicks) unit.ContactDipEpisodes++;
-                        unit.CurrentDipTicks = 0;
+                        unit.CurrentTerrainDipTicks = 0;
+                        unit.CurrentCrowdDipTicks = 0;
+                    }
+                    else if (terrain)
+                    {
+                        unit.CurrentTerrainDipTicks++;
+                        if (unit.CurrentTerrainDipTicks == StopGoTicks) unit.TerrainDipEpisodes++;
+                        unit.CurrentContactDipTicks = 0;
+                        unit.CurrentCrowdDipTicks = 0;
                     }
                     else
                     {
-                        unit.CurrentDipTicks++;
-                        if (unit.CurrentDipTicks == StopGoTicks) unit.DipEpisodes++;
+                        unit.CurrentCrowdDipTicks++;
+                        if (unit.CurrentCrowdDipTicks == StopGoTicks) unit.CrowdDipEpisodes++;
                         unit.CurrentContactDipTicks = 0;
+                        unit.CurrentTerrainDipTicks = 0;
                     }
                 }
                 else
                 {
-                    unit.CurrentDipTicks = 0;
                     unit.CurrentContactDipTicks = 0;
+                    unit.CurrentTerrainDipTicks = 0;
+                    unit.CurrentCrowdDipTicks = 0;
                 }
             }
 
@@ -599,16 +631,21 @@ namespace RPG.Core.Tests
             MedianPathEfficiency = Median(efficiency);
             MedianHeadingToTarget = Median(_targetAngles);
             MedianHeadingJitterDegrees = Median(_headingJitter);
-            UnitsWithStopGo = 0;
             ContactUnitsWithStopGo = 0;
-            FlowStopGoEpisodes = 0;
+            TerrainUnitsWithStopGo = 0;
+            CrowdUnitsWithStopGo = 0;
+            ContactStopGoEpisodes = 0;
+            TerrainStopGoEpisodes = 0;
+            CrowdStopGoEpisodes = 0;
             for (var index = 0; index < _order.Count; index++)
             {
                 var unit = _units[_order[index]];
-                if (unit.DipEpisodes > 0) UnitsWithStopGo++;
                 if (unit.ContactDipEpisodes > 0) ContactUnitsWithStopGo++;
-                FlowStopGoEpisodes += unit.DipEpisodes;
+                if (unit.TerrainDipEpisodes > 0) TerrainUnitsWithStopGo++;
+                if (unit.CrowdDipEpisodes > 0) CrowdUnitsWithStopGo++;
                 ContactStopGoEpisodes += unit.ContactDipEpisodes;
+                TerrainStopGoEpisodes += unit.TerrainDipEpisodes;
+                CrowdStopGoEpisodes += unit.CrowdDipEpisodes;
             }
             SpeedDipShare = _movingTicks == 0 ? 0f : _speedDipTicks / (float)_movingTicks;
             FractionStalledLong = Spawned == 0 ? 0f : stalledLong / (float)Spawned;
@@ -640,8 +677,9 @@ namespace RPG.Core.Tests
             Line($"## Move: travelled {Describe(travelled)}, speed ratio {Describe(speedRatios)}, "
                 + $"never moved {_neverMoved}, net/travelled {Describe(efficiency)}");
             Line($"## Flow: turn per tick {Describe(_headingJitter)} degrees, speed dips {Pct(_speedDipTicks, _movingTicks)}% "
-                + $"of moving ticks, stop-and-go episodes {FlowStopGoEpisodes} affecting {UnitsWithStopGo}/{Spawned} units "
-                + $"(plus {ContactStopGoEpisodes} while an enemy was in reach), "
+                + $"of moving ticks; stop-and-go episodes by cause: terrain {TerrainStopGoEpisodes} "
+                + $"({TerrainUnitsWithStopGo} units), crowd {CrowdStopGoEpisodes} ({CrowdUnitsWithStopGo} units), "
+                + $"contact {ContactStopGoEpisodes} ({ContactUnitsWithStopGo} units); "
                 + $"units past the midline {MidlineCrossings}/{Spawned}");
             Line($"## Move: heading vs direction to the target {Describe(_targetAngles)}, away in "
                 + $"{Pct(_targetAnglesAway, _targetAngles.Count)}% of samples");

@@ -48,7 +48,7 @@ of phases 2, 4, 6 and 7.
 | 3 | Progression, stats and persistence | Open |
 | 4 | Meta structure: campaign, encounters, roster | Open |
 | 5 | Presentation and feel | Open |
-| 6 | AI and tactical depth | Open — C6 movement recovery and fluid crowd movement landed early |
+| 6 | AI and tactical depth | Open — C6 movement: jams, obstacle pinning, terrain edges and the queue feel fixed; see "Movement status" in `Docs/RPG-Combat-Plan.md` |
 | 7 | Scale, performance and validation | Open |
 | 8 | Authoring and live-ops tooling | Open |
 | 9 | Remote play (deferred) | Open |
