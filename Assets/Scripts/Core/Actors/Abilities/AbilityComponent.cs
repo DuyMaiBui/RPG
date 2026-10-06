@@ -20,6 +20,18 @@ namespace RPG.Core.Actors
 
         public int Count => _definitions.Length;
 
+        /// <summary>Index of the ability with this id, or -1 when the actor does not have it.</summary>
+        public int IndexOf(int abilityId)
+        {
+            for (var index = 0; index < _definitions.Length; index++)
+            {
+                if (_definitions[index].Id == abilityId)
+                    return index;
+            }
+
+            return -1;
+        }
+
         public AbilityDefinition GetAt(int index) => _definitions[index];
 
         public int CooldownRemaining(int index) => _cooldowns[index];

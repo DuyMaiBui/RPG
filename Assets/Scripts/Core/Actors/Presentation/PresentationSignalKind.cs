@@ -5,8 +5,7 @@ namespace RPG.Core.Actors
         AttackStarted = 1,
         Damaged = 2,
         Died = 3,
-        TurnStarted = 4,
-        BattleEnded = 5,
-        AbilityCast = 6,
+        OrderRejected = 4,
+        AbilityCast = 5,
     }
 }

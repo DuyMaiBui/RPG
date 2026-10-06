@@ -44,7 +44,7 @@ of phases 2, 4, 6 and 7.
 |---|---|---|
 | 0 | Deterministic battle vertical slice | **Done** |
 | 1 | Composition root + authored content pipeline | **Done** |
-| 2 | Playable loop: player agency + battle HUD | Open |
+| 2 | Playable loop: player agency + battle HUD | **In progress** — C1a orders done |
 | 3 | Progression, stats and persistence | Open |
 | 4 | Meta structure: campaign, encounters, roster | Open |
 | 5 | Presentation and feel | Open |
@@ -92,15 +92,16 @@ Evidence in this repository:
 - **Scenes**: `Assets/Scenes/MobaBattleDemo.unity`,
   `TurnBattleDemo.unity` — renamed to `SkirmishBattleDemo.unity` under
   decision 8 — and `StressBattleDemo.unity`.
-- **Tests**: after phase 1, `Assets/Tests/EditMode` holds **339** tests =
-  **105** in `Core.Tests` + `Simulation.Contracts.Tests` (engine-free and
+- **Tests**: after phase 1 and C1a, `Assets/Tests/EditMode` holds **378** tests
+  = **144** in `Core.Tests` + `Simulation.Contracts.Tests` (engine-free and
   headless-runnable), **10** in `Unity.Tests` (Editor-only, authored-asset
   validation), and **224** in `Assets/AuraEngine/Tests` (out of scope for this
   plan). `Assets/Tests/PlayMode` holds one `[UnityTest]`
   (`NavigationStressPlayModeTests`). The standalone harness at `/tmp/rpg-tests`
-  compiles the engine-free sources and runs the 105 headless through
+  compiles the engine-free sources and runs the 144 headless through
   `dotnet test` (needs `DOTNET_ROLL_FORWARD=LatestMajor` against this machine's
-  .NET 9 runtime). Last verified: **EditMode 339/339**, **PlayMode 1/1**.
+  .NET 9 runtime). Last verified: **EditMode 378/378**, **headless 144/144** on
+  three consecutive runs, **PlayMode 1/1**.
 
 ### Phase-0 defects: status
 
@@ -121,6 +122,13 @@ Evidence in this repository:
 3. **Empty assembly — resolved.** `Assets/Scripts/Combat/RPG.Combat.asmdef`
    declared an assembly with no sources and no references; it was deleted along
    with the now-empty `Assets/Scripts/Combat` folder.
+4. **Protocol identity equality recursed — fixed (found in C1a).** `PlayerId`
+   and `EntityId` implement `IEquatable<T>` explicitly by convention, and their
+   `Equals(object)` called `Equals(other)`, which binds back to
+   `Equals(object)`: any `id.Equals(someObject)` overflowed the stack. The order
+   work hit it because `PlayerRoster` compares players. Both types now compare
+   through one private core, expose `==`/`!=`, and `ProtocolIdentityTests`
+   guards the contract.
 
 ### Phase-0 baseline additions
 
@@ -296,9 +304,27 @@ Combat scope here: **C1 orders and control**, **C2 aggro/stances**, **C3 damage
 and mitigation**, **C4 ability model**, **C5 status model** — see
 `Docs/RPG-Combat-Plan.md`.
 
-### Problem (evidence)
-- The only player command is `MoveIntentCommand`, and only movement of a
-  mapped actor is affected (`SimulationMoveInput`).
+### Progress
+
+**C1a landed.** Per-unit order queues (`OrderQueueComponent`), the six order
+commands (`MoveOrder`, `AttackMoveOrder`, `AttackOrder`, `CastAbilityOrder`,
+`HoldOrder`, `StopOrder`), host validation that reports an `OrderRejected`
+signal per refusal, `PlayerRoster` (one player owns many actors, replacing the
+1:1 `PlayerActors` map), and order-driven movement, targeting and casting
+including "walk into range first". Exact per-order semantics are in
+`Docs/RPG-Combat-Plan.md`.
+
+Still open in phase 2: C1b (selection, box-select, order input, selection
+marker, and the deletion of the placeholder single-actor path), then C2–C5.
+
+Verified: **EditMode 378/378**, **headless 144/144** (three consecutive runs),
+**PlayMode 1/1**, and a clean `MobaBattleDemo` Play session with no console
+errors.
+
+### Problem (evidence, before this phase)
+- The only player command was `MoveIntentCommand`, affecting movement of a
+  single mapped actor (`SimulationMoveInput`) — now a placeholder next to the
+  order commands, deleted in C1b.
 - Abilities are auto-cast only (`AbilitySystem`); there is no cast command, no
   targeting UI, no cooldown UI.
 - No camera rig, no selection, no pointer picking: a search across

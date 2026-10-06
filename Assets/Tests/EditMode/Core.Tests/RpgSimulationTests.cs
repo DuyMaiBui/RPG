@@ -138,7 +138,7 @@ public sealed class RpgSimulationTests
         var actorId = state.Actors.Spawn(ActorKind.Player, FactionId.Red, new ActorSpawnData(
             10, 0, SimulationVector2.Zero, 0.3f, 1f, 5f, 0.2f, 0.1f));
         var player = new PlayerId("local-player");
-        state.PlayerActors.Add(player, actorId);
+        state.Players.Assign(player, actorId);
         using var host = new SimulationHost<RpgSimulationState>(state, new RpgSimulationApplication(), new SimulationOptions(60));
         using ISimulationClient client = new LocalSimulationClient<RpgSimulationState>(
             host, new SessionContext(new SessionId(Guid.NewGuid()), player));

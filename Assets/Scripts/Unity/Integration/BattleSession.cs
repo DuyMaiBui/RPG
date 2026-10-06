@@ -142,7 +142,7 @@ namespace RPG.Unity
                 _setup.VisionRange,
                 0.8f,
                 colliderShapes: _setup.ActorColliderShapes));
-            _state.PlayerActors.Add(new PlayerId($"{faction}-{index}"), id);
+            _state.Players.Assign(new PlayerId($"{faction}-{index}"), id);
 
             var session = new SessionContext(new SessionId(Guid.NewGuid()), new PlayerId($"{faction}-{index}"));
             var client = new LocalSimulationClient<RpgSimulationState>(_host, session);

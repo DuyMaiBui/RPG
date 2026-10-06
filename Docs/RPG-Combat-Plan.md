@@ -178,9 +178,54 @@ Per-unit order queue with `Move`/`AttackMove`/`AttackTarget`/`CastAbility`/
 fan-out to selected actors; shift-queued orders; formation-aware arrival.
 Validation in the host: ownership, reachability, ability ownership, range, LoS,
 cooldown, resource, stance legality.
-*Acceptance:* a selected group moves, attacks and holds through orders only; an
-illegal order is rejected and observable; deterministic tests cover queue
-replacement, shift-append, unreachable destination and order completion.
+
+**C1a — order model and command surface (done).** `OrderKind`, `ActorOrder`,
+`OrderQueueComponent` (bounded, replace-vs-append, advance) and `PlayerRoster`
+(one player owns many actors) live in `RPG.Core`; `OrderSystem` resolves the
+queue once per tick before the auto battle; `MoveOrderCommand`,
+`AttackMoveOrderCommand`, `AttackOrderCommand`, `CastAbilityOrderCommand`,
+`HoldOrderCommand` and `StopOrderCommand` are the command surface, validated in
+`RpgSimulationApplication.HandleCommand` with the rejection recorded as an
+`OrderRejected` presentation signal. Ordered casting is resolved inside
+`AbilitySystem` so cooldowns and the one-cast-per-tick rule stay in one place.
+
+Semantics as implemented:
+
+| Order | Acquires targets | Movement | Completes when |
+|---|---|---|---|
+| `Move` | no — clears the target | straight at the destination with local avoidance | within `OrderSystem.ArrivalRadius` |
+| `AttackMove` | yes | chases an acquired enemy, otherwise the destination | arrived with nothing left to fight |
+| `AttackTarget` | locked to the ordered target | chases to attack reach | target dead, gone or unseen |
+| `CastAbility` | locked to the ordered target | chases to the ability's own reach | the ordered cast lands |
+| `Hold` | yes, never chases | none | never — replaced or stopped |
+
+Rejections are permanent problems only (`PlayerDoesNotOwnActor`, `ActorMissing`,
+`ActorDead`, `UnknownAbility`, `TargetMissing`, `DestinationNotWalkable`,
+`QueueFull`); an order that is merely blocked by range, line of sight or a
+cooldown is accepted, and the actor walks into position or waits. While a cast
+order is current it owns the actor's cast slot, so the ordered ability is never
+silently replaced by an automatic one.
+
+An ordered move steers straight at its destination rather than asking the
+cohort system for a direction: cohort routes follow the battle objective (the
+enemy base or a cohort's own target), which is not where the player pointed.
+Local avoidance (ORCA), overlap separation and grid resolution still apply, and a
+regression test covers a unit standing directly on the ordered path.
+
+**C1b — selection and order input (open).** Click and box selection, order
+issuing (right-click move, enemy click attack, ability and stance keys),
+selection feedback and the authored selection marker; then the placeholder
+single-actor path (`SimulationMoveInput`, `MoveIntentCommand`,
+`ManualMovementComponent`, and the bridge's local-actor prediction) is deleted
+in the same cutover.
+
+*Acceptance:* a selected group moves, attacks and holds through orders only —
+verified for the command/order layer by 32 deterministic tests plus a stable
+headless suite (144 tests) and Unity EditMode (378 tests); the interactive part
+is what C1b adds. An illegal order is rejected and observable in the frame —
+verified. Deterministic tests cover queue replacement, shift-append, an
+unreachable destination, an on-path blocker, order completion on arrival, on
+target death and on cast, and a cast that has to walk into range first.
 
 ### C2 — Targeting, aggro and rules of engagement (phase 2/6)
 Stances and leash, threat accumulation and decay, extended

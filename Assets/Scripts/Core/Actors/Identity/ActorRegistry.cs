@@ -70,6 +70,7 @@ namespace RPG.Core.Actors
             components.Add(new AttackRangeComponent(data.AttackRange));
             components.Add(new AttackCooldownComponent(data.AttackCooldown));
             components.Add(new AutoCombatStateComponent());
+            components.Add(new OrderQueueComponent());
             components.Add(new TargetPriorityComponent(data.TargetPriority));
             components.Add(new MovementCohortComponent());
             if (data.AttackType == AttackType.Projectile)

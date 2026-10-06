@@ -46,6 +46,26 @@ namespace RPG.Core.Actors
                     continue;
                 }
 
+                // An order owns targeting while it lasts: OrderSystem validated and wrote the locked target this tick,
+                // and a plain move order means "do not engage at all".
+                if (OrderSystem.TryGetLockedTarget(actor, out var orderedTargetId))
+                {
+                    var orderedTargetComponent = actor.Components.Get<TargetComponent>();
+                    orderedTargetComponent.CurrentTarget = orderedTargetId;
+                    behavior.State = IsLiveEnemy(actors, actor, orderedTargetId, out var orderedTarget) &&
+                                     IsTargetVisible(actor, orderedTarget, context.State.Navigation)
+                        ? _behaviorTree.Evaluate(true, IsAttackTriggerOverlapping(actor, orderedTarget))
+                        : AutoCombatState.ChaseTarget;
+                    continue;
+                }
+
+                if (OrderSystem.IsMoveWithoutEngaging(actor))
+                {
+                    actor.Components.Get<TargetComponent>().CurrentTarget = EntityId.None;
+                    behavior.State = AutoCombatState.ChaseTarget;
+                    continue;
+                }
+
                 var target = actor.Components.Get<TargetComponent>();
                 if (!IsLiveEnemy(actors, actor, target.CurrentTarget, out var targetActor) ||
                     !IsTargetVisible(actor, targetActor, context.State.Navigation))
@@ -107,19 +127,62 @@ namespace RPG.Core.Actors
                     continue;
                 }
 
+                if (OrderSystem.IsHolding(actor))
+                    continue;
+
                 var targetComponent = actor.Components.Get<TargetComponent>();
                 var hasTarget = IsLiveEnemy(actors, actor, targetComponent.CurrentTarget, out var target) &&
                                 IsTargetVisible(actor, target, context.State.Navigation);
-                var destination = hasTarget
-                    ? target.Components.Get<PositionComponent>().Position
-                    : context.State.GetEnemyBasePosition(actor.Components.Get<FactionComponent>().Faction);
-                var distance = hasTarget ? Distance(actor, target) : Distance(position.Position, destination);
-                var stopDistance = hasTarget ? AttackDistance(actor, target) : context.State.BaseReach;
+                var hasMoveDestination = OrderSystem.TryGetMoveDestination(actor, out var order, out var orderStopDistance);
+                var movesWithoutEngaging = OrderSystem.IsMoveWithoutEngaging(actor);
+
+                SimulationVector2 destination;
+                float stopDistance;
+                var steersDirectly = false;
+                if (hasMoveDestination && movesWithoutEngaging)
+                {
+                    destination = order.Destination;
+                    stopDistance = orderStopDistance;
+                    steersDirectly = true;
+                }
+                else if (hasTarget)
+                {
+                    destination = target.Components.Get<PositionComponent>().Position;
+                    stopDistance = OrderSystem.ResolveChaseStopDistance(actor, target);
+                }
+                else if (hasMoveDestination)
+                {
+                    destination = order.Destination;
+                    stopDistance = orderStopDistance;
+                    steersDirectly = true;
+                }
+                else if (OrderSystem.TryGetLockedTarget(actor, out _))
+                {
+                    continue;
+                }
+                else
+                {
+                    destination = context.State.GetEnemyBasePosition(actor.Components.Get<FactionComponent>().Faction);
+                    stopDistance = context.State.BaseReach;
+                }
+
+                var distance = Distance(position.Position, destination);
                 if (movement.EffectiveSpeed <= 0f || distance <= stopDistance)
                     continue;
 
-                if (!context.State.MovementCohorts.TryGetDirection(actor, out var preferredDirection))
+                SimulationVector2 preferredDirection;
+                if (steersDirectly)
+                {
+                    // An ordered move steers straight at its destination and leaves the rest to local avoidance.
+                    // Cohort routing follows the battle objective, which is not where the player pointed.
+                    preferredDirection = (destination - position.Position).Normalized();
+                    if (preferredDirection.LengthSquared <= 0f)
+                        continue;
+                }
+                else if (!context.State.MovementCohorts.TryGetDirection(actor, out preferredDirection))
+                {
                     continue;
+                }
 
                 var resolvedDirection = _avoidance.Solve(
                     actor,
@@ -277,7 +340,10 @@ namespace RPG.Core.Actors
             return SimulationMath.Sqrt(difference.LengthSquared);
         }
 
-        private static float AttackDistance(Actor attacker, Actor target) =>
+        /// <summary>Centre-to-centre distance at which <paramref name="attacker"/> stops to attack
+        /// <paramref name="target"/>: both bodies plus the attacker's reach. Order resolution uses it too, so an actor
+        /// ordered onto a target stops at the same distance an automatic attack would.</summary>
+        public static float AttackDistance(Actor attacker, Actor target) =>
             attacker.Components.Get<ColliderComponent>().Compound.BoundingRadius +
             target.Components.Get<ColliderComponent>().Compound.BoundingRadius +
             attacker.Components.Get<AttackRangeComponent>().Reach;

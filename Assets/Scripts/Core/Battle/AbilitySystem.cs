@@ -21,24 +21,73 @@ namespace RPG.Core.Actors
                 if (ActorStatus.IsDisabled(actor)) continue;
                 if (actor.Components.Get<HealthComponent>().IsDead) continue;
 
+                if (TryResolveOrderedCast(context, actor, abilities)) continue;
+
                 for (var abilityIndex = 0; abilityIndex < abilities.Count; abilityIndex++)
                 {
                     if (!abilities.IsReady(abilityIndex)) continue;
-                    var ability = abilities.GetAt(abilityIndex);
-                    if (!TryResolveTarget(context, actor, ability, out var target)) continue;
-
-                    ApplyEffects(context, actor, target, ability);
-                    context.Publish(new ActorAbilityCast(actor.Id, target.Id, ability.Id));
-                    abilities.StartCooldown(abilityIndex);
-                    break;
+                    if (TryBeginCast(context, actor, abilityIndex, actor.Components.Get<TargetComponent>().CurrentTarget))
+                        break;
                 }
             }
+        }
+
+        /// <summary>Attempts one cast: applies the ability's effects and starts its cooldown. Returns false when the
+        /// caster is dead or disabled, the ability is on cooldown, or the target is missing, out of range or out of
+        /// sight. Callers retry on later ticks, so a blocked cast is a wait rather than a failure.</summary>
+        public bool TryBeginCast(
+            SimulationContext<RpgSimulationState> context,
+            Actor caster,
+            int abilityIndex,
+            EntityId targetId)
+        {
+            if (ActorStatus.IsDisabled(caster)) return false;
+            if (caster.Components.Get<HealthComponent>().IsDead) return false;
+            if (!caster.Components.TryGet<AbilityComponent>(out var abilities)) return false;
+            if (abilityIndex < 0 || abilityIndex >= abilities.Count) return false;
+            if (!abilities.IsReady(abilityIndex)) return false;
+
+            var ability = abilities.GetAt(abilityIndex);
+            if (!TryResolveTarget(context, caster, ability, targetId, out var target)) return false;
+
+            ApplyEffects(context, caster, target, ability);
+            context.Publish(new ActorAbilityCast(caster.Id, target.Id, ability.Id));
+            abilities.StartCooldown(abilityIndex);
+            return true;
+        }
+
+        /// <summary>Handles a <see cref="OrderKind.CastAbility"/> order. Returns true when the order owns this actor's
+        /// cast for the tick — whether it landed or is still waiting for its cooldown, range or target — so an ordered
+        /// ability is never silently replaced by an automatic one. An order naming an ability the actor does not have
+        /// is dropped, and the actor falls back to choosing for itself.</summary>
+        private bool TryResolveOrderedCast(
+            SimulationContext<RpgSimulationState> context,
+            Actor actor,
+            AbilityComponent abilities)
+        {
+            if (!actor.Components.TryGet<OrderQueueComponent>(out var orders) || !orders.HasOrder)
+                return false;
+            if (orders.Current.Kind != OrderKind.CastAbility)
+                return false;
+
+            var abilityIndex = abilities.IndexOf(orders.Current.AbilityId);
+            if (abilityIndex < 0)
+            {
+                orders.Advance();
+                return false;
+            }
+
+            if (TryBeginCast(context, actor, abilityIndex, orders.Current.Target))
+                orders.Advance();
+
+            return true;
         }
 
         private static bool TryResolveTarget(
             SimulationContext<RpgSimulationState> context,
             Actor caster,
             AbilityDefinition ability,
+            EntityId requestedTarget,
             out Actor target)
         {
             if (ability.TargetMode == AbilityTargetMode.Self)
@@ -48,8 +97,7 @@ namespace RPG.Core.Actors
             }
 
             target = null!;
-            var targetId = caster.Components.Get<TargetComponent>().CurrentTarget;
-            if (!context.State.Actors.TryGet(targetId, out var candidate)) return false;
+            if (!context.State.Actors.TryGet(requestedTarget, out var candidate)) return false;
             if (candidate.Id == caster.Id) return false;
             if (candidate.Components.Get<HealthComponent>().IsDead) return false;
 
