@@ -217,7 +217,7 @@ LineRenderer:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.03
+        value: 0.07
         inSlope: 0
         outSlope: 0
         tangentMode: 0
@@ -226,7 +226,7 @@ LineRenderer:
         outWeight: 0.33333334
       - serializedVersion: 3
         time: 1
-        value: 0.03
+        value: 0.04
         inSlope: 0
         outSlope: 0
         tangentMode: 0
@@ -238,8 +238,8 @@ LineRenderer:
       m_RotationOrder: 4
     colorGradient:
       serializedVersion: 2
-      key0: {r: 1, g: 1, b: 1, a: 1}
-      key1: {r: 1, g: 1, b: 1, a: 1}
+      key0: {r: 0.9490196, g: 0.8509804, b: 0.54901963, a: 1}
+      key1: {r: 0.8509804, g: 0.7019608, b: 0.4, a: 1}
       key2: {r: 0, g: 0, b: 0, a: 0}
       key3: {r: 0, g: 0, b: 0, a: 0}
       key4: {r: 0, g: 0, b: 0, a: 0}
@@ -438,7 +438,7 @@ LineRenderer:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.03
+        value: 0.07
         inSlope: 0
         outSlope: 0
         tangentMode: 0
@@ -447,7 +447,7 @@ LineRenderer:
         outWeight: 0.33333334
       - serializedVersion: 3
         time: 1
-        value: 0.03
+        value: 0.04
         inSlope: 0
         outSlope: 0
         tangentMode: 0
@@ -459,8 +459,8 @@ LineRenderer:
       m_RotationOrder: 4
     colorGradient:
       serializedVersion: 2
-      key0: {r: 1, g: 1, b: 1, a: 1}
-      key1: {r: 1, g: 1, b: 1, a: 1}
+      key0: {r: 0.9490196, g: 0.8509804, b: 0.54901963, a: 1}
+      key1: {r: 0.8509804, g: 0.7019608, b: 0.4, a: 1}
       key2: {r: 0, g: 0, b: 0, a: 0}
       key3: {r: 0, g: 0, b: 0, a: 0}
       key4: {r: 0, g: 0, b: 0, a: 0}
@@ -550,6 +550,7 @@ MonoBehaviour:
   _mode: 1
   _gravity: {x: 0, y: -9.81, z: 0}
   _autoCreateOnStart: 1
+  _timeScale: 1
   _backendKind: 1
   _layers: {fileID: 11400000, guid: 13f5abed9718c4caf851ad87ef0a773f, type: 2}
 --- !u!1 &1024447945
@@ -804,7 +805,7 @@ LineRenderer:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.03
+        value: 0.07
         inSlope: 0
         outSlope: 0
         tangentMode: 0
@@ -813,7 +814,7 @@ LineRenderer:
         outWeight: 0.33333334
       - serializedVersion: 3
         time: 1
-        value: 0.03
+        value: 0.04
         inSlope: 0
         outSlope: 0
         tangentMode: 0
@@ -825,8 +826,8 @@ LineRenderer:
       m_RotationOrder: 4
     colorGradient:
       serializedVersion: 2
-      key0: {r: 1, g: 1, b: 1, a: 1}
-      key1: {r: 1, g: 1, b: 1, a: 1}
+      key0: {r: 0.9490196, g: 0.8509804, b: 0.54901963, a: 1}
+      key1: {r: 0.8509804, g: 0.7019608, b: 0.4, a: 1}
       key2: {r: 0, g: 0, b: 0, a: 0}
       key3: {r: 0, g: 0, b: 0, a: 0}
       key4: {r: 0, g: 0, b: 0, a: 0}
@@ -1209,6 +1210,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 16, y: 1}

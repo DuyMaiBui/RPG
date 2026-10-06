@@ -240,6 +240,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 20, y: 1}
@@ -323,6 +324,8 @@ MonoBehaviour:
   _maxMotorForce: 1
   _springFrequency: 2
   _springDamping: 0.5
+  _breakForce: 0
+  _breakTorque: 0
 --- !u!1 &216216668
 GameObject:
   m_ObjectHideFlags: 0
@@ -337,6 +340,7 @@ GameObject:
   - component: {fileID: 216216673}
   - component: {fileID: 216216676}
   - component: {fileID: 216216677}
+  - component: {fileID: 216216678}
   m_Layer: 0
   m_Name: PendulumArm
   m_TagString: Untagged
@@ -465,9 +469,30 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 0.4, y: 4}
+--- !u!114 &216216678
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 216216668}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c186d74e275394c45bbe884e6b9e63a0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AuraEngine.Demo::AuraEngine.Demo.AuraDemoImpulseKicker2D
+  _instance: {fileID: 254248842}
+  _body: {fileID: 216216676}
+  _interval: 4
+  _initialDelay: 1
+  _impulse: {x: 5, y: 0}
+  _setVelocity: 0
+  _alternateDirection: 1
+  _angularImpulse: 0
 --- !u!1 &229590217
 GameObject:
   m_ObjectHideFlags: 0
@@ -527,6 +552,8 @@ MonoBehaviour:
   _maxMotorForce: 1
   _springFrequency: 2
   _springDamping: 0.5
+  _breakForce: 0
+  _breakTorque: 0
 --- !u!1 &254248840
 GameObject:
   m_ObjectHideFlags: 0
@@ -585,6 +612,7 @@ MonoBehaviour:
   _mode: 1
   _gravity: {x: 0, y: -9.81, z: 0}
   _autoCreateOnStart: 1
+  _timeScale: 1
   _backendKind: 1
   _layers: {fileID: 11400000, guid: 13f5abed9718c4caf851ad87ef0a773f, type: 2}
 --- !u!1 &458479968
@@ -658,6 +686,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 1
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 4, y: 4}
@@ -790,7 +819,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 4.75
+  orthographic size: 5.6
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
@@ -815,7 +844,7 @@ Transform:
   m_GameObject: {fileID: 1112854780}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.75, y: 3.25, z: -20}
+  m_LocalPosition: {x: -1.5, y: 3.2, z: -20}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -978,6 +1007,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 6, y: 0.5}
@@ -1220,6 +1250,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 1, y: 1}
@@ -1365,6 +1396,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 1, y: 1}

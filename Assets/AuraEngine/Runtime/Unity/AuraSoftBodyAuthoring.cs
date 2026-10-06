@@ -35,6 +35,9 @@ namespace AuraEngine.Unity
 
         public AuraSoftBodyId SoftBodyId => _softBody;
 
+        /* Triangle indices of the authored surface mesh (three per face), used by AuraSoftBodyView to draw it. */
+        public int[] Triangles => _triangles;
+
         private void OnEnable()
         {
             _instance = GetComponentInParent<AuraSimulationInstance>();

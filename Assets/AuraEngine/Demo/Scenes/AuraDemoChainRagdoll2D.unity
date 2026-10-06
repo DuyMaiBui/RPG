@@ -177,6 +177,7 @@ MonoBehaviour:
   _mode: 1
   _gravity: {x: 0, y: -9.81, z: 0}
   _autoCreateOnStart: 1
+  _timeScale: 1
   _backendKind: 1
   _layers: {fileID: 11400000, guid: 13f5abed9718c4caf851ad87ef0a773f, type: 2}
 --- !u!1 &81555591
@@ -321,6 +322,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 0.3, y: 0.3}
@@ -466,6 +468,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 0.3, y: 0.3}
@@ -708,6 +711,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 0.3, y: 0.3}
@@ -853,6 +857,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 0.6, y: 0.6}
@@ -918,7 +923,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 4.9
+  orthographic size: 4.4
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
@@ -1024,6 +1029,7 @@ GameObject:
   - component: {fileID: 1157244578}
   - component: {fileID: 1157244581}
   - component: {fileID: 1157244582}
+  - component: {fileID: 1157244583}
   m_Layer: 0
   m_Name: Link4
   m_TagString: Untagged
@@ -1152,9 +1158,30 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 0.3, y: 0.3}
+--- !u!114 &1157244583
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1157244573}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c186d74e275394c45bbe884e6b9e63a0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: AuraEngine.Demo::AuraEngine.Demo.AuraDemoImpulseKicker2D
+  _instance: {fileID: 2356686}
+  _body: {fileID: 1157244581}
+  _interval: 2.5
+  _initialDelay: 1
+  _impulse: {x: 1.2, y: 0}
+  _setVelocity: 0
+  _alternateDirection: 1
+  _angularImpulse: 0
 --- !u!1 &1383220110
 GameObject:
   m_ObjectHideFlags: 0
@@ -1297,6 +1324,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 0.3, y: 0.3}
@@ -1476,6 +1504,7 @@ MonoBehaviour:
   _offset: {x: 0, y: 0}
   _rotationDegrees: 0
   _isTrigger: 0
+  _oneWay: 0
   _material: {fileID: 0}
   _layer: 0
   _size: {x: 16, y: 1}
