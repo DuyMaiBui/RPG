@@ -351,6 +351,33 @@ own attack range. Measured on the 300 s run: units that never acquire a target *
 units stalled for ten seconds or more **81 → 4**, longest stall **132 s → 76 s**, while speed ratio and
 path efficiency stayed at 0.89 and 0.84. `CrowdMovementTests` and `MobaScenarioTests` guard it.
 
+**Core fix, second pass (same day).** The first pass removed frozen actors but not the cause. 17 units
+still walked about seven units from spawn and stayed there: they kept *twitching*, because the escape
+sidestep and body pushes move an actor a hair every tick, and the stall check read that as progress. So
+nothing replanned, and the route they follow is cached per navigation revision, which never changes on a
+static map. Two changes, measured on the same 300 s run:
+
+1. **Crawl detection.** An actor that has not reduced its distance to the destination by 0.1 units within
+   90 ticks (3 s) is stalled even though it keeps moving. A changed objective (a further destination)
+   resets the signal instead of counting as a stall.
+2. **Committed escape.** The window is 240 ticks (8 s), holds one lateral heading checked against the
+   navigation grid, ends as soon as the destination distance improves by 0.5, and switches heading when
+   the actor stops moving for 15 ticks. Twenty ticks of sidestep followed by pressing into the same wall
+   again is why units never got around anything.
+
+| | first pass | after the core fix |
+|---|---|---|
+| pinned units (lived >= 10 s, no target, travelled < 5) | ~15 | **0** |
+| units that never acquire a target | 17 of 362 | **8 of 362**, every one spawned in the last 20 s |
+| stalled >= 10 s | 0 | 0 (longest 6.8 s -> 6.4 s) |
+
+**Rejected: a per-actor A\* detour.** Planning a real path for a stuck actor (rate limited, occupancy
+aware, heading followed until reached) was implemented and measured: stalls went from **0 to 81 of 362**
+and the longest stall to 104 s. A path runs through cells occupied by other actors — the occupancy grid
+is a cost there, not a wall — and the relaxed separation push is larger than one movement step, so an
+actor following a path into a crowd stands still for the whole follow window. The escape sweep keeps the
+crowd case healthy, so the detour was dropped rather than tuned.
+
 **Measured 2026-10-06 (real Moba scenario, headless).** Movement itself is healthy: median speed 0.90 of
 the 0.8 u/s budget, net displacement over travelled distance 0.89, and the heading sits within 8.4° of the
 direction to the assigned target (only 4% of samples move away from it). Two behaviour-level problems

@@ -9,12 +9,24 @@ namespace RPG.Core.Actors
 {
     public sealed class AutoBattleSystem
     {
-        // A crowd where every actor keeps pushing into the same blocked spot never dissolves. After this long without
-        // net progress an actor steps sideways for a short window, which breaks the symmetry and lets a queue form.
+        // A crowd where every actor keeps pushing into the same blocked spot never dissolves, and an actor that has
+        // stopped getting anywhere in open terrain presses into the same wall forever. After this long without net
+        // progress an actor commits to a lateral heading (see BeginEscape), which breaks the symmetry and lets a queue
+        // form or walks it along the obstacle until a gap opens.
         private const int RecoveryTickThreshold = 45;
-        private const int RecoveryTicks = 20;
         private const float ProgressEpsilonSquared = 0.000001f;
         private const float ReachEpsilon = 0.0001f;
+        // An escape only works if it is committed: a stuck actor holds one lateral heading until it actually closes on
+        // its destination, and switches heading only when it stops moving at all. Twenty ticks of sidestep followed by
+        // pressing into the same obstacle again moved units nowhere, which is what pinned them against the terrain.
+        private const int EscapeTicks = 240;
+        private const int EscapeBlockedTicks = 15;
+        private const float EscapeProgressEpsilon = 0.5f;
+        // A crawl is a stall too: an actor can keep twitching in place where an escape sweep or a body push moves it a
+        // hair every tick, which the per-tick displacement check reads as progress. Not improving the distance to the
+        // objective for this long is the signal that actually means "not getting anywhere".
+        private const int ObjectiveStallTicks = 90;
+        private const float ObjectiveProgressEpsilon = 0.1f;
 
         private readonly AnyAliveEnemyTargetSelector _targetSelector = new();
         private readonly ProjectileSystem _projectiles = new();
@@ -29,10 +41,18 @@ namespace RPG.Core.Actors
         private int[] _stuckTicks = new int[0];
         private int[] _recoveryTicks = new int[0];
         private int[] _escapeIndex = new int[0];
+        private float[] _escapeStartDistance = new float[0];
+        private int[] _escapeSwitchTick = new int[0];
+        private float[] _objectiveDistance = new float[0];
+        private float[] _bestObjectiveDistance = new float[0];
+        private int[] _objectiveStallTicks = new int[0];
+        private bool[] _engaged = new bool[0];
+        private int _tick;
         private bool[] _wantsToMove = new bool[0];
 
         public void Tick(SimulationContext<RpgSimulationState> context)
         {
+            _tick++;
             context.State.Waves.Tick(context.State, context.FixedDeltaTime);
             _projectiles.Tick(context);
             var actors = context.State.Actors;
@@ -128,6 +148,7 @@ namespace RPG.Core.Actors
             for (var index = 0; index < actors.SlotCount; index++)
             {
                 _resolvedDirections[index] = SimulationVector2.Zero;
+                _engaged[index] = false;
                 if (!actors.TryGetAt(index, out var actor) || actor.Components.Get<HealthComponent>().IsDead)
                     continue;
 
@@ -156,6 +177,7 @@ namespace RPG.Core.Actors
                 var targetComponent = actor.Components.Get<TargetComponent>();
                 var hasTarget = IsLiveEnemy(actors, actor, targetComponent.CurrentTarget, out var target) &&
                                 IsTargetVisible(actor, target, context.State.Navigation);
+                _engaged[index] = hasTarget;
                 var hasMoveDestination = OrderSystem.TryGetMoveDestination(actor, out var order, out var orderStopDistance);
                 var movesWithoutEngaging = OrderSystem.IsMoveWithoutEngaging(actor);
 
@@ -190,8 +212,12 @@ namespace RPG.Core.Actors
                 }
 
                 var distance = Distance(position.Position, destination);
+                _objectiveDistance[index] = distance;
                 if (movement.EffectiveSpeed <= 0f || distance <= stopDistance)
+                {
+                    _objectiveDistance[index] = -1f;
                     continue;
+                }
 
                 _wantsToMove[index] = true;
                 SimulationVector2 preferredDirection;
@@ -219,9 +245,24 @@ namespace RPG.Core.Actors
                 }
 
                 var escaping = _recoveryTicks[index] > 0;
+                if (escaping && _escapeStartDistance[index] - distance >= EscapeProgressEpsilon)
+                {
+                    // The escape is working: the actor is closing on its destination again, so normal movement resumes.
+                    _recoveryTicks[index] = 0;
+                    escaping = false;
+                }
+
                 if (escaping)
                 {
                     _recoveryTicks[index]--;
+                    if (_stuckTicks[index] >= EscapeBlockedTicks &&
+                        _tick - _escapeSwitchTick[index] >= EscapeBlockedTicks)
+                    {
+                        // Blocked even while escaping: try the next heading instead of pressing on.
+                        _escapeSwitchTick[index] = _tick;
+                        _escapeIndex[index] = (_escapeIndex[index] + 1) % EscapeAngles.Length;
+                    }
+
                     preferredDirection = EscapeHeading(
                         actor,
                         preferredDirection,
@@ -232,9 +273,10 @@ namespace RPG.Core.Actors
                         context.State.Navigation);
                 }
 
-                // An escaping actor drives its heading directly: local avoidance is what refused to move in the first
-                // place, because a jam of mutually avoiding actors resolves to no velocity at all. The separation pass
-                // still keeps bodies apart while the actor walks out.
+                // An actor that is unsticking drives its heading directly: local avoidance is what refused to move in
+                // the first place, because a jam of mutually avoiding actors resolves to no velocity at all, and the
+                // measured effect of keeping the solver in the loop was stalls going from none back to a quarter of the
+                // army. The separation pass still keeps bodies apart while the actor walks out.
                 var resolvedDirection = escaping
                     ? preferredDirection
                     : _avoidance.Solve(actor, preferredDirection, actors, _spatialHash, context.FixedDeltaTime);
@@ -283,6 +325,7 @@ namespace RPG.Core.Actors
                 }
 
                 var position = actor.Components.Get<PositionComponent>().Position;
+                TrackObjectiveProgress(index);
                 if (!_wantsToMove[index])
                 {
                     _stuckTicks[index] = 0;
@@ -302,9 +345,58 @@ namespace RPG.Core.Actors
                     continue;
 
                 _stuckTicks[index] = 0;
-                _recoveryTicks[index] = RecoveryTicks;
-                _escapeIndex[index] = (_escapeIndex[index] + 1) % EscapeAngles.Length;
+                BeginEscape(index);
             }
+        }
+
+        /// <summary>Starts an escape window: the actor takes the next lateral heading and holds it until it closes on its
+        /// destination or gets blocked. Deterministic; it depends only on tick counts, actor ids and the objective
+        /// distance.</summary>
+        private void BeginEscape(int index)
+        {
+            _recoveryTicks[index] = EscapeTicks;
+            _escapeIndex[index] = (_escapeIndex[index] + 1) % EscapeAngles.Length;
+            _escapeStartDistance[index] = _objectiveDistance[index];
+        }
+
+        /// <summary>Detects the slow stall the per-tick displacement check cannot see: the actor keeps moving but never
+        /// gets closer to what it is walking towards, which is what happens when a route dead-ends at an obstacle field
+        /// and the actor twitches against it. Triggers the same recovery window a jam does, so the actor plans a detour
+        /// or sweeps escape headings.</summary>
+        private void TrackObjectiveProgress(int index)
+        {
+            var objective = _objectiveDistance[index];
+            if (objective < 0f || _engaged[index])
+            {
+                // A unit in combat is supposed to stand where it is: waiting for a swing, holding a line or queueing
+                // behind the rank in front is not a navigation stall, and treating it as one made melee units wander
+                // off instead of fighting.
+                _bestObjectiveDistance[index] = objective < 0f ? float.MaxValue : objective;
+                _objectiveStallTicks[index] = 0;
+                return;
+            }
+
+            var best = _bestObjectiveDistance[index];
+            if (objective < best - ObjectiveProgressEpsilon)
+            {
+                _bestObjectiveDistance[index] = objective;
+                _objectiveStallTicks[index] = 0;
+                return;
+            }
+
+            if (objective > best + 1f)
+            {
+                // The objective itself moved (a new target, a new order): not a stall.
+                _bestObjectiveDistance[index] = objective;
+                _objectiveStallTicks[index] = 0;
+                return;
+            }
+
+            _objectiveStallTicks[index]++;
+            if (_objectiveStallTicks[index] < ObjectiveStallTicks) return;
+            _objectiveStallTicks[index] = 0;
+            _bestObjectiveDistance[index] = objective;
+            BeginEscape(index);
         }
 
         /// <summary>Headings a stuck actor sweeps through, relative to the direction it wanted. A fixed sequence keeps
@@ -363,6 +455,13 @@ namespace RPG.Core.Actors
             _stuckTicks = new int[count];
             _recoveryTicks = new int[count];
             _escapeIndex = new int[count];
+            _escapeStartDistance = new float[count];
+            _escapeSwitchTick = new int[count];
+            _objectiveDistance = new float[count];
+            _bestObjectiveDistance = new float[count];
+            _objectiveStallTicks = new int[count];
+            _engaged = new bool[count];
+            for (var index = 0; index < count; index++) _bestObjectiveDistance[index] = float.MaxValue;
             _wantsToMove = new bool[count];
         }
 

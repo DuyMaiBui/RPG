@@ -157,19 +157,27 @@ Evidence in this repository:
    melee attack, so the content now hardens the melee rank instead: a per-loadout
    `_healthMultiplier` (2 for melee, 1 for ranged, written into the three demo
    scenes) and Cleave damage 8 -> 4. Melee reaches contact (closest approach
-   1.88 -> 0.86) and lands basic attacks; 27 -> 141 attacks per 300 s and no unit
-   stalls any more. Ranged poison is still the dominant damage source.
+   1.88 -> 0.86) but still lands at most a handful of basic attacks per 300 s:
+   about three quarters of its approaches are blocked by an ally that stopped
+   closer to the same target, and the ability fight is decided before contact.
+   Total basic attacks went 27 -> ~131 per 300 s, almost all ranged. Ranged
+   poison remains the dominant damage source.
    `MobaScenarioTests.Battle_BasicAttacksLand` guards it; evidence in
    `Docs/RPG-Combat-Plan.md` (C2).
 7. **Units pinned on the obstacle field — fixed (measured 2026-10-06).** 16% of
    units used to never acquire a target, travel about eight units and then stand
    against the obstacle field for the rest of the match; with the obstacles
    removed that run pinned none, so the cause was the route/avoidance
-   interaction at the terrain. A stuck actor now sweeps escape headings (each
-   one checked against the navigation grid) with local avoidance bypassed while
-   it escapes. Measured on the 300 s run: never acquired a target 42 → 16 of
-   362, stalled for ten seconds or more 81 → 4, longest stall 132 s → 76 s.
-   `MobaScenarioTests.Battle_UnitsAreNotPinnedOnTerrain` guards it; evidence in
+   interaction at the terrain. Two passes landed: an escape window that holds
+   one navigation-checked lateral heading with local avoidance bypassed, and a
+   crawl detector that treats "keeps twitching but never gets closer to the
+   destination" as a stall, because the per-tick displacement check read those
+   twitches as progress. Measured over the 300 s run: pinned units (lived
+   >= 10 s, no target, travelled < 5) **15 → 0**, units that never acquire a
+   target 42 → 8 of 362 (all eight spawned in the last 20 s of the run),
+   stalled for ten seconds or more 81 → 0, longest stall 132 s → 6.4 s.
+   `MobaScenarioTests.Battle_UnitsAreNotPinnedOnTerrain` asserts zero pinned
+   units; evidence and the rejected A* detour experiment in
    `Docs/RPG-Combat-Plan.md` (C6).
 
 ### Phase-0 baseline additions

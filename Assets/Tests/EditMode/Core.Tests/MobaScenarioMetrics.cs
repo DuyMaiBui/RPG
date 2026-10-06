@@ -34,6 +34,10 @@ namespace RPG.Core.Tests
         private readonly List<float> _meleeStopDistances = new();
         private readonly List<float> _targetAngles = new();
         private readonly List<float> _idleTravel = new();
+        private readonly List<float> _idleNetDisplacement = new();
+        private int _idleReachedBase;
+        private const int PinnedLifetimeTicks = 300;
+        private const float PinnedTravel = 5f;
         private readonly List<MobaScenarioUnit> _idleUnits = new();
         private readonly List<string> _idleTrace = new();
         private int _totalTicks;
@@ -62,6 +66,7 @@ namespace RPG.Core.Tests
         private int _meleeStoppedSamples;
         private int _targetAnglesAway;
         private int _neverMoved;
+        private int _neverAcquiredButMoved;
         private int _neverAttackedMelee;
         private int _neverAttackedRanged;
         private bool _ended;
@@ -94,7 +99,15 @@ namespace RPG.Core.Tests
 
         public int MeleeContactSamples => _meleeContactSamples;
 
+        /// <summary>Closest any melee unit got to its assigned target: the number that tells "cannot reach" apart from
+        /// "reached but the ability fight decided it first".</summary>
+        public float MeleeClosestApproach { get; private set; }
+
         public int IdleUnits => _idleUnits.Count;
+
+        /// <summary>Units that lived long enough to get somewhere and still never acquired a target and barely moved:
+        /// the signature of an actor pinned against the terrain rather than a late spawn with no time left.</summary>
+        public int PinnedUnits { get; private set; }
 
         public int FailedToCloseUnits { get; private set; }
 
@@ -484,14 +497,23 @@ namespace RPG.Core.Tests
                 speedRatios.Add(unit.Travelled / (lifetimeTicks / (float)rate) / MobaScenarioData.MoveSpeed);
                 if (unit.MinTargetDistance == float.MaxValue)
                 {
+                    if (lifetimeTicks >= PinnedLifetimeTicks && unit.Travelled < PinnedTravel) PinnedUnits++;
                     _idleUnits.Add(unit);
                     _idleTravel.Add(unit.Travelled);
+                    _idleNetDisplacement.Add(unit.NetDisplacement);
+                    var enemyBaseX = unit.Faction == FactionId.Red
+                        ? MobaScenarioData.BaseOffset
+                        : -MobaScenarioData.BaseOffset;
+                    if (Math.Abs(unit.LastPosition.X - enemyBaseX) <= 5f) _idleReachedBase++;
+                    if (unit.NetDisplacement > 10f) _neverAcquiredButMoved++;
                 }
 
                 if (!unit.Ranged && unit.MinTargetDistance < float.MaxValue)
                     _meleeMinTargetDistances.Add(unit.MinTargetDistance);
             }
 
+            foreach (var distance in _meleeMinTargetDistances)
+                if (MeleeClosestApproach <= 0f || distance < MeleeClosestApproach) MeleeClosestApproach = distance;
             MedianSpeedRatio = Median(speedRatios);
             MedianPathEfficiency = Median(efficiency);
             MedianHeadingToTarget = Median(_targetAngles);
@@ -529,7 +551,10 @@ namespace RPG.Core.Tests
                 + $"{stalledVeryLong}, failed to close on a target >= 10s {FailedToCloseUnits}/{Spawned}, "
                 + $"stall ticks {Pct(stalledTotal, Spawned * _totalTicks)}%, longest stall "
                 + $"{MaxStall() / (float)rate:0.0}s");
-            Line($"## Idle: units that never acquired a target {IdleUnits}/{Spawned}, travel {Describe(_idleTravel)}");
+            Line($"## Idle: pinned units (lived >= 10s, never had a target, travelled < 5) {PinnedUnits}/{Spawned}");
+            Line($"## Idle: units that never acquired a target {IdleUnits}/{Spawned}, travel {Describe(_idleTravel)}, "
+                + $"net displacement {Describe(_idleNetDisplacement)}, reached within 5 of the enemy base "
+                + $"{_idleReachedBase}/{IdleUnits}; {_neverAcquiredButMoved} of them covered more than 10 units net");
             for (var index = 0; index < _idleTrace.Count; index++) Line(_idleTrace[index]);
             ReportText = string.Join("\n", _lines);
         }
