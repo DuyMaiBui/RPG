@@ -23,9 +23,12 @@ must not become the RPG core.
 
 The simulation uses `float` (`SimulationVector2`) and is deterministic **on one platform**, which is what
 the authoritative (`RPG.Simulation`) architecture needs: the host owns the truth, clients render updates.
-Bit-exact cross-platform replay is not a current requirement. If it becomes one, all simulation math must
-move behind a `SimulationMath` facade and switch to fixed-point; keep new math inside that facade so the
-change stays contained.
+Bit-exact cross-platform replay is not a current requirement.
+
+All simulation math goes through `SimulationMath` (in `RPG.Simulation.Contracts`), which currently delegates
+to `System.MathF`. Keeping the numeric backend behind one facade makes a switch to fixed-point — for
+cross-platform replay — a contained change: implement the fixed-point backend and update the facade, not the
+gameplay code. New simulation math must use `SimulationMath`, not `MathF` directly.
 
 ## Module layout
 
